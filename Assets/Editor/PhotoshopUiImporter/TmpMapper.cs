@@ -1,0 +1,181 @@
+using System.IO;
+using TMPro;
+using UnityEditor;
+using UnityEngine;
+
+namespace PhotoshopToUnity.EditorImporter
+{
+    public sealed class TmpMapper
+    {
+        private readonly string generatedMaterialFolder;
+        private readonly TMP_FontAsset defaultFontAsset;
+        private readonly Material defaultMaterialPreset;
+
+        public TmpMapper(TMP_FontAsset defaultFontAsset, Material defaultMaterialPreset, string generatedMaterialFolder = null)
+        {
+            this.defaultFontAsset = defaultFontAsset;
+            this.defaultMaterialPreset = defaultMaterialPreset;
+            this.generatedMaterialFolder = string.IsNullOrWhiteSpace(generatedMaterialFolder)
+                ? "Assets/GeneratedMaterials"
+                : generatedMaterialFolder;
+        }
+
+        public void Apply(TextMeshProUGUI target, PhotoshopUiNode node)
+        {
+            if (target == null || node == null)
+            {
+                return;
+            }
+
+            target.text = node.text ?? string.Empty;
+            target.raycastTarget = false;
+            target.enableAutoSizing = false;
+            target.enableWordWrapping = false;
+            target.overflowMode = TextOverflowModes.Overflow;
+            target.margin = Vector4.zero;
+            target.fontSize = node.fontSize > 0 ? node.fontSize : 24;
+            target.characterSpacing = node.characterSpacing;
+            target.lineSpacing = node.lineSpacing;
+            target.color = ParseColor(node.color, Color.white);
+            target.alignment = ParseAlignment(node.alignment, TextAlignmentOptions.Left);
+
+            var fontAsset = defaultFontAsset != null ? defaultFontAsset : TMP_Settings.defaultFontAsset;
+            if (fontAsset != null)
+            {
+                target.font = fontAsset;
+            }
+
+            if (defaultMaterialPreset != null)
+            {
+                target.fontSharedMaterial = defaultMaterialPreset;
+            }
+        }
+
+        private Material ResolveGeneratedMaterial(Material baseMaterial, PhotoshopUiNode node)
+        {
+            if (baseMaterial == null || node == null || node.outlineWidth <= 0f || string.IsNullOrWhiteSpace(node.outlineColor))
+            {
+                return baseMaterial;
+            }
+
+            if (!ColorUtility.TryParseHtmlString(node.outlineColor, out var outlineColor))
+            {
+                return baseMaterial;
+            }
+
+            outlineColor.a = Mathf.Clamp01(node.outlineOpacity <= 0f ? 1f : node.outlineOpacity);
+
+            Directory.CreateDirectory(PathUtility.ToAbsolutePath(generatedMaterialFolder));
+
+            var token = string.IsNullOrWhiteSpace(node.materialToken) ? BuildOutlineToken(node) : node.materialToken;
+            var materialName = $"{MakeSafeFileName(baseMaterial.name)}_{MakeSafeFileName(token)}";
+            var materialPath = $"{generatedMaterialFolder}/{materialName}.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
+
+            if (material == null)
+            {
+                material = new Material(baseMaterial)
+                {
+                    name = materialName
+                };
+                AssetDatabase.CreateAsset(material, materialPath);
+            }
+            else
+            {
+                material.CopyPropertiesFromMaterial(baseMaterial);
+            }
+
+            if (material.HasProperty(ShaderUtilities.ID_OutlineColor))
+            {
+                material.SetColor(ShaderUtilities.ID_OutlineColor, outlineColor);
+            }
+
+            if (material.HasProperty(ShaderUtilities.ID_OutlineWidth))
+            {
+                material.SetFloat(ShaderUtilities.ID_OutlineWidth, ConvertPhotoshopStrokeWidth(node.outlineWidth, node.fontSize));
+            }
+
+            EditorUtility.SetDirty(material);
+            AssetDatabase.SaveAssets();
+            return material;
+        }
+
+        private static float ConvertPhotoshopStrokeWidth(float strokeWidthPixels, float fontSize)
+        {
+            var referenceSize = fontSize > 0f ? fontSize : 40f;
+            return Mathf.Clamp(strokeWidthPixels / Mathf.Max(referenceSize * 0.65f, 1f), 0.01f, 0.35f);
+        }
+
+        private static string BuildOutlineToken(PhotoshopUiNode node)
+        {
+            var color = string.IsNullOrWhiteSpace(node.outlineColor) ? "outline" : node.outlineColor.Trim().TrimStart('#');
+            return $"outline_{color}_{Mathf.RoundToInt(node.outlineWidth)}";
+        }
+
+        private static string MakeSafeFileName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return "material";
+            }
+
+            foreach (var invalidChar in Path.GetInvalidFileNameChars())
+            {
+                value = value.Replace(invalidChar, '_');
+            }
+
+            return value.Replace('#', '_').Replace(' ', '_');
+        }
+
+        private static Color ParseColor(string value, Color fallback)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return fallback;
+            }
+
+            if (ColorUtility.TryParseHtmlString(value, out var color))
+            {
+                return color;
+            }
+
+            return fallback;
+        }
+
+        private static TextAlignmentOptions ParseAlignment(string value, TextAlignmentOptions fallback)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return fallback;
+            }
+
+            switch (value.Trim().ToLowerInvariant())
+            {
+                case "left":
+                case "top-left":
+                case "topleft":
+                    return TextAlignmentOptions.Left;
+                case "center":
+                case "middle":
+                    return TextAlignmentOptions.Center;
+                case "right":
+                case "top-right":
+                case "topright":
+                    return TextAlignmentOptions.Right;
+                case "justified":
+                case "justify":
+                    return TextAlignmentOptions.Justified;
+                case "top":
+                case "top-center":
+                case "topcenter":
+                    return TextAlignmentOptions.Top;
+                case "bottom":
+                case "bottom-center":
+                case "bottomcenter":
+                    return TextAlignmentOptions.Bottom;
+                default:
+                    return fallback;
+            }
+        }
+    }
+}

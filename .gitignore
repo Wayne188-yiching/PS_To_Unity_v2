@@ -1,0 +1,10 @@
+.unitymcp-cache/
+.tools/
+QC_Output/
+
+*.tmp
+*.log
+*.bak
+Thumbs.db
+.DS_Store
+
