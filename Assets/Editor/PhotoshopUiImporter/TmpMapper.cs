@@ -8,16 +8,18 @@ namespace PhotoshopToUnity.EditorImporter
     public sealed class TmpMapper
     {
         private readonly string generatedMaterialFolder;
+        private readonly string materialLibraryFolder;
         private readonly TMP_FontAsset defaultFontAsset;
         private readonly Material defaultMaterialPreset;
 
-        public TmpMapper(TMP_FontAsset defaultFontAsset, Material defaultMaterialPreset, string generatedMaterialFolder = null)
+        public TmpMapper(TMP_FontAsset defaultFontAsset, Material defaultMaterialPreset, string generatedMaterialFolder = null, string materialLibraryFolder = null)
         {
             this.defaultFontAsset = defaultFontAsset;
             this.defaultMaterialPreset = defaultMaterialPreset;
             this.generatedMaterialFolder = string.IsNullOrWhiteSpace(generatedMaterialFolder)
                 ? "Assets/GeneratedMaterials"
                 : generatedMaterialFolder;
+            this.materialLibraryFolder = materialLibraryFolder;
         }
 
         public void Apply(TextMeshProUGUI target, PhotoshopUiNode node)
@@ -45,9 +47,11 @@ namespace PhotoshopToUnity.EditorImporter
                 target.font = fontAsset;
             }
 
-            if (defaultMaterialPreset != null)
+            // outline 材質：有 outline 資料時解析專屬材質，否則 fallback 到 defaultMaterialPreset
+            var resolvedMaterial = ResolveGeneratedMaterial(defaultMaterialPreset, node) ?? defaultMaterialPreset;
+            if (resolvedMaterial != null)
             {
-                target.fontSharedMaterial = defaultMaterialPreset;
+                target.fontSharedMaterial = resolvedMaterial;
             }
         }
 
@@ -64,6 +68,12 @@ namespace PhotoshopToUnity.EditorImporter
             }
 
             outlineColor.a = Mathf.Clamp01(node.outlineOpacity <= 0f ? 1f : node.outlineOpacity);
+
+            // 先從材質庫尋找相近的現成材質球，找到就直接用，不新增
+            var targetWidth = ConvertPhotoshopStrokeWidth(node.outlineWidth, node.fontSize);
+            var libraryMatch = FindLibraryMaterial(outlineColor, targetWidth);
+            if (libraryMatch != null)
+                return libraryMatch;
 
             Directory.CreateDirectory(PathUtility.ToAbsolutePath(generatedMaterialFolder));
 
@@ -92,7 +102,7 @@ namespace PhotoshopToUnity.EditorImporter
 
             if (material.HasProperty(ShaderUtilities.ID_OutlineWidth))
             {
-                material.SetFloat(ShaderUtilities.ID_OutlineWidth, ConvertPhotoshopStrokeWidth(node.outlineWidth, node.fontSize));
+                material.SetFloat(ShaderUtilities.ID_OutlineWidth, targetWidth);
             }
 
             EditorUtility.SetDirty(material);
@@ -104,6 +114,43 @@ namespace PhotoshopToUnity.EditorImporter
         {
             var referenceSize = fontSize > 0f ? fontSize : 40f;
             return Mathf.Clamp(strokeWidthPixels / Mathf.Max(referenceSize * 0.65f, 1f), 0.01f, 0.35f);
+        }
+
+        private Material FindLibraryMaterial(Color targetOutlineColor, float targetOutlineWidth)
+        {
+            if (string.IsNullOrWhiteSpace(materialLibraryFolder) || !AssetDatabase.IsValidFolder(materialLibraryFolder))
+                return null;
+            if (targetOutlineWidth <= 0f)
+                return null;
+
+            var guids = AssetDatabase.FindAssets("t:Material", new[] { materialLibraryFolder });
+            var libraryRoot = materialLibraryFolder.TrimEnd('/');
+            foreach (var guid in guids)
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                // 只比對最上層資料夾，不遞迴子資料夾
+                if (!string.Equals(
+                        Path.GetDirectoryName(path)?.Replace('\\', '/'),
+                        libraryRoot,
+                        System.StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (mat == null ||
+                    !mat.HasProperty(ShaderUtilities.ID_OutlineColor) ||
+                    !mat.HasProperty(ShaderUtilities.ID_OutlineWidth))
+                    continue;
+
+                var matColor = mat.GetColor(ShaderUtilities.ID_OutlineColor);
+                var matWidth = mat.GetFloat(ShaderUtilities.ID_OutlineWidth);
+
+                if (Mathf.Abs(matColor.r - targetOutlineColor.r) < 0.08f &&
+                    Mathf.Abs(matColor.g - targetOutlineColor.g) < 0.08f &&
+                    Mathf.Abs(matColor.b - targetOutlineColor.b) < 0.08f &&
+                    Mathf.Abs(matWidth / targetOutlineWidth - 1f) < 0.15f)
+                    return mat;
+            }
+            return null;
         }
 
         private static string BuildOutlineToken(PhotoshopUiNode node)

@@ -46,6 +46,8 @@ namespace PhotoshopToUnity.EditorImporter
         public float outlineWidth;
         public float outlineOpacity = 1f;
         public string alignment;
+        public float fakeThicknessOffsetX;
+        public float fakeThicknessOffsetY;
         public List<PhotoshopUiNode> children = new List<PhotoshopUiNode>();
 
         public string NormalizedType => string.IsNullOrWhiteSpace(type) ? string.Empty : type.Trim().ToLowerInvariant();

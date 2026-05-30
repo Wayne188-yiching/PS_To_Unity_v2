@@ -94,6 +94,11 @@ namespace PhotoshopToUnity.EditorImporter
                     ApplyImage(gameObject, node, context);
                     break;
                 case "text":
+                    if (node.fakeThicknessOffsetX != 0f || node.fakeThicknessOffsetY != 0f)
+                    {
+                        ApplyFakeThicknessText(gameObject, rectTransform, node, context);
+                        return; // 子節點由 ApplyFakeThicknessText 內部掛載
+                    }
                     ApplyText(gameObject, node, context);
                     break;
             }
@@ -197,6 +202,43 @@ namespace PhotoshopToUnity.EditorImporter
         {
             var text = gameObject.GetComponent<TextMeshProUGUI>();
             context.tmpMapper?.Apply(text, node);
+        }
+
+        // 假厚度：在原 group GameObject 下疊兩層 TMP（shadow 在下、main 在上）
+        private static void ApplyFakeThicknessText(GameObject group, RectTransform groupRect, PhotoshopUiNode node, PrefabGenerationContext context)
+        {
+            // shadow TMP（偏移，顏色加深）
+            var shadowGo = new GameObject($"{group.name}_shadow", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            var shadowRect = shadowGo.GetComponent<RectTransform>();
+            shadowRect.SetParent(groupRect, false);
+            ApplyChildTmpRect(shadowRect, node.width, node.height, node.fakeThicknessOffsetX, node.fakeThicknessOffsetY);
+            var shadowTmp = shadowGo.GetComponent<TextMeshProUGUI>();
+            context.tmpMapper?.Apply(shadowTmp, node);
+            var c = shadowTmp.color;
+            shadowTmp.color = new Color(c.r * 0.55f, c.g * 0.55f, c.b * 0.55f, c.a);
+
+            // main TMP（置中，原始設定）
+            var mainGo = new GameObject($"{group.name}_main", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            var mainRect = mainGo.GetComponent<RectTransform>();
+            mainRect.SetParent(groupRect, false);
+            ApplyChildTmpRect(mainRect, node.width, node.height, 0f, 0f);
+            context.tmpMapper?.Apply(mainGo.GetComponent<TextMeshProUGUI>(), node);
+
+            // 子節點掛在 group 上，座標空間與原 node 一致
+            if (node.children == null) return;
+            foreach (var child in node.children)
+                CreateNode(child, groupRect, node.x, node.y, node.width, node.height, groupRect.pivot, context);
+        }
+
+        private static void ApplyChildTmpRect(RectTransform rect, float width, float height, float offsetX, float offsetY)
+        {
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(offsetX, -offsetY); // Unity Y 軸向上，PS 向下
+            rect.sizeDelta = new Vector2(width, height);
+            rect.localScale = Vector3.one;
+            rect.localRotation = Quaternion.identity;
         }
 
         private static string MakeSafeFileName(string value)

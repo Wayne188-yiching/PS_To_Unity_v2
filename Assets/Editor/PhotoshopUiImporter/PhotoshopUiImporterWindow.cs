@@ -26,11 +26,12 @@ namespace PhotoshopToUnity.EditorImporter
         private MessageType statusType = MessageType.Info;
         private bool showAdvancedPackage;
         private bool showAdvancedOutput;
+        private string materialLibraryFolder = string.Empty;
         private string reskinArtSourceFolder = string.Empty;
         private string reskinTargetFolder = string.Empty;
         private System.Collections.Generic.List<string> reskinMissingFiles;
         private Vector2 reskinMissingScrollPos;
-        private const string ToolVersion = "2.2.0";
+        private const string ToolVersion = "2.3.0";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -231,7 +232,15 @@ namespace PhotoshopToUnity.EditorImporter
                 EditorGUILayout.LabelField("3. 文字、材質與換皮", EditorStyles.boldLabel);
                 defaultTmpFontAsset = (TMP_FontAsset)EditorGUILayout.ObjectField("預設 TMP Font Asset", defaultTmpFontAsset, typeof(TMP_FontAsset), false);
                 defaultTmpMaterialPreset = (Material)EditorGUILayout.ObjectField("預設 TMP 材質球", defaultTmpMaterialPreset, typeof(Material), false);
+                DrawFolderPathField("TMP 材質球資料夾（選填）", ref materialLibraryFolder, true);
                 skinMap = (SkinMap)EditorGUILayout.ObjectField("Skin Map（選填）", skinMap, typeof(SkinMap), false);
+
+                if (!string.IsNullOrWhiteSpace(materialLibraryFolder) && AssetDatabase.IsValidFolder(materialLibraryFolder))
+                {
+                    var matCount = AssetDatabase.FindAssets("t:Material", new[] { materialLibraryFolder }).Length;
+                    EditorGUILayout.HelpBox($"材質球資料夾：找到 {matCount} 顆材質球，Generate 時優先比對，找不到才自動新增。", MessageType.Info);
+                }
+
                 EditorGUILayout.HelpBox(
                     "若 UI Package 含 text 節點，至少要指定預設 TMP Font Asset。若要穩定重現文字風格，建議同時指定 TMP 材質球。",
                     MessageType.Info);
@@ -448,7 +457,8 @@ namespace PhotoshopToUnity.EditorImporter
             var generatedMaterialFolder = string.IsNullOrWhiteSpace(projectFolder)
                 ? "Assets/GeneratedMaterials"
                 : $"Assets/Temp/{projectFolder}/Font/GeneratedMaterials";
-            var tmpMapper = new TmpMapper(defaultTmpFontAsset, defaultTmpMaterialPreset, generatedMaterialFolder);
+            var tmpMapper = new TmpMapper(defaultTmpFontAsset, defaultTmpMaterialPreset, generatedMaterialFolder,
+                string.IsNullOrWhiteSpace(materialLibraryFolder) ? null : materialLibraryFolder);
             var backend = new UGuiTmpPrefabBackend();
             var prefabName = Path.GetFileNameWithoutExtension(layoutJsonPath);
 
