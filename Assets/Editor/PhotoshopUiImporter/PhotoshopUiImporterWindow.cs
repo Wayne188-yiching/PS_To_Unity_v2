@@ -2,7 +2,9 @@ using System.IO;
 using System.Text;
 using TMPro;
 using UnityEditor;
+using UnityEditor.U2D;
 using UnityEngine;
+using UnityEngine.U2D;
 
 namespace PhotoshopToUnity.EditorImporter
 {
@@ -179,6 +181,11 @@ namespace PhotoshopToUnity.EditorImporter
                     {
                         AutoSelectImportFolderFromSource();
                     }
+                }
+
+                if (GUILayout.Button("建立專案資料夾", GUILayout.Height(28)))
+                {
+                    CreateProjectFolders();
                 }
 
                 showAdvancedOutput = EditorGUILayout.Foldout(showAdvancedOutput, "進階設定", true);
@@ -489,6 +496,64 @@ namespace PhotoshopToUnity.EditorImporter
             importFolder = standardImport;
             prefabFolder = GetStandardPrefabFolder();
             SetStatus("已套用標準輸出路徑。", MessageType.Info);
+        }
+
+        private void CreateProjectFolders()
+        {
+            if (string.IsNullOrWhiteSpace(projectFolder))
+            {
+                SetStatus("請先填寫專案資料夾名稱。", MessageType.Warning);
+                return;
+            }
+
+            var root = $"Assets/Temp/{projectFolder}";
+
+            foreach (var folder in new[] { "Animation", "Atlas", "Font", "Fx", "Prefab", "Spine", "TimeLine" })
+                EnsureAssetFolder($"{root}/{folder}");
+
+            var atlasFolder = $"{root}/Atlas/SpriteAtlas";
+            foreach (var lang in new[] { "Base", "CHS", "CHT", "EN" })
+                EnsureAssetFolder($"{atlasFolder}/{lang}");
+
+            EnsureAssetFolder($"{root}/Fx/Material");
+            EnsureAssetFolder($"{root}/Fx/Texture");
+
+            AssetDatabase.Refresh();
+            CreateOrUpdateSpriteAtlas(atlasFolder);
+
+            importFolder = GetStandardImportFolder();
+            prefabFolder = GetStandardPrefabFolder();
+            SetStatus($"已建立專案資料夾並設定 SpriteAtlas：{root}", MessageType.Info);
+        }
+
+        private static void EnsureAssetFolder(string assetPath)
+        {
+            if (string.IsNullOrEmpty(assetPath) || AssetDatabase.IsValidFolder(assetPath))
+                return;
+            var parent = Path.GetDirectoryName(assetPath)?.Replace('\\', '/');
+            if (string.IsNullOrEmpty(parent))
+                return;
+            EnsureAssetFolder(parent);
+            AssetDatabase.CreateFolder(parent, Path.GetFileName(assetPath));
+        }
+
+        private static void CreateOrUpdateSpriteAtlas(string atlasFolder)
+        {
+            var atlasPath = $"{atlasFolder}/SpriteAtlas.spriteatlas";
+            var atlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
+            if (atlas == null)
+            {
+                atlas = new SpriteAtlas();
+                AssetDatabase.CreateAsset(atlas, atlasPath);
+                atlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
+            }
+
+            var folderObject = AssetDatabase.LoadAssetAtPath<Object>(atlasFolder);
+            if (folderObject != null)
+                SpriteAtlasExtensions.Add(atlas, new Object[] { folderObject });
+
+            EditorUtility.SetDirty(atlas);
+            AssetDatabase.SaveAssets();
         }
 
         private void ApplyPackageRoot()
