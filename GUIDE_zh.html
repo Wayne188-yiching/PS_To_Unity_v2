@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Photoshop → Unity UI 工具 v2.4.2 — 完整使用說明</title>
+  <title>Photoshop → Unity UI 工具 v2.4 — 完整使用說明</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.4.2</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.4.1</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -535,7 +535,6 @@ Mac：    /Applications/Adobe Photoshop [版本]/Presets/Scripts/</code></pre>
     <tr><td>Default text layers</td><td>文字圖層預設輸出為 TMP 節點（建議）或 PNG 圖片。</td></tr>
     <tr><td>Export selected text as PNG</td><td>進階選項，<strong>預設不勾選</strong>。在 PS 中先選取特定文字圖層再執行腳本，這些圖層會強制輸出為 PNG，其餘仍按預設。</td></tr>
     <tr><td>Auto-export non-Source-Han fonts as PNG <span class="tag tag-new">v2.4</span></td><td><strong>預設勾選</strong>。工具自動判斷文字圖層字型：思源系列（思源黑體/宋體、源泉圓體、Noto CJK 等）以 TMP 節點輸出；其他字型強制輸出為 PNG，避免 Unity 缺少字型導致無法正確顯示。</td></tr>
-    <tr><td>Additional TMP fonts <span class="tag tag-new">v2.4.2</span></td><td>逗號分隔的字型關鍵字清單，除了思源系列以外，額外允許走 TMP 的字型。比對採不分大小寫的字串包含。例：<code>dfyuancw, 華康, microsoft yahei</code>。需要 Unity 端已準備對應的 TMP Font Asset，否則文字會以預設字型 fallback 顯示。</td></tr>
   </table>
 
   <div class="callout ok">
@@ -798,20 +797,15 @@ TXT_score_[THICK:2]</code></pre>
   v2.4.1 起改用 ActionDescriptor 讀取 <code>impliedFontSize</code>，與 PS 字元面板顯示完全一致。</p>
 
   <h3>明明設定 TMP，文字卻變成圖片？<span class="tag tag-new">v2.4</span></h3>
-  <p>v2.4 起新增「Auto-export non-Source-Han fonts as PNG」自動分流。若文字圖層使用非思源系列字型（思源黑體/宋體、源泉圓體、Noto CJK 之外的字型），會自動輸出為 PNG，避免 Unity 缺字型造成顯示異常。</p>
-  <p><strong>三種解法</strong>，依優先順序：</p>
-  <ol>
-    <li><strong>v2.4.2 起</strong>，可在對話框「Additional TMP fonts」欄位填入字型關鍵字（如 <code>dfyuancw, 華康</code>），這些字型也會走 TMP。</li>
-    <li>在 PS 圖層名稱加 <code>[TMP]</code> 或 <code>TXT_</code> 手動標記，強制單一圖層走 TMP。</li>
-    <li>取消勾選「Auto-export non-Source-Han fonts as PNG」，全部文字一律以 default text 設定處理。</li>
-  </ol>
+  <p>v2.4 起新增「Auto-export non-Source-Han fonts as PNG」自動分流。若文字圖層使用非思源系列字型（思源黑體/宋體、源泉圓體、Noto CJK 之外的字型），會自動輸出為 PNG，避免 Unity 缺字型造成顯示異常。<br>
+  若要強制以 TMP 輸出，可在對話框取消勾選此選項，或在圖層名稱加入 <code>[TMP]</code> / <code>TXT_</code> 等手動標記。</p>
 
   <h3>Layout Group 沒有自動偵測成功？<span class="tag tag-new">v2.4</span></h3>
   <p>自動偵測需要群組內所有子層的 X（垂直 layout）或 Y（水平 layout）座標一致（±3px 容差）。若子層位置略有偏移超出容差，可在群組名稱加 <code>[H]</code> 或 <code>[V]</code> 強制指定方向。命名標記永遠優先於自動偵測。</p>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.4.2 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.4.1 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

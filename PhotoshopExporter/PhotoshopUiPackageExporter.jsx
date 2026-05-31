@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.4.2";
+var SCRIPT_VERSION = "2.4.1";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 (function () {
@@ -257,14 +257,6 @@ function showExportDialog(doc) {
     var autoRouteNonSourceHanFonts = optionPanel.add("checkbox", undefined, "Auto-export non-Source-Han fonts as PNG");
     autoRouteNonSourceHanFonts.value = true;
 
-    var additionalTmpFontsGroup = optionPanel.add("group");
-    additionalTmpFontsGroup.orientation = "row";
-    additionalTmpFontsGroup.alignment = "left";
-    additionalTmpFontsGroup.add("statictext", undefined, "  Additional TMP fonts:");
-    var additionalTmpFontsField = additionalTmpFontsGroup.add("edittext", undefined, "");
-    additionalTmpFontsField.preferredSize.width = 320;
-    additionalTmpFontsField.helpTip = "Comma-separated keywords for extra TMP-allowed fonts. e.g.  dfyuancw, 華康, microsoft yahei";
-
     var note = optionPanel.add("statictext", undefined, "Select text layers in Photoshop before export to bake only those as PNG. Layout JSON can stay beside the PNG output folder.");
     note.characters = 82;
 
@@ -315,8 +307,7 @@ function showExportDialog(doc) {
             atlasLanguage: languageList.selection ? languageList.selection.text : "Base",
             textLayerOutput: textOutputList.selection && textOutputList.selection.index === 1 ? "image" : "tmp",
             selectedTextLayersAsImages: selectedTextAsImage.value,
-            autoRouteNonSourceHanFonts: autoRouteNonSourceHanFonts.value,
-            additionalTmpFontKeywords: parseTmpFontKeywords(additionalTmpFontsField.text)
+            autoRouteNonSourceHanFonts: autoRouteNonSourceHanFonts.value
         };
         dialog.close(1);
     };
@@ -368,7 +359,6 @@ function exportUiPackage(sourceDoc, options) {
             textLayerOutput: options.textLayerOutput || "tmp",
             selectedTextLayerIds: options.selectedTextLayersAsImages ? readSelectedLayerIdMap(sourceDoc) : {},
             autoRouteNonSourceHanFonts: options.autoRouteNonSourceHanFonts !== false,
-            additionalTmpFontKeywords: parseTmpFontKeywords(options.additionalTmpFontKeywords),
             sourceModified: readDocumentModified(sourceDoc),
             exportCache: null,
             exportCacheDirty: false,
@@ -1077,8 +1067,8 @@ function dedupeLayoutGroupImages(children) {
             var key = jsonNumber(child.width) + "x" + jsonNumber(child.height);
             var first = firstByKey[key];
             if (first) {
-                child.imagePath = first.imagePath; // 共用第一張的圖片
-                child._skipExport = true;          // 跳過 PNG 輸出
+                child.imagePath = first.imagePath;
+                child._skipExport = true;
             } else {
                 firstByKey[key] = child;
             }
@@ -2247,13 +2237,7 @@ function shouldExportTextLayerAsImage(layer, context) {
         if (!rawFont) {
             return true;
         }
-        if (isSourceHanFamily(rawFont)) {
-            return false;
-        }
-        if (isCustomTmpFont(rawFont, context.additionalTmpFontKeywords)) {
-            return false;
-        }
-        return true;
+        return !isSourceHanFamily(rawFont);
     }
 
     return context.textLayerOutput === "image";
@@ -2289,33 +2273,6 @@ function readRawFontName(layer) {
     }
 
     return "";
-}
-
-function parseTmpFontKeywords(input) {
-    // 接受：array、逗號/分號/換行分隔字串，回傳 trimmed 字串陣列
-    if (!input) return [];
-    var parts;
-    if (input.length !== undefined && typeof input !== "string") {
-        parts = input; // already an array-like
-    } else {
-        parts = String(input).split(/[,，;；\n]/);
-    }
-    var result = [];
-    for (var i = 0; i < parts.length; i++) {
-        var trimmed = trim(String(parts[i] || ""));
-        if (trimmed) result.push(trimmed);
-    }
-    return result;
-}
-
-function isCustomTmpFont(rawFontName, keywords) {
-    if (!rawFontName || !keywords || keywords.length === 0) return false;
-    var lower = String(rawFontName).toLowerCase();
-    for (var i = 0; i < keywords.length; i++) {
-        var kw = String(keywords[i] || "").toLowerCase();
-        if (kw && lower.indexOf(kw) !== -1) return true;
-    }
-    return false;
 }
 
 function isSourceHanFamily(rawFontName) {
