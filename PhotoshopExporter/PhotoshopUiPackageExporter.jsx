@@ -1055,7 +1055,7 @@ function layoutVisibleChildren(children) {
 }
 
 function dedupeLayoutGroupImages(children) {
-    // 不過濾節點：保留所有 children，僅將重複的圖片設成共用 imagePath 並跳過 PNG 輸出
+    // Keep all nodes. Mark repeated images to share imagePath and skip PNG export.
     var firstByKey = {};
     if (!children) {
         return [];
