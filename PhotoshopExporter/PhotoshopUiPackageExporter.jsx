@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.4.1";
+var SCRIPT_VERSION = "2.4.2";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 (function () {
@@ -507,9 +507,8 @@ function appendNodes(target, source) {
 
 function createGroupNode(layerSet, children, context, parentBounds, bounds) {
     var layoutType = detectLayoutGroupType(layerSet, children);
-    if (layoutType) {
-        children = dedupeLayoutGroupImages(children);
-    }
+    // Auto-dedup disabled in v2.4.2: same width x height does not imply same content.
+    // Function dedupeLayoutGroupImages retained for potential opt-in via layer tag in the future.
 
     if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
         bounds = boundsFromChildren(children, context.doc);
@@ -941,7 +940,8 @@ function applyLayoutGroupMetadata(node, group, children, bounds) {
     node.layoutPaddingTop = padding.padTop;
     node.layoutPaddingBottom = padding.padBottom;
     node.contentSizeFitter = true;
-    node.children = dedupeLayoutGroupImages(children);
+    // Auto-dedup disabled in v2.4.2 to avoid wrongly merging same-size but different-content images.
+    node.children = children;
 }
 
 function detectLayoutGroupType(group, children) {

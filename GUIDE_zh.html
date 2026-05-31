@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.4.1</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.4.2</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -604,7 +604,10 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="layout-group">Layout Group 自動排版 <span class="tag tag-new">v2.4</span></h2>
 
-  <p>圖層群組可自動轉為 Unity 的 <code>HorizontalLayoutGroup</code> 或 <code>VerticalLayoutGroup</code>，並自動套上 <code>ContentSizeFitter</code>。同一群組內<strong>相同尺寸的圖只匯出一次</strong>，重複使用同一張 PNG，省檔案、省 Atlas 空間。</p>
+  <p>圖層群組可自動轉為 Unity 的 <code>HorizontalLayoutGroup</code> 或 <code>VerticalLayoutGroup</code>，並自動套上 <code>ContentSizeFitter</code>。</p>
+  <div class="callout warn">
+    <strong>v2.4.2 起停用自動去重</strong>：先前依「相同寬高」判斷重複圖會誤判（譬如同寬度但不同字的文字、同尺寸但不同 icon），故 v2.4.2 起每個圖層各自輸出獨立 PNG。若需要圖片共用，請在 PS 將圖層名稱統一。
+  </div>
 
   <h3>偵測規則</h3>
   <p>支援兩種方式，<strong>命名標記優先於自動偵測</strong>：</p>
@@ -648,11 +651,13 @@ TXT_score_[THICK:2]</code></pre>
     <li>所有值由 PS 設計稿座標自動算出，不需手動輸入。</li>
   </ul>
 
-  <h3>重複圖去重</h3>
-  <p>同一 Layout Group 內，若多個子層 type 為 <code>image</code> 且 <strong>width 與 height 完全相同</strong>，工具只會匯出第一張 PNG，其餘子層共用同一個 <code>imagePath</code>。</p>
-  <div class="callout info">
-    用途：選單列上重複的按鈕底圖、Tab 列的相同背景、ICON 容器框等，只需設計一張，工具自動複用。
-  </div>
+  <h3>重複圖去重（v2.4.2 已停用）</h3>
+  <p>v2.4.0 ~ v2.4.1 曾以「相同 width × height」為判斷依據自動共用 imagePath。但實務上此判斷不準確：</p>
+  <ul>
+    <li>同寬度但不同字的文字節點被誤判為同一張圖。</li>
+    <li>共用後也會干擾 Layout Spacing 中位數計算，造成排版錯誤。</li>
+  </ul>
+  <p><strong>v2.4.2 起取消自動去重</strong>，每個圖層各自輸出一張 PNG。若多個圖層真的指向同一張圖，請將圖層名稱命名一致（如 <code>btn_bg</code> + 副本），工具會以 <code>btn_bg_002</code>、<code>btn_bg_003</code> 的方式分別匯出，仍可由設計師後續手動合併或在 Unity 端用相同 Sprite。</p>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="folders">專案資料夾結構</h2>
@@ -805,7 +810,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.4.1 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.4.2 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 
