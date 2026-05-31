@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.2.0";
+var SCRIPT_VERSION = "2.4.1";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 (function () {
@@ -29,6 +29,10 @@ var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_
             "Text nodes: " + result.textCount + "\n" +
             "Groups: " + result.groupCount + "\n\n" +
             "Skipped empty/unsupported layers: " + result.skippedCount + "\n" +
+            "Skipped hidden layers: " + result.skipHidden + "\n" +
+            "Skipped IGNORE/REF layers: " + result.skipIgnoreRef + "\n" +
+            "Skipped adjustment layers: " + result.skipAdjustment + "\n" +
+            "Skipped clipping layers: " + result.skipClipping + "\n" +
             "Unchanged PNGs skipped: " + result.unchangedCount + "\n\n" +
             "PNG folder:\n" + result.imageFolder.fsName + "\n\n" +
             "Layout JSON:\n" + result.layoutJsonFile.fsName
@@ -248,7 +252,10 @@ function showExportDialog(doc) {
     textOutputList.selection = 0;
 
     var selectedTextAsImage = optionPanel.add("checkbox", undefined, "Export currently selected text layers as PNG overrides");
-    selectedTextAsImage.value = true;
+    selectedTextAsImage.value = false;
+
+    var autoRouteNonSourceHanFonts = optionPanel.add("checkbox", undefined, "Auto-export non-Source-Han fonts as PNG");
+    autoRouteNonSourceHanFonts.value = true;
 
     var note = optionPanel.add("statictext", undefined, "Select text layers in Photoshop before export to bake only those as PNG. Layout JSON can stay beside the PNG output folder.");
     note.characters = 82;
@@ -299,7 +306,8 @@ function showExportDialog(doc) {
             useUnityAtlasStructure: useUnityAtlas.value,
             atlasLanguage: languageList.selection ? languageList.selection.text : "Base",
             textLayerOutput: textOutputList.selection && textOutputList.selection.index === 1 ? "image" : "tmp",
-            selectedTextLayersAsImages: selectedTextAsImage.value
+            selectedTextLayersAsImages: selectedTextAsImage.value,
+            autoRouteNonSourceHanFonts: autoRouteNonSourceHanFonts.value
         };
         dialog.close(1);
     };
@@ -350,6 +358,7 @@ function exportUiPackage(sourceDoc, options) {
             useFastLayerDuplicate: options.useFastLayerDuplicate !== false,
             textLayerOutput: options.textLayerOutput || "tmp",
             selectedTextLayerIds: options.selectedTextLayersAsImages ? readSelectedLayerIdMap(sourceDoc) : {},
+            autoRouteNonSourceHanFonts: options.autoRouteNonSourceHanFonts !== false,
             sourceModified: readDocumentModified(sourceDoc),
             exportCache: null,
             exportCacheDirty: false,
@@ -358,7 +367,11 @@ function exportUiPackage(sourceDoc, options) {
             textCount: 0,
             groupCount: 0,
             unchangedCount: 0,
-            skippedCount: 0
+            skippedCount: 0,
+            skipHidden: 0,
+            skipIgnoreRef: 0,
+            skipAdjustment: 0,
+            skipClipping: 0
         };
         context.exportCache = context.useExportCache ? loadExportCache(imageFolder) : null;
 
@@ -385,7 +398,11 @@ function exportUiPackage(sourceDoc, options) {
             textCount: context.textCount,
             groupCount: context.groupCount,
             unchangedCount: context.unchangedCount,
-            skippedCount: context.skippedCount
+            skippedCount: context.skippedCount,
+            skipHidden: context.skipHidden,
+            skipIgnoreRef: context.skipIgnoreRef,
+            skipAdjustment: context.skipAdjustment,
+            skipClipping: context.skipClipping
         };
     } finally {
         // Direction 4: restore original visibility instead of closing a workDoc copy
@@ -405,11 +422,13 @@ function collectNodes(container, parentVisible, context, pendingImages, parentBo
         var layer = container.layers[i];
         var effectiveVisible = parentVisible && isVisible(layer);
 
-            if (context.ignoreHiddenLayers && !effectiveVisible) {
-                continue;
-            }
+        if (context.ignoreHiddenLayers && !effectiveVisible) {
+            context.skipHidden++;
+            continue;
+        }
 
         if (context.skipReferenceLayers && isReferenceOrIgnored(layer.name)) {
+            context.skipIgnoreRef++;
             continue;
         }
 
@@ -439,6 +458,10 @@ function collectNodes(container, parentVisible, context, pendingImages, parentBo
 
         if (isTextLayer(layer)) {
             if (shouldExportTextLayerAsImage(layer, context)) {
+                if (trackSkippedImageReason(layer, context)) {
+                    context.skippedCount++;
+                    continue;
+                }
                 var textImageNode = createImageNode(layer, context, parentBounds);
                 if (textImageNode) {
                     pendingImages.push({ layer: layer, node: textImageNode });
@@ -456,6 +479,11 @@ function collectNodes(container, parentVisible, context, pendingImages, parentBo
             } else {
                 context.skippedCount++;
             }
+            continue;
+        }
+
+        if (trackSkippedImageReason(layer, context)) {
+            context.skippedCount++;
             continue;
         }
 
@@ -478,6 +506,11 @@ function appendNodes(target, source) {
 }
 
 function createGroupNode(layerSet, children, context, parentBounds, bounds) {
+    var layoutType = detectLayoutGroupType(layerSet, children);
+    if (layoutType) {
+        children = dedupeLayoutGroupImages(children);
+    }
+
     if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
         bounds = boundsFromChildren(children, context.doc);
     }
@@ -487,7 +520,7 @@ function createGroupNode(layerSet, children, context, parentBounds, bounds) {
     }
 
     var node = {
-        name: uniqueNodeName(layerSet.name, context.counters),
+        name: uniqueNodeName(layoutType ? stripLayoutGroupTags(layerSet.name) : layerSet.name, context.counters),
         type: "group",
         x: bounds.left,
         y: bounds.top,
@@ -498,6 +531,7 @@ function createGroupNode(layerSet, children, context, parentBounds, bounds) {
     };
 
     applyLayoutMetadata(node, bounds, parentBounds, layerSet.name);
+    applyLayoutGroupMetadata(node, layerSet, children, bounds);
     node._parentBounds = parentBounds;
     node._rawName = layerSet.name;
     return node;
@@ -521,6 +555,7 @@ function refreshGroupBounds(nodes, doc) {
         node.width = bounds.width;
         node.height = bounds.height;
         applyLayoutMetadata(node, bounds, node._parentBounds, node._rawName);
+        applyLayoutGroupMetadata(node, node._rawName, node.children || [], bounds);
     }
 }
 
@@ -622,6 +657,9 @@ function exportAllImages(pendingImages, context) {
     try {
         for (var i = 0; i < pendingImages.length; i++) {
             var entry = pendingImages[i];
+            if (entry.node && entry.node._skipExport) {
+                continue;
+            }
             var file = new File(context.imageFolder.fsName + "/" + entry.node.imagePath);
             ensureFolder(file.parent);
             if (trySkipCachedImage(entry, context, file)) {
@@ -889,6 +927,156 @@ function applyLayoutMetadata(node, bounds, parentBounds, rawName) {
     node.pivot = layout.pivot;
 }
 
+function applyLayoutGroupMetadata(node, group, children, bounds) {
+    var layoutType = detectLayoutGroupType(group, children);
+    if (!layoutType) {
+        return;
+    }
+
+    var padding = calcLayoutPadding(bounds, children);
+    node.layoutType = layoutType;
+    node.layoutSpacing = calcLayoutSpacing(layoutType, children);
+    node.layoutPaddingLeft = padding.padLeft;
+    node.layoutPaddingRight = padding.padRight;
+    node.layoutPaddingTop = padding.padTop;
+    node.layoutPaddingBottom = padding.padBottom;
+    node.contentSizeFitter = true;
+    node.children = dedupeLayoutGroupImages(children);
+}
+
+function detectLayoutGroupType(group, children) {
+    var rawName = typeof group === "string" ? group : (group && group.name);
+    var name = String(rawName || "");
+
+    if (/\[(?:H|HLAYOUT)\]/i.test(name)) {
+        return "horizontal";
+    }
+    if (/\[(?:V|VLAYOUT)\]/i.test(name)) {
+        return "vertical";
+    }
+
+    var visibleChildren = layoutVisibleChildren(children);
+    if (visibleChildren.length < 2) {
+        return null;
+    }
+
+    var sameY = true;
+    var sameX = true;
+    var baseY = visibleChildren[0].y;
+    var baseX = visibleChildren[0].x;
+    for (var i = 1; i < visibleChildren.length; i++) {
+        if (Math.abs(visibleChildren[i].y - baseY) > 3) {
+            sameY = false;
+        }
+        if (Math.abs(visibleChildren[i].x - baseX) > 3) {
+            sameX = false;
+        }
+    }
+
+    if (sameY) {
+        return "horizontal";
+    }
+    if (sameX) {
+        return "vertical";
+    }
+
+    return null;
+}
+
+function calcLayoutSpacing(layoutType, children) {
+    var items = layoutVisibleChildren(children);
+    if (items.length < 2) {
+        return 0;
+    }
+
+    items.sort(function (a, b) {
+        return layoutType === "horizontal" ? a.x - b.x : a.y - b.y;
+    });
+
+    var gaps = [];
+    for (var i = 0; i < items.length - 1; i++) {
+        var current = items[i];
+        var next = items[i + 1];
+        var gap = layoutType === "horizontal" ? next.x - (current.x + current.width) : next.y - (current.y + current.height);
+        gaps.push(Math.max(0, round2(gap)));
+    }
+
+    gaps.sort(function (a, b) {
+        return a - b;
+    });
+
+    var middle = Math.floor(gaps.length / 2);
+    if (gaps.length % 2 === 1) {
+        return Math.max(0, round2(gaps[middle]));
+    }
+    return Math.max(0, round2((gaps[middle - 1] + gaps[middle]) / 2));
+}
+
+function calcLayoutPadding(bounds, children) {
+    var items = layoutVisibleChildren(children);
+    if (!bounds || items.length === 0) {
+        return { padLeft: 0, padTop: 0, padRight: 0, padBottom: 0 };
+    }
+
+    var left = Number.POSITIVE_INFINITY;
+    var top = Number.POSITIVE_INFINITY;
+    var right = Number.NEGATIVE_INFINITY;
+    var bottom = Number.NEGATIVE_INFINITY;
+
+    for (var i = 0; i < items.length; i++) {
+        left = Math.min(left, items[i].x);
+        top = Math.min(top, items[i].y);
+        right = Math.max(right, items[i].x + items[i].width);
+        bottom = Math.max(bottom, items[i].y + items[i].height);
+    }
+
+    return {
+        padLeft: Math.max(0, round2(left - bounds.left)),
+        padTop: Math.max(0, round2(top - bounds.top)),
+        padRight: Math.max(0, round2((bounds.left + bounds.width) - right)),
+        padBottom: Math.max(0, round2((bounds.top + bounds.height) - bottom))
+    };
+}
+
+function layoutVisibleChildren(children) {
+    var items = [];
+    if (!children) {
+        return items;
+    }
+
+    for (var i = 0; i < children.length; i++) {
+        var child = children[i];
+        if (!child || child.visible === false || child._skipExport) {
+            continue;
+        }
+        items.push(child);
+    }
+    return items;
+}
+
+function dedupeLayoutGroupImages(children) {
+    var seenImageSizes = {};
+    var result = [];
+    if (!children) {
+        return result;
+    }
+
+    for (var i = 0; i < children.length; i++) {
+        var child = children[i];
+        if (child && child.type === "image") {
+            var key = jsonNumber(child.width) + "x" + jsonNumber(child.height);
+            if (seenImageSizes[key]) {
+                child._skipExport = true;
+                continue;
+            }
+            seenImageSizes[key] = true;
+        }
+        result.push(child);
+    }
+
+    return result;
+}
+
 function inferLayout(bounds, parentBounds) {
     if (!parentBounds || parentBounds.width <= 0 || parentBounds.height <= 0) {
         return fixedLayout("auto_top_left", 0, 1);
@@ -1131,6 +1319,18 @@ function isAdjustmentLikeLayer(layer) {
     }
 }
 
+function trackSkippedImageReason(layer, context) {
+    if (isClippingLayer(layer)) {
+        context.skipClipping++;
+        return true;
+    }
+    if (isAdjustmentLikeLayer(layer)) {
+        context.skipAdjustment++;
+        return true;
+    }
+    return false;
+}
+
 function createTextNode(layer, context, parentBounds) {
     var bounds = readLayerBounds(layer);
     if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
@@ -1139,6 +1339,7 @@ function createTextNode(layer, context, parentBounds) {
 
     var textStyle = readTextLayerStyle(layer);
     var manualMaterialToken = readMaterialToken(layer);
+    var fakeThickness = readFakeThickness(layer.name);
 
     var node = {
         name: uniqueNodeName(layer.name, context.counters),
@@ -1162,6 +1363,13 @@ function createTextNode(layer, context, parentBounds) {
         children: []
     };
 
+    if (fakeThickness.offsetY !== 0) {
+        node.fakeThicknessOffsetY = fakeThickness.offsetY;
+    }
+    if (fakeThickness.offsetX !== 0) {
+        node.fakeThicknessOffsetX = fakeThickness.offsetX;
+    }
+
     applyLayoutMetadata(node, bounds, parentBounds, layer.name);
     return node;
 }
@@ -1169,7 +1377,7 @@ function createTextNode(layer, context, parentBounds) {
 function buildLayoutJson(doc, nodes) {
     var lines = [];
     lines.push("{");
-    lines.push('  "schemaVersion": "1.0",');
+    lines.push('  "schemaVersion": "2.4",');
     lines.push('  "canvas": {');
     lines.push('    "width": ' + jsonNumber(px(doc.width)) + ",");
     lines.push('    "height": ' + jsonNumber(px(doc.height)));
@@ -1201,6 +1409,16 @@ function nodeToJson(node, indent) {
     lines.push(childIndent + '"anchorMax": ' + vectorToJson(node.anchorMax || vector2(0, 1)) + ",");
     lines.push(childIndent + '"pivot": ' + vectorToJson(node.pivot || vector2(0, 1)) + ",");
 
+    if (node.layoutType) {
+        lines.push(childIndent + '"layoutType": ' + quoteJson(node.layoutType) + ",");
+        lines.push(childIndent + '"layoutSpacing": ' + jsonNumber(node.layoutSpacing || 0) + ",");
+        lines.push(childIndent + '"layoutPaddingLeft": ' + jsonNumber(node.layoutPaddingLeft || 0) + ",");
+        lines.push(childIndent + '"layoutPaddingRight": ' + jsonNumber(node.layoutPaddingRight || 0) + ",");
+        lines.push(childIndent + '"layoutPaddingTop": ' + jsonNumber(node.layoutPaddingTop || 0) + ",");
+        lines.push(childIndent + '"layoutPaddingBottom": ' + jsonNumber(node.layoutPaddingBottom || 0) + ",");
+        lines.push(childIndent + '"contentSizeFitter": ' + (node.contentSizeFitter ? "true" : "false") + ",");
+    }
+
     if (node.type === "image") {
         lines.push(childIndent + '"imagePath": ' + quoteJson(node.imagePath) + ",");
     } else if (node.type === "text") {
@@ -1215,6 +1433,12 @@ function nodeToJson(node, indent) {
         lines.push(childIndent + '"outlineWidth": ' + jsonNumber(node.outlineWidth || 0) + ",");
         lines.push(childIndent + '"outlineOpacity": ' + jsonNumber(node.outlineOpacity || 1) + ",");
         lines.push(childIndent + '"alignment": ' + quoteJson(node.alignment) + ",");
+        if (node.fakeThicknessOffsetY) {
+            lines.push(childIndent + '"fakeThicknessOffsetY": ' + jsonNumber(node.fakeThicknessOffsetY) + ",");
+        }
+        if (node.fakeThicknessOffsetX) {
+            lines.push(childIndent + '"fakeThicknessOffsetX": ' + jsonNumber(node.fakeThicknessOffsetX) + ",");
+        }
     }
 
     var children = node.children || [];
@@ -1853,7 +2077,7 @@ function normalizeFileSystemPath(path) {
 }
 
 function uniqueFileName(name, counters) {
-    var base = normalizeAsciiSlug(stripLayoutTokens(stripControlPrefix(name)));
+    var base = normalizeAsciiSlug(stripFakeThicknessTags(stripLayoutGroupTags(stripLayoutTokens(stripControlPrefix(name)))));
     if (!base) {
         base = "layer";
     }
@@ -1869,6 +2093,14 @@ function uniqueFileName(name, counters) {
 
 function uniqueNodeName(name, counters) {
     return uniqueFileName(name, counters);
+}
+
+function stripLayoutGroupTags(name) {
+    return String(name || "").replace(/\[(?:H|HLAYOUT|V|VLAYOUT)\]/ig, "");
+}
+
+function stripFakeThicknessTags(name) {
+    return String(name || "").replace(/\[THICK\s*:\s*-?\d+(?:\.\d+)?\s*(?::\s*-?\d+(?:\.\d+)?)?\s*\]/ig, "");
 }
 
 function normalizeAsciiSlug(value) {
@@ -1999,6 +2231,14 @@ function shouldExportTextLayerAsImage(layer, context) {
         return false;
     }
 
+    if (context.autoRouteNonSourceHanFonts) {
+        var rawFont = readRawFontName(layer);
+        if (!rawFont) {
+            return true;
+        }
+        return !isSourceHanFamily(rawFont);
+    }
+
     return context.textLayerOutput === "image";
 }
 
@@ -2011,11 +2251,49 @@ function readText(layer) {
 }
 
 function readFontName(layer) {
+    return normalizeAsciiSlug(readRawFontName(layer));
+}
+
+function readRawFontName(layer) {
     try {
-        return layer.textItem.font || "";
+        if (layer.textItem && layer.textItem.font) {
+            return layer.textItem.font || "";
+        }
     } catch (e) {
-        return "";
     }
+
+    try {
+        var textStyle = readPrimaryTextStyleDescriptor(layer);
+        var fontName = getDescriptorString(textStyle, ["fontPostScriptName", "fontName"], ["FntN"], "");
+        if (fontName) {
+            return fontName;
+        }
+    } catch (ignored) {
+    }
+
+    return "";
+}
+
+function isSourceHanFamily(rawFontName) {
+    var lower = String(rawFontName || "").toLowerCase();
+    if (!lower) {
+        return false;
+    }
+
+    if (/[\u3400-\u9fff\uf900-\ufaff]/.test(lower)) {
+        return true;
+    }
+
+    return hasAny(lower, [
+        "gensenrounded",
+        "gensenmaru",
+        "sourcehan",
+        "source han",
+        "noto sans cjk",
+        "noto serif cjk",
+        "notosanscjk",
+        "notoserifcjk"
+    ]);
 }
 
 function readTextLayerStyle(layer) {
@@ -2074,6 +2352,15 @@ function readMaterialToken(layer) {
     }
 }
 
+function readFakeThickness(name) {
+    var text = String(name || "");
+    var match = text.match(/\[THICK\s*:\s*(-?\d+(?:\.\d+)?)\s*(?::\s*(-?\d+(?:\.\d+)?))?\s*\]/i);
+    return {
+        offsetY: match ? round2(Number(match[1])) : 0,
+        offsetX: match && match[2] ? round2(Number(match[2])) : 0
+    };
+}
+
 function readNameToken(name, keys) {
     var text = String(name || "");
 
@@ -2092,6 +2379,31 @@ function readNameToken(name, keys) {
     }
 
     return "";
+}
+
+function readPrimaryTextStyleDescriptor(layer) {
+    try {
+        var descriptor = getLayerDescriptor(layer);
+        var textDescriptor = getDescriptorObject(descriptor, ["textKey"], ["Txt "]);
+        if (!textDescriptor) {
+            return null;
+        }
+
+        var rangeListKey = findDescriptorKey(textDescriptor, ["textStyleRange"], ["Txtt"]);
+        if (!rangeListKey) {
+            return null;
+        }
+
+        var ranges = textDescriptor.getList(rangeListKey);
+        if (!ranges || ranges.count < 1) {
+            return null;
+        }
+
+        var firstRange = ranges.getObjectValue(0);
+        return getDescriptorObject(firstRange, ["textStyle"], ["TxtS"]);
+    } catch (e) {
+        return null;
+    }
 }
 
 function getLayerDescriptor(layer) {
@@ -2160,6 +2472,19 @@ function getDescriptorDouble(descriptor, stringKeys, charKeys, fallback) {
     }
 }
 
+function getDescriptorString(descriptor, stringKeys, charKeys, fallback) {
+    var id = findDescriptorKey(descriptor, stringKeys, charKeys);
+    if (!id) {
+        return fallback;
+    }
+
+    try {
+        return descriptor.getString(id);
+    } catch (e) {
+        return fallback;
+    }
+}
+
 function findDescriptorKey(descriptor, stringKeys, charKeys) {
     var i;
     var id;
@@ -2194,10 +2519,25 @@ function descriptorColorToHex(colorDescriptor) {
 
 function readFontSize(layer) {
     try {
-        return round2(px(layer.textItem.size));
-    } catch (e) {
-        return 24;
+        var textStyle = readPrimaryTextStyleDescriptor(layer);
+        var impliedFontSize = getDescriptorUnitDouble(textStyle, ["impliedFontSize"], [], 0);
+        if (isFinite(impliedFontSize) && impliedFontSize > 0) {
+            return round2(impliedFontSize);
+        }
+    } catch (e1) {
     }
+
+    try {
+        var sizePx = px(layer.textItem.size);
+        var docRes = readLayerDocumentResolution(layer);
+        var sizePt = sizePx * 72 / docRes;
+        if (isFinite(sizePt) && sizePt > 0) {
+            return round2(sizePt);
+        }
+    } catch (e2) {
+    }
+
+    return 24;
 }
 
 function readTextCharacterSpacing(layer) {
@@ -2210,15 +2550,45 @@ function readTextCharacterSpacing(layer) {
 
 function readTextLineSpacing(layer) {
     try {
-        var leading = px(layer.textItem.leading);
-        var fontSize = readFontSize(layer);
-        if (leading > 0 && fontSize > 0) {
-            return round2(leading - fontSize);
+        var textStyle = readPrimaryTextStyleDescriptor(layer);
+        var impliedLeading = getDescriptorUnitDouble(textStyle, ["impliedLeading"], [], 0);
+        if (isFinite(impliedLeading) && impliedLeading > 0) {
+            return round2(impliedLeading - readFontSize(layer));
         }
-    } catch (e) {
+    } catch (e1) {
+    }
+
+    try {
+        var leadingPx = px(layer.textItem.leading);
+        var docRes = readLayerDocumentResolution(layer);
+        var leadingPt = leadingPx * 72 / docRes;
+        if (isFinite(leadingPt)) {
+            return round2(leadingPt - readFontSize(layer));
+        }
+    } catch (e2) {
     }
 
     return 0;
+}
+
+function readLayerDocumentResolution(layer) {
+    var parent = layer;
+    while (parent) {
+        try {
+            if (parent.typename === "Document" && parent.resolution) {
+                return Number(parent.resolution) || 72;
+            }
+            parent = parent.parent;
+        } catch (e) {
+            break;
+        }
+    }
+
+    try {
+        return Number(app.activeDocument.resolution) || 72;
+    } catch (ignored) {
+        return 72;
+    }
 }
 
 function readTextColor(layer) {

@@ -112,8 +112,13 @@ namespace PhotoshopToUnity.EditorImporter
 
         private static float ConvertPhotoshopStrokeWidth(float strokeWidthPixels, float fontSize)
         {
+            // TMP SDF formula: _OutlineWidth = strokePx × (SamplingPointSize / Padding) / fontSize
+            // Derived from: outlinePixels = _OutlineWidth × Padding × (fontSize / SamplingPointSize)
+            // Common TMP default: SamplingPointSize=25, Padding=5 → ratio = 5
+            // Clamp upper bound raised to 1.0 to support large strokes
             var referenceSize = fontSize > 0f ? fontSize : 40f;
-            return Mathf.Clamp(strokeWidthPixels / Mathf.Max(referenceSize * 0.65f, 1f), 0.01f, 0.35f);
+            const float sdfRatio = 5f; // SamplingPointSize(25) / Padding(5)
+            return Mathf.Clamp(strokeWidthPixels * sdfRatio / referenceSize, 0.01f, 1.0f);
         }
 
         private Material FindLibraryMaterial(Color targetOutlineColor, float targetOutlineWidth)

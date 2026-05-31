@@ -124,6 +124,17 @@ namespace PhotoshopToUnity.EditorImporter
                 outlineWidth = GetFloat(source, "outlineWidth"),
                 outlineOpacity = GetFloat(source, "outlineOpacity", 1f),
                 alignment = GetString(source, "alignment"),
+                characterSpacing = GetFloat(source, "characterSpacing"),
+                lineSpacing = GetFloat(source, "lineSpacing"),
+                fakeThicknessOffsetX = GetFloat(source, "fakeThicknessOffsetX"),
+                fakeThicknessOffsetY = GetFloat(source, "fakeThicknessOffsetY"),
+                layoutType = GetString(source, "layoutType"),
+                layoutSpacing = GetFloat(source, "layoutSpacing"),
+                layoutPaddingLeft = GetFloat(source, "layoutPaddingLeft"),
+                layoutPaddingRight = GetFloat(source, "layoutPaddingRight"),
+                layoutPaddingTop = GetFloat(source, "layoutPaddingTop"),
+                layoutPaddingBottom = GetFloat(source, "layoutPaddingBottom"),
+                contentSizeFitter = GetBool(source, "contentSizeFitter", false),
                 children = ParseNodes(GetArray(source, "children"))
             };
         }

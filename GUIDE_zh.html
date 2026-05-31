@@ -3,159 +3,445 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Photoshop → Unity UI 工具 v2.2 — 完整使用說明</title>
+  <title>Photoshop → Unity UI 工具 v2.4 — 完整使用說明</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
     :root {
-      --bg: #f6f8fb;
-      --paper: #ffffff;
-      --ink: #1f2937;
-      --muted: #667085;
-      --line: #d0d7e2;
-      --accent: #2563eb;
-      --accent-soft: #eff6ff;
-      --ok: #0f766e;
-      --ok-soft: #dff5f1;
-      --warn: #b45309;
-      --warn-soft: #fff4d6;
-      --red: #b91c1c;
-      --red-soft: #fef2f2;
-      --code-bg: #1e2535;
-      --code-fg: #e2e8f0;
+      --bg: #0a0e1a;
+      --paper: #0f1524;
+      --panel: #0f1524;
+      --panel-alt: #101a2b;
+      --ink: #c8d6e8;
+      --muted: #6b7a99;
+      --line: #1e2d4a;
+      --accent: #00e5ff;
+      --accent-soft: rgba(0, 229, 255, 0.10);
+      --accent-glow: rgba(0, 229, 255, 0.25);
+      --magenta: #ff00c8;
+      --magenta-soft: rgba(255, 0, 200, 0.12);
+      --ok: #00ff9f;
+      --ok-soft: rgba(0, 255, 159, 0.10);
+      --warn: #ffd600;
+      --warn-soft: rgba(255, 214, 0, 0.10);
+      --red: #ff2d6b;
+      --red-soft: rgba(255, 45, 107, 0.10);
+      --code-bg: #050810;
+      --code-fg: #00e5ff;
+      --shadow-cyan: 0 0 8px #00e5ff40, inset 0 0 8px #00e5ff08;
+      --shadow-magenta: 0 0 10px #ff00c840, inset 0 0 8px #ff00c808;
     }
+
     * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      scrollbar-color: var(--accent) #050810;
+    }
+
     body {
       margin: 0;
-      background: var(--bg);
+      background:
+        repeating-linear-gradient(0deg, rgba(0, 229, 255, 0.035) 0 1px, transparent 1px 4px),
+        repeating-linear-gradient(90deg, rgba(255, 0, 200, 0.035) 0 1px, transparent 1px 72px),
+        repeating-linear-gradient(0deg, rgba(0, 229, 255, 0.025) 0 1px, transparent 1px 72px),
+        radial-gradient(circle at 12% 0%, rgba(0, 229, 255, 0.12), transparent 34%),
+        radial-gradient(circle at 88% 8%, rgba(255, 0, 200, 0.10), transparent 32%),
+        var(--bg);
       color: var(--ink);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
       line-height: 1.7;
+      min-height: 100vh;
+      text-shadow: 0 0 1px rgba(200, 214, 232, 0.15);
     }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 18%),
+        repeating-linear-gradient(0deg, transparent 0 6px, rgba(0, 0, 0, 0.18) 6px 7px);
+      opacity: 0.35;
+      z-index: -1;
+    }
+
     main {
       width: min(1040px, calc(100% - 40px));
       margin: 0 auto;
       padding: 40px 0 80px;
     }
+
     header {
-      padding-bottom: 24px;
-      border-bottom: 2px solid var(--line);
-      margin-bottom: 10px;
+      padding: 28px 30px 26px;
+      border: 1px solid var(--line);
+      border-bottom: 1px solid rgba(0, 229, 255, 0.65);
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(15, 21, 36, 0.96), rgba(10, 14, 26, 0.94));
+      box-shadow: var(--shadow-cyan), 0 18px 46px rgba(0, 0, 0, 0.35);
+      margin-bottom: 18px;
+      position: relative;
+      overflow: hidden;
     }
-    h1 { margin: 0 0 10px; font-size: clamp(26px, 4vw, 40px); line-height: 1.15; }
-    h2 { margin: 48px 0 14px; font-size: 21px; padding-bottom: 7px; border-bottom: 1px solid var(--line); }
-    h3 { margin: 24px 0 8px; font-size: 16px; font-weight: 700; color: var(--ink); }
+
+    header::after {
+      content: "";
+      position: absolute;
+      right: -60px;
+      bottom: -80px;
+      width: 260px;
+      height: 180px;
+      background: radial-gradient(circle, rgba(255, 0, 200, 0.18), transparent 68%);
+      pointer-events: none;
+    }
+
+    h1,
+    h2,
+    h3 {
+      font-family: "Share Tech Mono", "Courier New", Consolas, monospace;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(26px, 4vw, 42px);
+      line-height: 1.15;
+      color: var(--accent);
+      text-shadow: 0 0 6px rgba(0, 229, 255, 0.55), 0 0 18px rgba(0, 229, 255, 0.22);
+    }
+
+    h2 {
+      margin: 48px 0 14px;
+      font-size: 23px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(0, 229, 255, 0.78);
+      color: var(--accent);
+      text-shadow: 0 0 5px rgba(0, 229, 255, 0.50), 0 0 16px rgba(0, 229, 255, 0.18);
+      box-shadow: 0 1px 0 rgba(0, 229, 255, 0.18);
+    }
+
+    h3 {
+      margin: 24px 0 8px;
+      font-size: 16px;
+      font-weight: 700;
+      color: #e2f8ff;
+      text-shadow: 0 0 5px rgba(255, 0, 200, 0.22);
+    }
+
     p { margin: 0 0 12px; }
     ul, ol { margin: 0 0 14px; padding-left: 22px; }
     li { margin-bottom: 5px; }
-    .lead { color: var(--muted); font-size: 16px; max-width: 780px; margin-bottom: 6px; }
+
+    a {
+      color: var(--accent);
+      text-decoration-color: rgba(0, 229, 255, 0.45);
+      text-underline-offset: 3px;
+      transition: color 160ms ease, text-shadow 160ms ease, text-decoration-color 160ms ease;
+    }
+
+    a:hover {
+      color: #8ff6ff;
+      text-decoration-color: var(--magenta);
+      text-shadow: 0 0 7px rgba(0, 229, 255, 0.75), 0 0 14px rgba(255, 0, 200, 0.35);
+    }
+
+    strong { color: #e4f7ff; }
+
+    .lead {
+      color: #9aacbf;
+      font-size: 16px;
+      max-width: 780px;
+      margin-bottom: 6px;
+    }
+
     .badge {
       display: inline-block;
-      padding: 2px 9px;
+      padding: 2px 10px;
       border-radius: 12px;
       font-size: 12px;
-      font-weight: 600;
-      background: var(--accent-soft);
-      color: var(--accent);
+      font-weight: 700;
+      background: var(--accent);
+      color: #031018;
       margin-left: 6px;
       vertical-align: middle;
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.70);
+      text-shadow: none;
     }
+
     .panel {
       padding: 18px 22px;
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: var(--paper);
+      background: linear-gradient(180deg, rgba(15, 21, 36, 0.96), rgba(10, 16, 30, 0.96));
       margin-bottom: 14px;
+      box-shadow: var(--shadow-cyan);
+      position: relative;
+      overflow: hidden;
     }
+
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-top: 1px solid rgba(0, 229, 255, 0.22);
+      pointer-events: none;
+    }
+
     .callout {
       padding: 13px 18px;
       border-radius: 6px;
       margin-bottom: 14px;
       font-size: 14px;
+      border: 1px solid var(--line);
+      background: rgba(15, 21, 36, 0.88);
+      box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.025);
     }
-    .callout.ok  { background: var(--ok-soft);   border-left: 4px solid var(--ok);   }
-    .callout.warn{ background: var(--warn-soft);  border-left: 4px solid var(--warn); }
-    .callout.info{ background: var(--accent-soft);border-left: 4px solid var(--accent);}
-    .callout.red { background: var(--red-soft);   border-left: 4px solid var(--red);  }
+
+    .callout.ok  { background: var(--ok-soft);     border-left: 4px solid var(--ok);     box-shadow: 0 0 8px rgba(0, 255, 159, 0.22), inset 0 0 8px rgba(0, 255, 159, 0.06); }
+    .callout.warn{ background: var(--warn-soft);   border-left: 4px solid var(--warn);   box-shadow: 0 0 8px rgba(255, 214, 0, 0.22), inset 0 0 8px rgba(255, 214, 0, 0.06); }
+    .callout.info{ background: var(--accent-soft); border-left: 4px solid var(--accent); box-shadow: var(--shadow-cyan); }
+    .callout.red { background: var(--red-soft);    border-left: 4px solid var(--red);    box-shadow: 0 0 8px rgba(255, 45, 107, 0.24), inset 0 0 8px rgba(255, 45, 107, 0.06); }
+
     code {
-      background: #eef0f4;
-      padding: 1px 5px;
+      background: rgba(5, 8, 16, 0.88);
+      padding: 2px 6px;
+      border: 1px solid rgba(0, 229, 255, 0.20);
       border-radius: 3px;
       font-size: 13px;
-      font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
-      color: #c7254e;
+      font-family: "Courier New", Consolas, monospace;
+      color: #7df3ff;
+      box-shadow: inset 0 0 7px rgba(0, 229, 255, 0.05);
     }
+
+    p code,
+    li code,
+    td code {
+      color: #8ff6ff;
+      text-shadow: 0 0 5px rgba(0, 229, 255, 0.35);
+    }
+
+    td code:nth-child(even),
+    li code:nth-child(even) {
+      color: #ff8be7;
+      border-color: rgba(255, 0, 200, 0.22);
+    }
+
     pre {
       background: var(--code-bg);
       color: var(--code-fg);
       padding: 16px 20px;
       border-radius: 8px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent);
       overflow-x: auto;
       font-size: 13px;
       line-height: 1.6;
       margin: 0 0 14px;
+      box-shadow: var(--shadow-cyan);
     }
-    pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 14px; }
-    th { text-align: left; padding: 8px 12px; background: var(--bg); border-bottom: 2px solid var(--line); font-weight: 600; }
-    td { padding: 8px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+
+    pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+      font-size: inherit;
+      border: 0;
+      box-shadow: none;
+      text-shadow: 0 0 6px rgba(0, 229, 255, 0.35);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 16px;
+      font-size: 14px;
+      background: rgba(15, 21, 36, 0.84);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-cyan);
+    }
+
+    th {
+      text-align: left;
+      padding: 9px 12px;
+      background: #0b1220;
+      border-bottom: 2px solid var(--accent);
+      color: #e3faff;
+      font-weight: 700;
+      text-shadow: 0 0 5px rgba(0, 229, 255, 0.35);
+    }
+
+    td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    tr:nth-child(even) td { background: rgba(255, 255, 255, 0.018); }
+    tr:nth-child(odd) td { background: rgba(0, 229, 255, 0.018); }
     tr:last-child td { border-bottom: none; }
+
+    tr {
+      transition: background 160ms ease, box-shadow 160ms ease;
+    }
+
+    tr:hover td {
+      background: rgba(0, 229, 255, 0.07);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
     .tag {
       display: inline-block;
-      padding: 1px 7px;
+      padding: 2px 8px;
       border-radius: 10px;
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 700;
+      border: 1px solid currentColor;
+      background: rgba(5, 8, 16, 0.76);
+      text-shadow: 0 0 6px currentColor;
+      box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.03);
     }
-    .tag-ps   { background: #fde8d8; color: #9a3412; }
-    .tag-unity{ background: #dbeafe; color: #1e40af; }
-    .tag-new  { background: #d1fae5; color: #065f46; }
+
+    .tag-ps   { background: rgba(255, 0, 200, 0.12); color: var(--magenta); }
+    .tag-unity{ background: rgba(0, 229, 255, 0.12); color: var(--accent); }
+    .tag-new  { background: rgba(0, 255, 159, 0.12); color: var(--ok); }
+
     nav {
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
       margin-bottom: 32px;
+      padding: 2px 0;
     }
+
     nav a {
       padding: 5px 14px;
       border-radius: 20px;
-      border: 1px solid var(--line);
-      background: var(--paper);
+      border: 1px solid rgba(0, 229, 255, 0.58);
+      background: rgba(15, 21, 36, 0.88);
       font-size: 13px;
       color: var(--accent);
       text-decoration: none;
+      box-shadow: 0 0 7px rgba(0, 229, 255, 0.16), inset 0 0 8px rgba(0, 229, 255, 0.04);
+      transition: background 160ms ease, color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
     }
-    nav a:hover { background: var(--accent-soft); }
+
+    nav a:hover {
+      background: rgba(0, 229, 255, 0.12);
+      border-color: var(--magenta);
+      color: #ffffff;
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.38), 0 0 14px rgba(255, 0, 200, 0.22), inset 0 0 8px rgba(0, 229, 255, 0.08);
+      transform: translateY(-1px);
+    }
+
     .step-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
       gap: 14px;
       margin-bottom: 14px;
     }
+
     .step-card {
       padding: 14px 16px;
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: var(--paper);
+      background: linear-gradient(180deg, rgba(15, 21, 36, 0.96), rgba(10, 16, 30, 0.96));
+      box-shadow: var(--shadow-cyan);
+      transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
     }
+
+    .step-card:hover {
+      border-color: rgba(0, 229, 255, 0.76);
+      box-shadow: 0 0 12px rgba(0, 229, 255, 0.32), inset 0 0 10px rgba(0, 229, 255, 0.06);
+      transform: translateY(-2px);
+    }
+
     .step-num {
       display: inline-block;
       width: 26px; height: 26px;
       border-radius: 50%;
-      background: var(--accent);
-      color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--magenta));
+      color: #050810;
       text-align: center;
       line-height: 26px;
       font-size: 13px;
       font-weight: 700;
       margin-bottom: 8px;
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.50), 0 0 14px rgba(255, 0, 200, 0.26);
+      text-shadow: none;
     }
-    .step-card p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+
+    .step-card p {
+      margin: 4px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    ::selection {
+      background: rgba(255, 0, 200, 0.45);
+      color: #ffffff;
+    }
+
+    ::-webkit-scrollbar {
+      width: 12px;
+      height: 12px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #050810;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, var(--accent), var(--magenta));
+      border: 3px solid #050810;
+      border-radius: 999px;
+      box-shadow: 0 0 8px rgba(0, 229, 255, 0.65);
+    }
+
+    ::-webkit-scrollbar-corner {
+      background: #050810;
+    }
+
+    @media (max-width: 640px) {
+      main {
+        width: min(100% - 28px, 1040px);
+        padding: 24px 0 56px;
+      }
+
+      header {
+        padding: 22px 18px;
+      }
+
+      h2 {
+        margin-top: 38px;
+        font-size: 20px;
+      }
+
+      nav a {
+        flex: 1 1 auto;
+        text-align: center;
+      }
+
+      .panel,
+      .step-card,
+      .callout {
+        padding-left: 15px;
+        padding-right: 15px;
+      }
+
+      table {
+        display: block;
+        overflow-x: auto;
+        white-space: normal;
+      }
+    }
   </style>
 </head>
 <body>
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.2.0</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.4.1</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -164,7 +450,9 @@
     <a href="#workflow">主流程</a>
     <a href="#ps-dialog">PS 匯出對話框</a>
     <a href="#naming">圖層命名規則</a>
+    <a href="#layout-group">Layout Group 自動排版</a>
     <a href="#unity-window">Unity 匯入工具</a>
+    <a href="#folders">專案資料夾結構</a>
     <a href="#text">文字與材質</a>
     <a href="#update">版本更新</a>
     <a href="#faq">常見問題</a>
@@ -217,13 +505,13 @@ Mac：    /Applications/Adobe Photoshop [版本]/Presets/Scripts/</code></pre>
     </div>
     <div class="step-card">
       <div class="step-num">4</div>
-      <strong>設定輸出</strong>
-      <p>填寫「專案資料夾名稱」，點「套用標準輸出路徑」自動填入 Atlas 與 Prefab 路徑。</p>
+      <strong>建立專案資料夾</strong>
+      <p>填寫「專案資料夾名稱」，點「<strong>建立專案資料夾</strong>」，自動建立子目錄結構並生成 SpriteAtlas。</p>
     </div>
     <div class="step-card">
       <div class="step-num">5</div>
-      <strong>指定字型</strong>
-      <p>若 UI 含文字節點，至少要指定「預設 TMP Font Asset」。材質球可選填。</p>
+      <strong>指定字型與材質</strong>
+      <p>至少指定「預設 TMP Font Asset」。有現成字框材質庫時，可填入「TMP 材質球資料夾」。</p>
     </div>
     <div class="step-card">
       <div class="step-num">6</div>
@@ -245,7 +533,8 @@ Mac：    /Applications/Adobe Photoshop [版本]/Presets/Scripts/</code></pre>
     <tr><td>Use export cache</td><td>PSD 已儲存且圖層未變動時，跳過重複輸出（預設開啟）。</td></tr>
     <tr><td>Use fast layer duplicate</td><td>盡量使用快速 duplicate 路徑，失敗才改用較慢的 merge-copy（預設開啟）。</td></tr>
     <tr><td>Default text layers</td><td>文字圖層預設輸出為 TMP 節點（建議）或 PNG 圖片。</td></tr>
-    <tr><td>Export selected text as PNG</td><td>在 PS 中先選取特定文字圖層再執行腳本，這些圖層會強制輸出為 PNG，其餘仍按預設。</td></tr>
+    <tr><td>Export selected text as PNG</td><td>進階選項，<strong>預設不勾選</strong>。在 PS 中先選取特定文字圖層再執行腳本，這些圖層會強制輸出為 PNG，其餘仍按預設。</td></tr>
+    <tr><td>Auto-export non-Source-Han fonts as PNG <span class="tag tag-new">v2.4</span></td><td><strong>預設勾選</strong>。工具自動判斷文字圖層字型：思源系列（思源黑體/宋體、源泉圓體、Noto CJK 等）以 TMP 節點輸出；其他字型強制輸出為 PNG，避免 Unity 缺少字型導致無法正確顯示。</td></tr>
   </table>
 
   <div class="callout ok">
@@ -305,6 +594,91 @@ Mac：    /Applications/Adobe Photoshop [版本]/Presets/Scripts/</code></pre>
 TXT_score_[MAT:reward_white_red_outline]</code></pre>
   <p>Unity 端 <strong>Skin Map</strong> 可將 materialToken 對應到不同的 TMP Material Preset。若圖層有 Layer Style 的 Stroke 效果，工具會自動產生 materialToken，無需手動標記。</p>
 
+  <h3>假厚度標記（文字圖層）</h3>
+  <p>在文字圖層名稱加入 <code>[THICK:N]</code>，N 為向下偏移的像素數，Unity 會自動疊兩層 TMP 模擬立體感：</p>
+  <pre><code>TXT_title_[THICK:3]
+TXT_score_[THICK:2]</code></pre>
+  <p>上層為原始文字，下層為顏色加深（× 0.55）的陰影層，偏移量對應 PS 設計稿像素。同時支援 X 軸偏移：<code>[THICK:2:1]</code>（格式：<code>[THICK:offsetY:offsetX]</code>）。</p>
+  <div class="callout ok"><strong>v2.4 起</strong> PS 端 JSX 已自動解析 <code>[THICK:N]</code> 與 <code>[THICK:N:M]</code>，名稱中加標記即可，不需手動編輯 JSON。</div>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <h2 id="layout-group">Layout Group 自動排版 <span class="tag tag-new">v2.4</span></h2>
+
+  <p>圖層群組可自動轉為 Unity 的 <code>HorizontalLayoutGroup</code> 或 <code>VerticalLayoutGroup</code>，並自動套上 <code>ContentSizeFitter</code>。同一群組內<strong>相同尺寸的圖只匯出一次</strong>，重複使用同一張 PNG，省檔案、省 Atlas 空間。</p>
+
+  <h3>偵測規則</h3>
+  <p>支援兩種方式，<strong>命名標記優先於自動偵測</strong>：</p>
+  <table>
+    <tr><th>方式</th><th>條件</th><th>結果</th></tr>
+    <tr><td>命名標記</td><td>群組名稱含 <code>[H]</code> 或 <code>[HLAYOUT]</code>（不分大小寫）</td><td>強制水平 layout</td></tr>
+    <tr><td>命名標記</td><td>群組名稱含 <code>[V]</code> 或 <code>[VLAYOUT]</code>（不分大小寫）</td><td>強制垂直 layout</td></tr>
+    <tr><td>自動偵測</td><td>群組有 2 個以上子層，且所有子層 Y 位置一致（±3px 容差）</td><td>水平 layout</td></tr>
+    <tr><td>自動偵測</td><td>群組有 2 個以上子層，且所有子層 X 位置一致（±3px 容差）</td><td>垂直 layout</td></tr>
+    <tr><td>無</td><td>不符合上述任一條件</td><td>普通群組，不加 Layout Component</td></tr>
+  </table>
+
+  <h3>實際 PSD 圖層命名範例</h3>
+  <p><strong>情境 A：標記強制（不依賴位置）</strong></p>
+  <pre><code>Settings_Page/
+├── BtnBar_[H]/              ← 強制水平
+│   ├── Btn_Home.png
+│   ├── Btn_Settings.png
+│   └── Btn_Shop.png
+└── Menu_List_[V]/           ← 強制垂直
+    ├── Menu_Play.png
+    ├── Menu_Help.png
+    └── Menu_Quit.png</code></pre>
+
+  <p><strong>情境 B：自動偵測（不寫標記）</strong></p>
+  <pre><code>Toolbar/                     ← 子層 Y 全相同 → 自動水平
+├── Icon_1.png  (x=100, y=50)
+├── Icon_2.png  (x=150, y=50)
+└── Icon_3.png  (x=200, y=50)</code></pre>
+
+  <p><strong>情境 C：結合其他標記（多標記共存）</strong></p>
+  <pre><code>TopBar_[H][ANCHOR_TC]/       ← 水平 layout + 上方置中錨點
+├── Coin.png
+├── Diamond.png
+└── Ticket.png</code></pre>
+
+  <h3>Spacing / Padding 自動計算</h3>
+  <ul>
+    <li><strong>Spacing</strong>：依子層排序後，計算相鄰子層的像素間距，取中位數作為 spacing。</li>
+    <li><strong>Padding</strong>：群組邊界與最外層子層邊界的距離，分別套用到 Left / Right / Top / Bottom。</li>
+    <li>所有值由 PS 設計稿座標自動算出，不需手動輸入。</li>
+  </ul>
+
+  <h3>重複圖去重</h3>
+  <p>同一 Layout Group 內，若多個子層 type 為 <code>image</code> 且 <strong>width 與 height 完全相同</strong>，工具只會匯出第一張 PNG，其餘子層共用同一個 <code>imagePath</code>。</p>
+  <div class="callout info">
+    用途：選單列上重複的按鈕底圖、Tab 列的相同背景、ICON 容器框等，只需設計一張，工具自動複用。
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <h2 id="folders">專案資料夾結構</h2>
+
+  <p>點「<strong>建立專案資料夾</strong>」後，工具在 <code>Assets/Temp/{專案名稱}/</code> 下自動建立以下結構，並同步建立 SpriteAtlas asset：</p>
+  <pre><code>Assets/Temp/{專案名稱}/
+├── Animation/
+├── Atlas/
+│   └── SpriteAtlas/
+│       ├── SpriteAtlas.spriteatlas   ← 自動建立，打包來源為 SpriteAtlas/ 資料夾
+│       ├── Base/                      ← 美術圖（預設語言）
+│       ├── CHS/                       ← 簡體中文文字圖
+│       ├── CHT/                       ← 繁體中文文字圖
+│       └── EN/                        ← 英文文字圖
+├── Font/
+├── Fx/
+│   ├── Material/
+│   └── Texture/
+├── Prefab/
+├── Spine/
+└── TimeLine/</code></pre>
+
+  <div class="callout ok">
+    <strong>SpriteAtlas 自動設定</strong>：建立後 SpriteAtlas 的 Objects for Packing 已指向 <code>SpriteAtlas/</code> 資料夾，PS 匯出的圖片放入對應語言子資料夾後，在 Unity 手動點「Pack Preview」即可打包。
+  </div>
+
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="unity-window">Unity 匯入工具（Importer_v2）</h2>
 
@@ -314,10 +688,10 @@ TXT_score_[MAT:reward_white_red_outline]</code></pre>
   <p>選擇 Photoshop 匯出的 Package 根資料夾，點「<strong>套用 Package</strong>」。工具自動掃描找出 layout JSON（優先找 <code>layout.json</code>，其次找 <code>*_layout.json</code>）以及 PNG 圖片資料夾。按「只驗證資料」可在不生成 Prefab 的情況下確認資料正確。</p>
 
   <h3>2. Unity 生成位置</h3>
-  <p>填寫「<strong>專案資料夾名稱</strong>」（例如 <code>Setting_Page</code>），點「套用標準輸出路徑」會自動填入：</p>
+  <p>填寫「<strong>專案資料夾名稱</strong>」（例如 <code>Setting_Page</code>），有兩個按鈕可用：</p>
   <ul>
-    <li>圖片匯入：<code>Assets/Temp/{名稱}/Atlas</code></li>
-    <li>Prefab 輸出：<code>Assets/Temp/{名稱}/Prefab</code></li>
+    <li>「<strong>建立專案資料夾</strong>」（新專案建議用）：自動建立完整子目錄結構、生成 SpriteAtlas，並填入輸出路徑。詳見 <a href="#folders">專案資料夾結構</a>。</li>
+    <li>「<strong>套用標準輸出路徑</strong>」（既有資料夾用）：只填入 Atlas 與 Prefab 路徑，不建立資料夾。</li>
   </ul>
   <p>圖片來源若已在 Unity 專案 <code>Assets</code> 底下，工具直接使用來源路徑，不重複複製。「<strong>參考解析度</strong>」預設自動跟隨 Layout JSON 中的 Canvas 尺寸。</p>
 
@@ -326,6 +700,7 @@ TXT_score_[MAT:reward_white_red_outline]</code></pre>
     <tr><th>欄位</th><th>用途</th></tr>
     <tr><td>預設 TMP Font Asset</td><td>所有文字節點的 fallback 字型。UI 含文字時必填。</td></tr>
     <tr><td>預設 TMP 材質球</td><td>文字的 fallback 材質。Stroke 效果自動衍生的材質也以此為基底，建議填寫。</td></tr>
+    <tr><td>TMP 材質球資料夾（選填）</td><td>指定一個存放現成字框材質球的資料夾。Generate 時優先從此資料夾比對，找到相近的直接重用，找不到才自動新建。設定後視窗會即時顯示找到幾顆。</td></tr>
     <tr><td>Skin Map（選填）</td><td>將特定 Sprite 名稱替換為換皮版本。</td></tr>
   </table>
 
@@ -345,15 +720,25 @@ TXT_score_[MAT:reward_white_red_outline]</code></pre>
 
   <h3>TMP 文字節點自動流程</h3>
   <ol>
-    <li>PS 文字圖層的 <strong>Layer Style → Stroke</strong> 效果，匯出 JSON 時會寫出 <code>outlineColor</code>、<code>outlineWidth</code> 與自動 <code>materialToken</code>。</li>
-    <li>PS 文字圖層的 <strong>Layer Style → Color Overlay</strong> 效果，填色顏色會寫入 <code>color</code> 欄位，Unity 端套用至 TMP 文字色。</li>
-    <li>Unity 匯入時，若 materialToken 存在且有預設材質球，工具自動從預設材質球複製一份，套用 <code>_OutlineColor</code> / <code>_OutlineWidth</code>，儲存至 <code>Assets/Temp/{名稱}/Font/GeneratedMaterials/</code>。</li>
+    <li>PS 文字圖層的 <strong>Layer Style → Stroke</strong> 效果，匯出 JSON 時寫出 <code>outlineColor</code>、<code>outlineWidth</code> 與自動 <code>materialToken</code>。</li>
+    <li>PS 文字圖層的 <strong>Layer Style → Color Overlay</strong> 效果，填色顏色寫入 <code>color</code> 欄位，Unity 端套用至 TMP 頂點色。</li>
+    <li>Unity Generate 時，依序執行材質球解析：
+      <ol style="margin:6px 0 0; padding-left:20px">
+        <li>若設定了「TMP 材質球資料夾」，先掃描資料夾內所有材質球，找到色差 &lt; 8% 且寬度誤差 &lt; 15% 的即直接重用，<strong>不新增</strong>。</li>
+        <li>未找到匹配 → 從預設材質球複製一份，套用 <code>_OutlineColor</code> / <code>_OutlineWidth</code>，儲存至 <code>Assets/Temp/{名稱}/Font/GeneratedMaterials/</code>。</li>
+        <li>無 Stroke 資料的文字節點直接套用預設材質球，不做任何處理。</li>
+      </ol>
+    </li>
   </ol>
+
+  <div class="callout ok">
+    <strong>材質球重用邏輯</strong>：同一頁面若多個文字用了接近的字框顏色，工具會自動共用同一顆材質球，避免 GeneratedMaterials 資料夾膨脹。
+  </div>
 
   <h3>手動指定材質球</h3>
   <pre><code>PS 圖層名稱：TXT_title_[MAT:title_yellow_outline]
             TXT_score_[MAT:reward_white_red_outline]</code></pre>
-  <p>在 Unity 建立對應名稱的 TMP 材質球，並在 <strong>Skin Map</strong> 或直接用材質球名稱對應 materialToken。</p>
+  <p>在圖層名稱加上 <code>[MAT:名稱]</code> 標記，Unity 端會優先以此 token 為鍵，從材質球資料夾或 GeneratedMaterials 中尋找對應材質。</p>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="update">版本更新</h2>
@@ -398,9 +783,29 @@ TXT_score_[MAT:reward_white_red_outline]</code></pre>
   <h3>Unity 端更新顯示「無法解析 GitHub 回應」？</h3>
   <p>請確認電腦可連線至 <code>api.github.com</code>。部分企業網路會封鎖 API 呼叫，可手動從 GitHub 下載 zip 並覆蓋 <code>Assets/Editor/PhotoshopUiImporter/</code>。</p>
 
+  <h3>點「建立專案資料夾」後 SpriteAtlas 沒出現？</h3>
+  <p>確認已填寫「專案資料夾名稱」再按按鈕。建立後若 Project 視窗未更新，執行 <code>Assets → Refresh</code>（或按 Ctrl+R）即可看到 <code>SpriteAtlas.spriteatlas</code>。</p>
+
+  <h3>Generate 後文字顏色不正確？</h3>
+  <p>工具讀取 PS <strong>Color Overlay</strong> 效果的顏色作為 TMP 頂點色。若文字使用的是 <strong>Gradient Overlay</strong>（漸層），目前版本僅支援純色，漸層上下色需等待後續版本支援。</p>
+
+  <h3>材質球資料夾設定後，Generate 還是一直新建材質球？</h3>
+  <p>比對條件為：RGB 每個色板差異 &lt; 8%，且寬度誤差 &lt; 15%。若庫中材質球顏色差異超出此範圍則視為不符，工具會自動新建。可確認庫中材質球的 <code>_OutlineColor</code> 是否與 PS 設定的 Stroke 色相近。</p>
+
+  <h3>文字在 PS 顯示 36pt，Unity 卻變成 29pt？<span class="tag tag-new">v2.4.1 已修正</span></h3>
+  <p>v2.4.0 之前使用 <code>textItem.size</code>，這個 API 拿到的是「設計時原始字體」，不含 Free Transform 縮放。若文字圖層被自由變形縮放過，PS 字元面板顯示的是「縮放後的有效字體」（impliedFontSize），兩者會不同。<br>
+  v2.4.1 起改用 ActionDescriptor 讀取 <code>impliedFontSize</code>，與 PS 字元面板顯示完全一致。</p>
+
+  <h3>明明設定 TMP，文字卻變成圖片？<span class="tag tag-new">v2.4</span></h3>
+  <p>v2.4 起新增「Auto-export non-Source-Han fonts as PNG」自動分流。若文字圖層使用非思源系列字型（思源黑體/宋體、源泉圓體、Noto CJK 之外的字型），會自動輸出為 PNG，避免 Unity 缺字型造成顯示異常。<br>
+  若要強制以 TMP 輸出，可在對話框取消勾選此選項，或在圖層名稱加入 <code>[TMP]</code> / <code>TXT_</code> 等手動標記。</p>
+
+  <h3>Layout Group 沒有自動偵測成功？<span class="tag tag-new">v2.4</span></h3>
+  <p>自動偵測需要群組內所有子層的 X（垂直 layout）或 Y（水平 layout）座標一致（±3px 容差）。若子層位置略有偏移超出容差，可在群組名稱加 <code>[H]</code> 或 <code>[V]</code> 強制指定方向。命名標記永遠優先於自動偵測。</p>
+
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.2.0 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.4.1 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

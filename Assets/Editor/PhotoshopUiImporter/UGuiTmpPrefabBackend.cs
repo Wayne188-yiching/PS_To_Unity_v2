@@ -78,8 +78,11 @@ namespace PhotoshopToUnity.EditorImporter
             var gameObject = CreateGameObject(node);
             var rectTransform = gameObject.GetComponent<RectTransform>();
             rectTransform.SetParent(parent, false);
+
             var isVisualNode = node.NormalizedType == "image" || node.NormalizedType == "text";
-            if (isVisualNode)
+            var isLayoutGroup = node.NormalizedType == "group" && !string.IsNullOrWhiteSpace(node.layoutType);
+
+            if (isVisualNode || isLayoutGroup)
             {
                 ApplyNodeRect(rectTransform, node, parentX, parentY, parentWidth, parentHeight, parentPivot);
             }
@@ -97,9 +100,13 @@ namespace PhotoshopToUnity.EditorImporter
                     if (node.fakeThicknessOffsetX != 0f || node.fakeThicknessOffsetY != 0f)
                     {
                         ApplyFakeThicknessText(gameObject, rectTransform, node, context);
-                        return; // 子節點由 ApplyFakeThicknessText 內部掛載
+                        return;
                     }
                     ApplyText(gameObject, node, context);
+                    break;
+                case "group":
+                    if (isLayoutGroup)
+                        ApplyLayoutGroup(gameObject, node);
                     break;
             }
 
@@ -110,7 +117,7 @@ namespace PhotoshopToUnity.EditorImporter
 
             foreach (var child in node.children)
             {
-                if (isVisualNode)
+                if (isVisualNode || isLayoutGroup)
                 {
                     CreateNode(child, rectTransform, node.x, node.y, node.width, node.height, rectTransform.pivot, context);
                 }
@@ -196,6 +203,51 @@ namespace PhotoshopToUnity.EditorImporter
             image.sprite = context.skinResolver?.Resolve(node);
             image.type = Image.Type.Simple;
             image.preserveAspect = false;
+        }
+
+        private static void ApplyLayoutGroup(GameObject gameObject, PhotoshopUiNode node)
+        {
+            var padding = new RectOffset(
+                Mathf.RoundToInt(node.layoutPaddingLeft),
+                Mathf.RoundToInt(node.layoutPaddingRight),
+                Mathf.RoundToInt(node.layoutPaddingTop),
+                Mathf.RoundToInt(node.layoutPaddingBottom));
+
+            var isHorizontal = string.Equals(node.layoutType, "horizontal", StringComparison.OrdinalIgnoreCase);
+
+            if (isHorizontal)
+            {
+                var lg = gameObject.AddComponent<HorizontalLayoutGroup>();
+                lg.spacing = node.layoutSpacing;
+                lg.padding = padding;
+                lg.childAlignment = TextAnchor.MiddleLeft;
+                lg.childControlWidth = false;
+                lg.childControlHeight = false;
+                lg.childForceExpandWidth = false;
+                lg.childForceExpandHeight = false;
+            }
+            else
+            {
+                var lg = gameObject.AddComponent<VerticalLayoutGroup>();
+                lg.spacing = node.layoutSpacing;
+                lg.padding = padding;
+                lg.childAlignment = TextAnchor.UpperCenter;
+                lg.childControlWidth = false;
+                lg.childControlHeight = false;
+                lg.childForceExpandWidth = false;
+                lg.childForceExpandHeight = false;
+            }
+
+            if (node.contentSizeFitter)
+            {
+                var csf = gameObject.AddComponent<ContentSizeFitter>();
+                csf.horizontalFit = isHorizontal
+                    ? ContentSizeFitter.FitMode.PreferredSize
+                    : ContentSizeFitter.FitMode.Unconstrained;
+                csf.verticalFit = isHorizontal
+                    ? ContentSizeFitter.FitMode.Unconstrained
+                    : ContentSizeFitter.FitMode.PreferredSize;
+            }
         }
 
         private static void ApplyText(GameObject gameObject, PhotoshopUiNode node, PrefabGenerationContext context)

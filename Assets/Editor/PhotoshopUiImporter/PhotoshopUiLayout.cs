@@ -48,6 +48,13 @@ namespace PhotoshopToUnity.EditorImporter
         public string alignment;
         public float fakeThicknessOffsetX;
         public float fakeThicknessOffsetY;
+        public string layoutType;           // "horizontal" | "vertical" | ""
+        public float layoutSpacing;
+        public float layoutPaddingLeft;
+        public float layoutPaddingRight;
+        public float layoutPaddingTop;
+        public float layoutPaddingBottom;
+        public bool contentSizeFitter;
         public List<PhotoshopUiNode> children = new List<PhotoshopUiNode>();
 
         public string NormalizedType => string.IsNullOrWhiteSpace(type) ? string.Empty : type.Trim().ToLowerInvariant();
