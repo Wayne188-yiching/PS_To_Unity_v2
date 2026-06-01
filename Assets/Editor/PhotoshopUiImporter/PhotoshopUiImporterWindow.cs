@@ -961,75 +961,58 @@ namespace PhotoshopToUnity.EditorImporter
 
         private void UpdateFromGitHub()
         {
-            const string apiUrl =
-                "https://api.github.com/repos/Wayne188-yiching/PS_To_Unity_v2/contents/Assets/Editor/PhotoshopUiImporter";
-            var urlPattern = new System.Text.RegularExpressions.Regex(
-                @"""download_url""\s*:\s*""(https://raw\.githubusercontent\.com/[^""]+\.cs)""");
+            // 直接使用 raw.githubusercontent.com 下載，不呼叫 GitHub API
+            // 避免 unauthenticated API 每小時 60 次的速率限制（403）
+            const string rawBase =
+                "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/Assets/Editor/PhotoshopUiImporter/";
+
+            var fileNames = new[]
+            {
+                "IUiPrefabBackend.cs",
+                "ImageImportService.cs",
+                "LayoutReader.cs",
+                "PathUtility.cs",
+                "PhotoshopUiImporterWindow.cs",
+                "PhotoshopUiLayout.cs",
+                "SimpleJsonReader.cs",
+                "SkinMap.cs",
+                "SkinResolver.cs",
+                "TMPStyleMap.cs",
+                "TmpMapper.cs",
+                "UGuiTmpPrefabBackend.cs",
+            };
 
             EditorUtility.DisplayProgressBar("更新工具", "正在連線 GitHub...", 0.05f);
             try
             {
-                // Step 1: 取得目錄下的檔案清單
-                string apiJson;
+                // Step 1: 取得遠端版本號（只下載 Window 檔，不耗 API 配額）
+                string remoteVersion = null;
                 using (var wc = new System.Net.WebClient())
                 {
                     wc.Headers["User-Agent"] = "PhotoshopUiImporter-Updater/1.0";
-                    apiJson = wc.DownloadString(apiUrl);
-                }
-
-                var urlMatches = urlPattern.Matches(apiJson);
-                if (urlMatches.Count == 0)
-                {
-                    SetStatus("無法解析 GitHub 回應，請確認網路連線或稍後再試。", MessageType.Error);
-                    return;
-                }
-
-                var fileUrls = new System.Collections.Generic.List<string>();
-                foreach (System.Text.RegularExpressions.Match m in urlMatches)
-                {
-                    fileUrls.Add(m.Groups[1].Value);
-                }
-
-                // Step 2: 取得遠端版本號（預覽用）
-                string remoteVersion = null;
-                foreach (var url in fileUrls)
-                {
-                    if (!url.EndsWith("PhotoshopUiImporterWindow.cs"))
-                    {
-                        continue;
-                    }
-
-                    using (var wc = new System.Net.WebClient())
-                    {
-                        wc.Headers["User-Agent"] = "PhotoshopUiImporter-Updater/1.0";
-                        var raw = wc.DownloadString(url);
-                        var vm = System.Text.RegularExpressions.Regex.Match(raw, @"ToolVersion\s*=\s*""([^""]+)""");
-                        if (vm.Success)
-                        {
-                            remoteVersion = vm.Groups[1].Value;
-                        }
-                    }
-
-                    break;
+                    var raw = wc.DownloadString(rawBase + "PhotoshopUiImporterWindow.cs");
+                    var vm = System.Text.RegularExpressions.Regex.Match(raw, @"ToolVersion\s*=\s*""([^""]+)""");
+                    if (vm.Success)
+                        remoteVersion = vm.Groups[1].Value;
                 }
 
                 EditorUtility.ClearProgressBar();
 
-                // Step 3: 顯示確認 Dialog
+                // Step 2: 顯示確認 Dialog
                 var versionLine = remoteVersion != null
                     ? $"GitHub 版本：v{remoteVersion}　/　本地版本：v{ToolVersion}\n\n"
                     : string.Empty;
 
                 if (!EditorUtility.DisplayDialog(
                     "更新 Photoshop UI Importer",
-                    $"{versionLine}將覆蓋 Assets/Editor/PhotoshopUiImporter/ 下共 {fileUrls.Count} 個腳本。\n更新後 Unity 會自動重新編譯。\n\n確定要繼續嗎？",
+                    $"{versionLine}將覆蓋 Assets/Editor/PhotoshopUiImporter/ 下共 {fileNames.Length} 個腳本。\n更新後 Unity 會自動重新編譯。\n\n確定要繼續嗎？",
                     "確定更新",
                     "取消"))
                 {
                     return;
                 }
 
-                // Step 4: 找本地腳本所在目錄
+                // Step 3: 找本地腳本所在目錄
                 var guids = AssetDatabase.FindAssets("PhotoshopUiImporterWindow t:Script");
                 if (guids.Length == 0)
                 {
@@ -1041,25 +1024,24 @@ namespace PhotoshopToUnity.EditorImporter
                 var localDir = Path.GetDirectoryName(
                     Path.GetFullPath(Path.Combine(Application.dataPath, "..", scriptAssetPath)));
 
-                // Step 5: 逐一下載並覆蓋
+                // Step 4: 逐一下載並覆蓋
                 using (var wc = new System.Net.WebClient())
                 {
                     wc.Headers["User-Agent"] = "PhotoshopUiImporter-Updater/1.0";
-                    for (var i = 0; i < fileUrls.Count; i++)
+                    for (var i = 0; i < fileNames.Length; i++)
                     {
-                        var url = fileUrls[i];
-                        var fileName = Path.GetFileName(url);
+                        var fileName = fileNames[i];
                         EditorUtility.DisplayProgressBar(
                             "更新工具",
-                            $"下載 {fileName}（{i + 1}/{fileUrls.Count}）",
-                            (float)(i + 1) / fileUrls.Count);
-                        var content = wc.DownloadString(url);
+                            $"下載 {fileName}（{i + 1}/{fileNames.Length}）",
+                            (float)(i + 1) / fileNames.Length);
+                        var content = wc.DownloadString(rawBase + fileName);
                         File.WriteAllText(Path.Combine(localDir, fileName), content, Encoding.UTF8);
                     }
                 }
 
                 AssetDatabase.Refresh();
-                SetStatus($"更新完成，已下載 {fileUrls.Count} 個腳本。Unity 正在重新編譯。", MessageType.Info);
+                SetStatus($"更新完成，已下載 {fileNames.Length} 個腳本。Unity 正在重新編譯。", MessageType.Info);
             }
             catch (System.Net.WebException webEx)
             {
