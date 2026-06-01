@@ -125,11 +125,16 @@ namespace PhotoshopToUnity.EditorImporter
         {
             if (string.IsNullOrWhiteSpace(materialLibraryFolder) || !AssetDatabase.IsValidFolder(materialLibraryFolder))
                 return null;
-            if (targetOutlineWidth <= 0f)
-                return null;
 
             var guids = AssetDatabase.FindAssets("t:Material", new[] { materialLibraryFolder });
             var libraryRoot = materialLibraryFolder.TrimEnd('/');
+
+            // 第一步：找所有顏色相近的候選材質球
+            // 顏色是材質球的主要識別依據（綠框、黑框、金框），Thickness 是次要條件
+            const float colorTolerance = 0.08f; // ±20/255 per channel
+            Material bestMatch = null;
+            float bestWidthDiff = float.MaxValue;
+
             foreach (var guid in guids)
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
@@ -147,15 +152,27 @@ namespace PhotoshopToUnity.EditorImporter
                     continue;
 
                 var matColor = mat.GetColor(ShaderUtilities.ID_OutlineColor);
-                var matWidth = mat.GetFloat(ShaderUtilities.ID_OutlineWidth);
 
-                if (Mathf.Abs(matColor.r - targetOutlineColor.r) < 0.08f &&
-                    Mathf.Abs(matColor.g - targetOutlineColor.g) < 0.08f &&
-                    Mathf.Abs(matColor.b - targetOutlineColor.b) < 0.08f &&
-                    Mathf.Abs(matWidth / targetOutlineWidth - 1f) < 0.15f)
-                    return mat;
+                // 顏色不符直接跳過
+                if (Mathf.Abs(matColor.r - targetOutlineColor.r) >= colorTolerance ||
+                    Mathf.Abs(matColor.g - targetOutlineColor.g) >= colorTolerance ||
+                    Mathf.Abs(matColor.b - targetOutlineColor.b) >= colorTolerance)
+                    continue;
+
+                // 顏色符合：以 Thickness 差距排序，選最接近的
+                var matWidth = mat.GetFloat(ShaderUtilities.ID_OutlineWidth);
+                var widthDiff = targetOutlineWidth > 0f
+                    ? Mathf.Abs(matWidth / targetOutlineWidth - 1f)
+                    : Mathf.Abs(matWidth);
+
+                if (widthDiff < bestWidthDiff)
+                {
+                    bestWidthDiff = widthDiff;
+                    bestMatch = mat;
+                }
             }
-            return null;
+
+            return bestMatch;
         }
 
         private static string BuildOutlineToken(PhotoshopUiNode node)
