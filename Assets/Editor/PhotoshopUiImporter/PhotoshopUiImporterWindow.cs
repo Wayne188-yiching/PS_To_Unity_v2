@@ -562,6 +562,41 @@ namespace PhotoshopToUnity.EditorImporter
             if (folderObject != null)
                 SpriteAtlasExtensions.Add(atlas, new Object[] { folderObject });
 
+            // Packing 設定
+            var packing = atlas.GetPackingSettings();
+            packing.enableRotation     = false;
+            packing.enableTightPacking = false;
+            packing.padding            = 4;
+            atlas.SetPackingSettings(packing);
+
+            // Texture 設定
+            var texture = atlas.GetTextureSettings();
+            texture.readable        = false;
+            texture.generateMipMaps = false;
+            texture.sRGB            = true;
+            texture.filterMode      = FilterMode.Bilinear;
+            atlas.SetTextureSettings(texture);
+
+            // Android 平台覆蓋
+            atlas.SetPlatformSettings(new TextureImporterPlatformSettings
+            {
+                name               = "Android",
+                overridden         = true,
+                maxTextureSize     = 2048,
+                format             = TextureImporterFormat.ASTC_6x6,
+                compressionQuality = (int)TextureCompressionQuality.Best,
+            });
+
+            // iOS 平台覆蓋（Unity 內部名稱為 "iPhone"）
+            atlas.SetPlatformSettings(new TextureImporterPlatformSettings
+            {
+                name               = "iPhone",
+                overridden         = true,
+                maxTextureSize     = 2048,
+                format             = TextureImporterFormat.ASTC_6x6,
+                compressionQuality = (int)TextureCompressionQuality.Best,
+            });
+
             EditorUtility.SetDirty(atlas);
             AssetDatabase.SaveAssets();
         }
