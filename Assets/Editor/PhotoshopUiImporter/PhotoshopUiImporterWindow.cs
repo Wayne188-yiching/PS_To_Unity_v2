@@ -31,6 +31,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinTargetFolder = string.Empty;
         private System.Collections.Generic.List<string> reskinMissingFiles;
         private Vector2 reskinMissingScrollPos;
+        private PsUiSkinTheme activeSkinTheme;
         private const string ToolVersion = "2.4.3";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
@@ -272,6 +273,53 @@ namespace PhotoshopToUnity.EditorImporter
                     EditorGUILayout.EndScrollView();
                 }
             }
+
+            EditorGUILayout.Space(4);
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField("SkinTheme 批次換皮", EditorStyles.boldLabel);
+                activeSkinTheme = (PsUiSkinTheme)EditorGUILayout.ObjectField(
+                    "Skin Theme", activeSkinTheme, typeof(PsUiSkinTheme), false);
+
+                if (activeSkinTheme != null)
+                {
+                    var folder = string.IsNullOrWhiteSpace(activeSkinTheme.targetPrefabFolder)
+                        ? "（未設定）"
+                        : activeSkinTheme.targetPrefabFolder;
+                    EditorGUILayout.LabelField($"目標資料夾：{folder}", EditorStyles.miniLabel);
+
+                    if (GUILayout.Button("套用換皮到所有 Prefab", GUILayout.Height(34)))
+                        ExecuteSkinTheme();
+                }
+            }
+        }
+
+        private void ExecuteSkinTheme()
+        {
+            if (activeSkinTheme == null) return;
+
+            var folder = string.IsNullOrWhiteSpace(activeSkinTheme.targetPrefabFolder)
+                ? "（未設定）"
+                : activeSkinTheme.targetPrefabFolder;
+
+            if (!EditorUtility.DisplayDialog(
+                "套用換皮",
+                $"目標資料夾：{folder}\n\n將掃描所有 Prefab，替換符合項目的 Sprite。\n此操作直接修改 .prefab 檔案，確定繼續嗎？",
+                "確定套用",
+                "取消"))
+                return;
+
+            var r = PsUiSkinApplier.Apply(activeSkinTheme);
+
+            if (!string.IsNullOrEmpty(r.errorMessage))
+            {
+                SetStatus(r.errorMessage, MessageType.Error);
+                return;
+            }
+
+            SetStatus(
+                $"換皮完成：{r.prefabsChanged} 個 Prefab 更新，共替換 {r.spritesReplaced} 個 Sprite。",
+                r.prefabsChanged > 0 ? MessageType.Info : MessageType.Warning);
         }
 
         private void ExecuteReskin()
