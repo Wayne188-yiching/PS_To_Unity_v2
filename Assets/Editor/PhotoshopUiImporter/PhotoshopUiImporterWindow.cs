@@ -1063,6 +1063,8 @@ namespace PhotoshopToUnity.EditorImporter
                 "TMPStyleMap.cs",
                 "TmpMapper.cs",
                 "UGuiTmpPrefabBackend.cs",
+                "PsUiSkinTheme.cs",
+                "PsUiSkinApplier.cs",
             };
 
             EditorUtility.DisplayProgressBar("更新工具", "正在連線 GitHub...", 0.05f);
