@@ -7,7 +7,7 @@ namespace PhotoshopToUnity.EditorImporter
     [CreateAssetMenu(menuName = "Photoshop UI Importer/Skin Theme", fileName = "SkinTheme")]
     public sealed class PsUiSkinTheme : ScriptableObject
     {
-        public string targetPrefabFolder = string.Empty;
+        public Object targetPrefabFolderAsset;
         public List<SkinThemeEntry> entries = new List<SkinThemeEntry>();
         public List<GameObject> excludedPrefabs = new List<GameObject>();
     }

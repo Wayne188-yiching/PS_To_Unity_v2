@@ -283,9 +283,9 @@ namespace PhotoshopToUnity.EditorImporter
 
                 if (activeSkinTheme != null)
                 {
-                    var folder = string.IsNullOrWhiteSpace(activeSkinTheme.targetPrefabFolder)
-                        ? "（未設定）"
-                        : activeSkinTheme.targetPrefabFolder;
+                    var folder = activeSkinTheme.targetPrefabFolderAsset != null
+                        ? AssetDatabase.GetAssetPath(activeSkinTheme.targetPrefabFolderAsset)
+                        : "（未設定）";
                     EditorGUILayout.LabelField($"目標資料夾：{folder}", EditorStyles.miniLabel);
 
                     if (GUILayout.Button("套用換皮到所有 Prefab", GUILayout.Height(34)))
@@ -298,9 +298,9 @@ namespace PhotoshopToUnity.EditorImporter
         {
             if (activeSkinTheme == null) return;
 
-            var folder = string.IsNullOrWhiteSpace(activeSkinTheme.targetPrefabFolder)
-                ? "（未設定）"
-                : activeSkinTheme.targetPrefabFolder;
+            var folder = activeSkinTheme.targetPrefabFolderAsset != null
+                ? AssetDatabase.GetAssetPath(activeSkinTheme.targetPrefabFolderAsset)
+                : "（未設定）";
 
             if (!EditorUtility.DisplayDialog(
                 "套用換皮",

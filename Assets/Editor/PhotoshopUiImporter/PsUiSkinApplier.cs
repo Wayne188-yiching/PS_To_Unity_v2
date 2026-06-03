@@ -24,10 +24,13 @@ namespace PhotoshopToUnity.EditorImporter
                 return result;
             }
 
-            if (string.IsNullOrWhiteSpace(theme.targetPrefabFolder) ||
-                !AssetDatabase.IsValidFolder(theme.targetPrefabFolder))
+            var targetFolder = theme.targetPrefabFolderAsset != null
+                ? AssetDatabase.GetAssetPath(theme.targetPrefabFolderAsset)
+                : null;
+
+            if (string.IsNullOrWhiteSpace(targetFolder) || !AssetDatabase.IsValidFolder(targetFolder))
             {
-                result.errorMessage = "目標資料夾無效，請在 SkinTheme 裡填入有效的 Assets 路徑。";
+                result.errorMessage = "請先拖入目標 Prefab 資料夾。";
                 return result;
             }
 
@@ -60,7 +63,7 @@ namespace PhotoshopToUnity.EditorImporter
             }
 
             // 掃描目標資料夾下所有 Prefab
-            var guids = AssetDatabase.FindAssets("t:Prefab", new[] { theme.targetPrefabFolder });
+            var guids = AssetDatabase.FindAssets("t:Prefab", new[] { targetFolder });
             foreach (var guid in guids)
             {
                 var path = AssetDatabase.GUIDToAssetPath(guid);
