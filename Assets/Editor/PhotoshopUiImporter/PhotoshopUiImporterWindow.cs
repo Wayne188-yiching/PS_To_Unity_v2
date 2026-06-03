@@ -288,10 +288,31 @@ namespace PhotoshopToUnity.EditorImporter
                         : "（未設定）";
                     EditorGUILayout.LabelField($"目標資料夾：{folder}", EditorStyles.miniLabel);
 
+                    if (GUILayout.Button("掃描 Prefab，自動填入舊 Sprite", GUILayout.Height(28)))
+                        ScanSkinTheme();
+
                     if (GUILayout.Button("套用換皮到所有 Prefab", GUILayout.Height(34)))
                         ExecuteSkinTheme();
                 }
             }
+        }
+
+        private void ScanSkinTheme()
+        {
+            if (activeSkinTheme == null) return;
+
+            if (activeSkinTheme.targetPrefabFolderAsset == null)
+            {
+                SetStatus("請先拖入目標 Prefab 資料夾再掃描。", MessageType.Warning);
+                return;
+            }
+
+            var added = PsUiSkinApplier.ScanAndFillOldSprites(activeSkinTheme);
+            SetStatus(
+                added > 0
+                    ? $"掃描完成，找到 {added} 個 Sprite。請在 SkinTheme Inspector 為每筆填入對應的新 Sprite。"
+                    : "掃描完成，沒有新增項目（所有 Sprite 已在清單中）。",
+                added > 0 ? MessageType.Info : MessageType.Warning);
         }
 
         private void ExecuteSkinTheme()

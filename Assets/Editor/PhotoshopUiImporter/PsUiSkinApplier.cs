@@ -97,6 +97,66 @@ namespace PhotoshopToUnity.EditorImporter
             return result;
         }
 
+        /// <summary>
+        /// 掃描 theme.targetPrefabFolderAsset 下所有 Prefab 的 Image 元件，
+        /// 把尚未在 entries 裡的 Sprite 自動加入（oldSprite 填入，newSprite 留空）。
+        /// </summary>
+        public static int ScanAndFillOldSprites(PsUiSkinTheme theme)
+        {
+            if (theme == null) return 0;
+
+            var targetFolder = theme.targetPrefabFolderAsset != null
+                ? AssetDatabase.GetAssetPath(theme.targetPrefabFolderAsset)
+                : null;
+
+            if (string.IsNullOrWhiteSpace(targetFolder) || !AssetDatabase.IsValidFolder(targetFolder))
+                return 0;
+
+            // 已在 entries 裡的 key 不重複加
+            var existingKeys = new HashSet<string>();
+            foreach (var entry in theme.entries)
+            {
+                var k = SpriteKey(entry.oldSprite);
+                if (k != null) existingKeys.Add(k);
+            }
+
+            // 排除清單（與 Apply 保持一致）
+            var excluded = new HashSet<string>();
+            if (theme.excludedPrefabs != null)
+                foreach (var go in theme.excludedPrefabs)
+                {
+                    if (go == null) continue;
+                    excluded.Add(AssetDatabase.GetAssetPath(go));
+                }
+
+            var added = 0;
+            var seenKeys = new HashSet<string>();
+
+            foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { targetFolder }))
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                if (excluded.Contains(path)) continue;
+
+                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (prefab == null) continue;
+
+                foreach (var img in prefab.GetComponentsInChildren<Image>(true))
+                {
+                    if (img.sprite == null) continue;
+                    var key = SpriteKey(img.sprite);
+                    if (key == null || existingKeys.Contains(key) || !seenKeys.Add(key)) continue;
+
+                    theme.entries.Add(new SkinThemeEntry { oldSprite = img.sprite });
+                    added++;
+                }
+            }
+
+            if (added > 0)
+                EditorUtility.SetDirty(theme);
+
+            return added;
+        }
+
         private static string SpriteKey(Sprite sprite)
         {
             if (sprite == null) return null;
