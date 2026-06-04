@@ -288,6 +288,9 @@ namespace PhotoshopToUnity.EditorImporter
                         : "（未設定）";
                     EditorGUILayout.LabelField($"目標資料夾：{folder}", EditorStyles.miniLabel);
 
+                    DrawFolderPathField("新美術來源資料夾", ref activeSkinTheme.sourceArtFolder, false);
+                    if (GUI.changed) EditorUtility.SetDirty(activeSkinTheme);
+
                     if (GUILayout.Button("掃描 Prefab，自動填入舊 Sprite", GUILayout.Height(28)))
                         ScanSkinTheme();
 
@@ -325,7 +328,10 @@ namespace PhotoshopToUnity.EditorImporter
 
             if (!EditorUtility.DisplayDialog(
                 "套用換皮",
-                $"目標資料夾：{folder}\n\n將掃描所有 Prefab，替換符合項目的 Sprite。\n此操作直接修改 .prefab 檔案，確定繼續嗎？",
+                $"目標資料夾：{folder}\n\n" +
+                "• 同名項目（New Sprite 為空或同名）→ 從美術來源資料夾覆蓋 PNG 檔案\n" +
+                "• 不同名項目（New Sprite 不同）→ 替換 Prefab 裡的 Sprite 參照\n\n" +
+                "此操作直接修改檔案，確定繼續嗎？",
                 "確定套用",
                 "取消"))
                 return;
@@ -338,9 +344,23 @@ namespace PhotoshopToUnity.EditorImporter
                 return;
             }
 
-            SetStatus(
-                $"換皮完成：{r.prefabsChanged} 個 Prefab 更新，共替換 {r.spritesReplaced} 個 Sprite。",
-                r.prefabsChanged > 0 ? MessageType.Info : MessageType.Warning);
+            var parts = new System.Collections.Generic.List<string>();
+            if (r.filesOverwritten > 0)
+                parts.Add($"覆蓋 {r.filesOverwritten} 個 PNG");
+            if (r.prefabsChanged > 0)
+                parts.Add($"{r.prefabsChanged} 個 Prefab 替換 {r.spritesReplaced} 個 Sprite 參照");
+            if (r.missingFiles != null && r.missingFiles.Count > 0)
+                parts.Add($"找不到 {r.missingFiles.Count} 個（見 Console）");
+
+            var msg = parts.Count > 0
+                ? "換皮完成：" + string.Join("，", parts) + "。"
+                : "換皮完成，沒有任何變更。";
+
+            if (r.missingFiles != null)
+                foreach (var f in r.missingFiles)
+                    Debug.LogWarning($"[SkinTheme] 找不到：{f}");
+
+            SetStatus(msg, r.filesOverwritten + r.prefabsChanged > 0 ? MessageType.Info : MessageType.Warning);
         }
 
         private void ExecuteReskin()

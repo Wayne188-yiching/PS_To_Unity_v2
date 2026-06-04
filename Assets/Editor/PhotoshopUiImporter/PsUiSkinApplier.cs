@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
@@ -11,12 +12,14 @@ namespace PhotoshopToUnity.EditorImporter
         {
             public int prefabsChanged;
             public int spritesReplaced;
+            public int filesOverwritten;
+            public List<string> missingFiles;
             public string errorMessage;
         }
 
         public static Result Apply(PsUiSkinTheme theme)
         {
-            var result = new Result();
+            var result = new Result { missingFiles = new List<string>() };
 
             if (theme == null)
             {
@@ -24,76 +27,142 @@ namespace PhotoshopToUnity.EditorImporter
                 return result;
             }
 
-            var targetFolder = theme.targetPrefabFolderAsset != null
-                ? AssetDatabase.GetAssetPath(theme.targetPrefabFolderAsset)
-                : null;
-
-            if (string.IsNullOrWhiteSpace(targetFolder) || !AssetDatabase.IsValidFolder(targetFolder))
+            if (theme.entries == null || theme.entries.Count == 0)
             {
-                result.errorMessage = "請先拖入目標 Prefab 資料夾。";
+                result.errorMessage = "沒有任何換皮項目。";
                 return result;
             }
 
-            // 建立舊 Sprite key → 新 Sprite 的對應表
-            // key 格式：assetPath#spriteName，跨 session 穩定
-            var map = new Dictionary<string, Sprite>();
+            // ── 把 entries 分成兩組 ──────────────────────────────────────────
+            // 同名模式：newSprite 為空 或 名稱相同 → 用檔案覆蓋
+            // 換參照模式：newSprite 不同 → 改 Prefab 裡的 sprite 參照
+            var fileCopyEntries   = new List<SkinThemeEntry>();
+            var refSwapMap        = new Dictionary<string, Sprite>(); // key → newSprite
+
             foreach (var entry in theme.entries)
             {
-                if (entry.oldSprite == null || entry.newSprite == null) continue;
-                var key = SpriteKey(entry.oldSprite);
-                if (key != null)
-                    map[key] = entry.newSprite;
-            }
+                if (entry.oldSprite == null) continue;
 
-            if (map.Count == 0)
-            {
-                result.errorMessage = "沒有完整的換皮項目（請確認每筆項目的舊圖和新圖都已填入）。";
-                return result;
-            }
+                bool sameNameMode = entry.newSprite == null ||
+                    string.Equals(entry.oldSprite.name, entry.newSprite.name,
+                                  System.StringComparison.OrdinalIgnoreCase);
 
-            // 建立排除清單
-            var excluded = new HashSet<string>();
-            if (theme.excludedPrefabs != null)
-            {
-                foreach (var go in theme.excludedPrefabs)
+                if (sameNameMode)
                 {
-                    if (go == null) continue;
-                    excluded.Add(AssetDatabase.GetAssetPath(go));
+                    fileCopyEntries.Add(entry);
+                }
+                else
+                {
+                    var key = SpriteKey(entry.oldSprite);
+                    if (key != null)
+                        refSwapMap[key] = entry.newSprite;
                 }
             }
 
-            // 掃描目標資料夾下所有 Prefab
-            var guids = AssetDatabase.FindAssets("t:Prefab", new[] { targetFolder });
-            foreach (var guid in guids)
+            // ── 模式 A：檔案覆蓋 ────────────────────────────────────────────
+            if (fileCopyEntries.Count > 0)
             {
-                var path = AssetDatabase.GUIDToAssetPath(guid);
-                if (excluded.Contains(path)) continue;
-
-                var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
-                if (prefab == null) continue;
-
-                bool changed = false;
-                foreach (var img in prefab.GetComponentsInChildren<Image>(true))
+                var sourceDir = theme.sourceArtFolder;
+                if (string.IsNullOrWhiteSpace(sourceDir) || !Directory.Exists(sourceDir))
                 {
-                    if (img.sprite == null) continue;
-                    var key = SpriteKey(img.sprite);
-                    if (key == null || !map.TryGetValue(key, out var newSprite)) continue;
-
-                    var so = new SerializedObject(img);
-                    so.FindProperty("m_Sprite").objectReferenceValue = newSprite;
-                    so.ApplyModifiedPropertiesWithoutUndo();
-                    result.spritesReplaced++;
-                    changed = true;
+                    if (fileCopyEntries.Count > 0)
+                        result.missingFiles.Add(
+                            $"（美術來源資料夾未設定或不存在，{fileCopyEntries.Count} 筆同名項目無法覆蓋）");
                 }
-
-                if (changed)
+                else
                 {
-                    PrefabUtility.SavePrefabAsset(prefab);
-                    result.prefabsChanged++;
+                    bool anyFileCopied = false;
+                    foreach (var entry in fileCopyEntries)
+                    {
+                        var oldAssetPath = AssetDatabase.GetAssetPath(entry.oldSprite);
+                        // 只允許個別 PNG（非 Atlas 子資產）
+                        if (!string.Equals(
+                                Path.GetFileNameWithoutExtension(oldAssetPath),
+                                entry.oldSprite.name,
+                                System.StringComparison.OrdinalIgnoreCase))
+                        {
+                            result.missingFiles.Add(
+                                $"{entry.oldSprite.name}（在 Atlas 內，無法直接覆蓋）");
+                            continue;
+                        }
+
+                        var ext         = Path.GetExtension(oldAssetPath); // .png / .jpg
+                        var sourceFile  = Path.Combine(sourceDir, entry.oldSprite.name + ext);
+                        if (!File.Exists(sourceFile))
+                            sourceFile = Path.Combine(sourceDir, entry.oldSprite.name + ".png");
+
+                        if (!File.Exists(sourceFile))
+                        {
+                            result.missingFiles.Add(entry.oldSprite.name + ext);
+                            continue;
+                        }
+
+                        var destAbsPath = Path.GetFullPath(
+                            Path.Combine(Application.dataPath, "..", oldAssetPath));
+                        File.Copy(sourceFile, destAbsPath, overwrite: true);
+                        result.filesOverwritten++;
+                        anyFileCopied = true;
+                    }
+
+                    if (anyFileCopied)
+                        AssetDatabase.Refresh();
                 }
             }
 
-            AssetDatabase.SaveAssets();
+            // ── 模式 B：Sprite 參照替換 ─────────────────────────────────────
+            if (refSwapMap.Count > 0)
+            {
+                var targetFolder = theme.targetPrefabFolderAsset != null
+                    ? AssetDatabase.GetAssetPath(theme.targetPrefabFolderAsset)
+                    : null;
+
+                if (string.IsNullOrWhiteSpace(targetFolder) || !AssetDatabase.IsValidFolder(targetFolder))
+                {
+                    result.missingFiles.Add("（目標 Prefab 資料夾未設定，參照替換已跳過）");
+                }
+                else
+                {
+                    var excluded = new HashSet<string>();
+                    if (theme.excludedPrefabs != null)
+                        foreach (var go in theme.excludedPrefabs)
+                        {
+                            if (go == null) continue;
+                            excluded.Add(AssetDatabase.GetAssetPath(go));
+                        }
+
+                    foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { targetFolder }))
+                    {
+                        var path = AssetDatabase.GUIDToAssetPath(guid);
+                        if (excluded.Contains(path)) continue;
+
+                        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                        if (prefab == null) continue;
+
+                        bool changed = false;
+                        foreach (var img in prefab.GetComponentsInChildren<Image>(true))
+                        {
+                            if (img.sprite == null) continue;
+                            var key = SpriteKey(img.sprite);
+                            if (key == null || !refSwapMap.TryGetValue(key, out var newSprite)) continue;
+
+                            var so = new SerializedObject(img);
+                            so.FindProperty("m_Sprite").objectReferenceValue = newSprite;
+                            so.ApplyModifiedPropertiesWithoutUndo();
+                            result.spritesReplaced++;
+                            changed = true;
+                        }
+
+                        if (changed)
+                        {
+                            PrefabUtility.SavePrefabAsset(prefab);
+                            result.prefabsChanged++;
+                        }
+                    }
+
+                    AssetDatabase.SaveAssets();
+                }
+            }
+
             return result;
         }
 
@@ -112,7 +181,6 @@ namespace PhotoshopToUnity.EditorImporter
             if (string.IsNullOrWhiteSpace(targetFolder) || !AssetDatabase.IsValidFolder(targetFolder))
                 return 0;
 
-            // 已在 entries 裡的 key 不重複加
             var existingKeys = new HashSet<string>();
             foreach (var entry in theme.entries)
             {
@@ -120,7 +188,6 @@ namespace PhotoshopToUnity.EditorImporter
                 if (k != null) existingKeys.Add(k);
             }
 
-            // 排除清單（與 Apply 保持一致）
             var excluded = new HashSet<string>();
             if (theme.excludedPrefabs != null)
                 foreach (var go in theme.excludedPrefabs)
@@ -129,7 +196,7 @@ namespace PhotoshopToUnity.EditorImporter
                     excluded.Add(AssetDatabase.GetAssetPath(go));
                 }
 
-            var added = 0;
+            var added    = 0;
             var seenKeys = new HashSet<string>();
 
             foreach (var guid in AssetDatabase.FindAssets("t:Prefab", new[] { targetFolder }))

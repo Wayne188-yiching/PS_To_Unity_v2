@@ -8,6 +8,8 @@ namespace PhotoshopToUnity.EditorImporter
     public sealed class PsUiSkinTheme : ScriptableObject
     {
         public UnityEngine.Object targetPrefabFolderAsset;
+        /// <summary>新美術 PNG 來源資料夾（可在 Assets 外，如 PS 匯出路徑）</summary>
+        public string sourceArtFolder = string.Empty;
         public List<SkinThemeEntry> entries = new List<SkinThemeEntry>();
         public List<GameObject> excludedPrefabs = new List<GameObject>();
     }
