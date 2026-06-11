@@ -5,6 +5,19 @@
     var repoRoot = sourceFolder.parent;
     var installFolder = photoshopScriptsFolder();
 
+    // Safety: refuse to run from inside the Photoshop Scripts folder. The
+    // cleanup step below deletes stray tool copies there, which would destroy
+    // the only copy if the user launched this installer from such a copy.
+    if (isSameOrInsideFolder(sourceFolder, installFolder)) {
+        alert(
+            "This installer is running from the Photoshop Scripts folder:\n" +
+            sourceFolder.fsName + "\n\n" +
+            "Run it from the PS_To_Unity_v2 repository instead:\n" +
+            "File > Scripts > Browse... > PhotoshopExporter/InstallPhotoshopPlugin.jsx"
+        );
+        return;
+    }
+
     if (!ensureFolder(installFolder) || !canWriteToFolder(installFolder)) {
         var selected = Folder.selectDialog("Choose Photoshop Presets/Scripts folder for PS_To_Unity_v2 launcher");
         if (!selected) {
@@ -20,13 +33,20 @@
 
     writeConfig(installFolder, sourceFolder, repoRoot);
     removeOldLaunchers(installFolder);
+    var cleanedCount = removeStrayToolCopies(installFolder, sourceFolder);
     writeLauncher(installFolder, "PS To Unity v2.jsx", "PhotoshopToolboxHub.jsx", "PS To Unity v2");
+
+    var cleanupNote = cleanedCount > 0
+        ? "\n\nRemoved " + cleanedCount + " stray tool cop" + (cleanedCount === 1 ? "y" : "ies") +
+          " from the Scripts folder.\nAll tools now run from the repository via the single menu entry."
+        : "";
 
     alert(
         "PS_To_Unity_v2 Photoshop plugin installed.\n\n" +
         "Restart Photoshop, then open:\n" +
         "File > Scripts > PS To Unity v2\n\n" +
-        "Installed folder:\n" + installFolder.fsName
+        "Installed folder:\n" + installFolder.fsName +
+        cleanupNote
     );
 })();
 
@@ -62,6 +82,51 @@ function removeFile(file) {
         }
     } catch (e) {
     }
+}
+
+// Remove stray copies of our tool scripts that users copied directly into
+// Presets/Scripts (the pre-v2.6.1 install instructions said to copy the whole
+// PhotoshopExporter folder, cluttering the File > Scripts menu). Matches exact
+// known filenames only; never touches the launcher, the config, or any
+// third-party script. Returns the number of files removed.
+function removeStrayToolCopies(installFolder, sourceFolder) {
+    // Guard duplicated here in case this function is ever called directly.
+    if (isSameOrInsideFolder(sourceFolder, installFolder)) {
+        return 0;
+    }
+
+    var toolFiles = [
+        "CreateCalibrationPsd.jsx",
+        "Debug_FontRouting.jsx",
+        "Debug_FontSize.jsx",
+        "Debug_LayerKind.jsx",
+        "InstallPhotoshopPlugin.jsx",
+        "PhotoshopLayerAutoNamer.jsx",
+        "PhotoshopToSpine.jsx",
+        "PhotoshopToolboxHub.jsx",
+        "PhotoshopUiPackageExporter.jsx",
+        "PhotoshopUiPackageUpdater.jsx"
+    ];
+
+    var removed = 0;
+    for (var i = 0; i < toolFiles.length; i++) {
+        var stray = new File(installFolder.fsName + "/" + toolFiles[i]);
+        if (stray.exists) {
+            try {
+                if (stray.remove()) {
+                    removed++;
+                }
+            } catch (e) {
+            }
+        }
+    }
+    return removed;
+}
+
+function isSameOrInsideFolder(child, parent) {
+    var childPath = String(child.fsName).toLowerCase().replace(/\\/g, "/");
+    var parentPath = String(parent.fsName).toLowerCase().replace(/\\/g, "/");
+    return childPath === parentPath || childPath.indexOf(parentPath + "/") === 0;
 }
 
 function writeLauncher(installFolder, launcherName, sourceScriptName, title) {

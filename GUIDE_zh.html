@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.6.0</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.6.1</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -464,17 +464,21 @@
   <h2 id="install">安裝</h2>
 
   <h3><span class="tag tag-ps">PS</span>　Photoshop 端</h3>
-  <p>JSX 腳本不需要安裝，兩種執行方式擇一：</p>
+  <p>兩種執行方式擇一：</p>
   <div class="panel">
-    <strong>方式 A（推薦）：放入 PS Scripts 資料夾</strong>
-    <p style="margin:8px 0 4px">將 <code>PhotoshopExporter/</code> 資料夾內的 JSX 複製到下列路徑，重啟 Photoshop 後即可從選單叫出：</p>
-    <pre><code>Windows：C:\Program Files\Adobe\Adobe Photoshop [版本]\Presets\Scripts\
-Mac：    /Applications/Adobe Photoshop [版本]/Presets/Scripts/</code></pre>
-    <p style="margin:0">之後從 <code>File &gt; Scripts &gt; PhotoshopUiPackageExporter</code> 執行。</p>
+    <strong>方式 A（推薦）：執行一次安裝器，選單只留一個入口 <span class="tag tag-new">v2.6.1</span></strong>
+    <ol style="margin:8px 0 4px; padding-left:20px">
+      <li>Photoshop 執行 <code>File &gt; Scripts &gt; Browse…</code>，選擇<strong>倉庫裡的</strong> <code>PhotoshopExporter/InstallPhotoshopPlugin.jsx</code>。</li>
+      <li>重啟 Photoshop。</li>
+    </ol>
+    <p style="margin:4px 0 0">之後選單只有一個 <code>File &gt; Scripts &gt; PS To Unity v2</code>，開啟後是工具面板，所有工具（匯出、自動命名、Spine、校準板、Debug 工具、更新）都從面板進入。工具本體留在倉庫資料夾，更新後不需重新安裝。</p>
   </div>
   <div class="panel">
     <strong>方式 B：每次手動瀏覽</strong>
-    <p style="margin:8px 0 0">在 Photoshop 執行 <code>File &gt; Scripts &gt; Browse…</code>，選擇 <code>PhotoshopExporter/PhotoshopUiPackageExporter.jsx</code>。</p>
+    <p style="margin:8px 0 0">在 Photoshop 執行 <code>File &gt; Scripts &gt; Browse…</code>，選擇 <code>PhotoshopExporter/PhotoshopUiPackageExporter.jsx</code>（或任一工具）。</p>
+  </div>
+  <div class="callout warn">
+    <strong>不要把整個 <code>PhotoshopExporter/</code> 資料夾複製進 <code>Presets\Scripts\</code></strong>——那會讓每支腳本各佔一個選單項（舊版說明的做法）。若你之前這樣裝過，重新執行一次方式 A 的安裝器即可：<span class="tag tag-new">v2.6.1</span> 起安裝器會自動清掉散落在 Scripts 資料夾裡的工具複本（只刪本工具的已知檔名，不動其他腳本）。
   </div>
 
   <h3><span class="tag tag-unity">Unity</span>　Unity 端</h3>
@@ -879,6 +883,13 @@ TXT_score_[THICK:2]</code></pre>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
+
+  <h3>v2.6.1（2026-06-12）— PS 選單整合：單一入口</h3>
+  <ul>
+    <li><strong>選單收斂為單一入口</strong>：執行一次 <code>InstallPhotoshopPlugin.jsx</code> 後，<code>File &gt; Scripts</code> 只剩「PS To Unity v2」一項，開啟為工具面板；工具本體留在倉庫，更新免重裝。</li>
+    <li><strong>Hub 面板收錄全部工具</strong>：新增「Calibration / Debug」區，含校準板生成（Create Calibration PSD）與 Font Routing / Font Size / Layer Kind 三支 Debug 工具；版本顯示改讀 <code>version.json</code>。</li>
+    <li><strong>安裝器自動清理</strong>：重跑安裝器會移除先前複製到 <code>Presets\Scripts\</code> 的工具複本（僅精確比對本工具的已知檔名，不動其他腳本）；並加入防呆——若安裝器是從 Scripts 資料夾內的複本執行會中止並提示改從倉庫執行。</li>
+  </ul>
 
   <h3>v2.6.0（2026-06-11）— 優化計畫 Phase 1：字型精度 + 版本基建</h3>
   <ul>

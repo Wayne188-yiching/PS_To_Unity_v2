@@ -17,14 +17,32 @@
     var versionText = dialog.add("statictext", undefined, "Version: " + readVersion(repoRoot));
     versionText.characters = 82;
 
-    var buttons = dialog.add("group");
-    buttons.orientation = "column";
-    buttons.alignChildren = "fill";
+    var mainPanel = dialog.add("panel", undefined, "Main Tools");
+    mainPanel.orientation = "column";
+    mainPanel.alignChildren = "fill";
+    mainPanel.margins = 14;
 
-    var exporterButton = buttons.add("button", undefined, "UI Package Exporter");
-    var namerButton = buttons.add("button", undefined, "Layer Auto Namer");
-    var spineButton = buttons.add("button", undefined, "Photoshop To Spine");
-    var updaterButton = buttons.add("button", undefined, "Update / Refresh Plugin");
+    var exporterButton = mainPanel.add("button", undefined, "UI Package Exporter");
+    var namerButton = mainPanel.add("button", undefined, "Layer Auto Namer");
+    var spineButton = mainPanel.add("button", undefined, "Photoshop To Spine");
+    var updaterButton = mainPanel.add("button", undefined, "Update / Refresh Plugin");
+
+    var devPanel = dialog.add("panel", undefined, "Calibration / Debug");
+    devPanel.orientation = "column";
+    devPanel.alignChildren = "fill";
+    devPanel.margins = 14;
+
+    var calibrationButton = devPanel.add("button", undefined, "Create Calibration PSD (font precision board)");
+
+    var debugRow = devPanel.add("group");
+    debugRow.orientation = "row";
+    debugRow.alignChildren = "fill";
+    var debugFontRoutingButton = debugRow.add("button", undefined, "Font Routing");
+    var debugFontSizeButton = debugRow.add("button", undefined, "Font Size");
+    var debugLayerKindButton = debugRow.add("button", undefined, "Layer Kind");
+    debugFontRoutingButton.preferredSize.width = 110;
+    debugFontSizeButton.preferredSize.width = 110;
+    debugLayerKindButton.preferredSize.width = 110;
 
     var closeGroup = dialog.add("group");
     closeGroup.orientation = "row";
@@ -32,6 +50,10 @@
     var closeButton = closeGroup.add("button", undefined, "Close", { name: "cancel" });
 
     spineButton.enabled = toolExists(sourceFolder, "PhotoshopToSpine.jsx");
+    calibrationButton.enabled = toolExists(sourceFolder, "CreateCalibrationPsd.jsx");
+    debugFontRoutingButton.enabled = toolExists(sourceFolder, "Debug_FontRouting.jsx");
+    debugFontSizeButton.enabled = toolExists(sourceFolder, "Debug_FontSize.jsx");
+    debugLayerKindButton.enabled = toolExists(sourceFolder, "Debug_LayerKind.jsx");
 
     exporterButton.onClick = function () {
         dialog.close(1);
@@ -51,6 +73,26 @@
     updaterButton.onClick = function () {
         dialog.close(1);
         runTool(sourceFolder, "PhotoshopUiPackageUpdater.jsx", "Update Plugin");
+    };
+
+    calibrationButton.onClick = function () {
+        dialog.close(1);
+        runTool(sourceFolder, "CreateCalibrationPsd.jsx", "Create Calibration PSD");
+    };
+
+    debugFontRoutingButton.onClick = function () {
+        dialog.close(1);
+        runTool(sourceFolder, "Debug_FontRouting.jsx", "Debug Font Routing");
+    };
+
+    debugFontSizeButton.onClick = function () {
+        dialog.close(1);
+        runTool(sourceFolder, "Debug_FontSize.jsx", "Debug Font Size");
+    };
+
+    debugLayerKindButton.onClick = function () {
+        dialog.close(1);
+        runTool(sourceFolder, "Debug_LayerKind.jsx", "Debug Layer Kind");
     };
 
     closeButton.onClick = function () {
@@ -100,24 +142,25 @@ function resolveRepoRoot(sourceFolder) {
 }
 
 function readVersion(repoRoot) {
-    var readme = new File(repoRoot.fsName + "/README.md");
-    if (!readme.exists) {
+    // version.json is the single source of truth (see bump-version.ps1).
+    var versionFile = new File(repoRoot.fsName + "/version.json");
+    if (!versionFile.exists) {
         return "local";
     }
 
     try {
-        readme.encoding = "UTF-8";
-        readme.open("r");
-        var content = readme.read();
-        readme.close();
+        versionFile.encoding = "UTF-8";
+        versionFile.open("r");
+        var content = versionFile.read();
+        versionFile.close();
 
-        var match = content.match(/Current status:\s*([^\r\n]+)/i);
+        var match = content.match(/"version"\s*:\s*"([^"]+)"/);
         if (match && match[1]) {
-            return match[1];
+            return "v" + match[1];
         }
     } catch (e) {
         try {
-            readme.close();
+            versionFile.close();
         } catch (ignored) {
         }
     }
