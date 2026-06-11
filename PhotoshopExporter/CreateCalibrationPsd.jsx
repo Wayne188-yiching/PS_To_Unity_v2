@@ -13,9 +13,9 @@
 (function () {
     var FONT_SIZES = [24, 36, 48, 72];          // pt (document at 72 DPI -> px == pt)
     var STROKE_WIDTHS = [0, 2, 4, 6, 8];        // px stroke (0 = none)
-    // CJK sample text via unicode escapes (U+5B57 U+6A23) -
+    // CJK sample text via unicode escape (U+5B57) -
     // ExtendScript fails to parse raw CJK source without a BOM.
-    var SAMPLE_TEXT = "\u5B57\u6A23Ag18";
+    var SAMPLE_TEXT = "\u5B57Ag18";
     var CELL_W = 360;
     var CELL_H = 140;
     var MARGIN = 60;
