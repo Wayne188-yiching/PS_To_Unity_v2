@@ -31,8 +31,12 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinTargetFolder = string.Empty;
         private System.Collections.Generic.List<string> reskinMissingFiles;
         private Vector2 reskinMissingScrollPos;
+        private System.Collections.Generic.List<string> reskinPendingOverwrites;
+        private Vector2 reskinOverwriteScrollPos;
+        private string reskinScannedSourceFolder;
+        private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.5.0";
+        private const string ToolVersion = "2.5.1";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -256,9 +260,46 @@ namespace PhotoshopToUnity.EditorImporter
                 DrawFolderPathField("美術來源資料夾", ref reskinArtSourceFolder, false);
                 DrawFolderPathField("Unity 目標資料夾", ref reskinTargetFolder, true);
 
-                if (GUILayout.Button("執行換皮掃描", GUILayout.Height(34)))
+                // 路徑變更後舊掃描結果失效，必須重新掃描才能覆蓋
+                if (reskinPendingOverwrites != null &&
+                    (reskinScannedSourceFolder != reskinArtSourceFolder ||
+                     reskinScannedTargetFolder != reskinTargetFolder))
                 {
-                    ExecuteReskin();
+                    reskinPendingOverwrites = null;
+                    reskinMissingFiles = null;
+                }
+
+                if (GUILayout.Button("掃描換皮（預覽，不會修改檔案）", GUILayout.Height(34)))
+                {
+                    ScanReskin();
+                }
+
+                if (reskinPendingOverwrites != null)
+                {
+                    EditorGUILayout.Space(4);
+                    var missingCount = reskinMissingFiles != null ? reskinMissingFiles.Count : 0;
+                    EditorGUILayout.LabelField(
+                        $"掃描結果：將覆蓋 {reskinPendingOverwrites.Count} 張 / 缺少 {missingCount} 張",
+                        EditorStyles.boldLabel);
+
+                    if (reskinPendingOverwrites.Count > 0)
+                    {
+                        reskinOverwriteScrollPos = EditorGUILayout.BeginScrollView(reskinOverwriteScrollPos, GUILayout.MaxHeight(120));
+                        foreach (var name in reskinPendingOverwrites)
+                        {
+                            EditorGUILayout.LabelField(name, EditorStyles.miniLabel);
+                        }
+                        EditorGUILayout.EndScrollView();
+
+                        if (GUILayout.Button($"確認覆蓋 {reskinPendingOverwrites.Count} 張 PNG", GUILayout.Height(34)))
+                        {
+                            ApplyReskinOverwrites();
+                        }
+                    }
+                    else
+                    {
+                        EditorGUILayout.HelpBox("美術來源資料夾內沒有與目標同名的 PNG，無可覆蓋項目。", MessageType.Info);
+                    }
                 }
 
                 if (reskinMissingFiles != null && reskinMissingFiles.Count > 0)
@@ -363,9 +404,10 @@ namespace PhotoshopToUnity.EditorImporter
             SetStatus(msg, r.filesOverwritten + r.prefabsChanged > 0 ? MessageType.Info : MessageType.Warning);
         }
 
-        private void ExecuteReskin()
+        private void ScanReskin()
         {
-            reskinMissingFiles = new System.Collections.Generic.List<string>();
+            reskinPendingOverwrites = null;
+            reskinMissingFiles = null;
 
             if (string.IsNullOrWhiteSpace(reskinArtSourceFolder) || !Directory.Exists(reskinArtSourceFolder))
             {
@@ -393,33 +435,85 @@ namespace PhotoshopToUnity.EditorImporter
                 return;
             }
 
-            var overwriteCount = 0;
+            var pendingOverwrites = new System.Collections.Generic.List<string>();
+            var missingFiles = new System.Collections.Generic.List<string>();
             foreach (var targetFile in targetFiles)
             {
                 var fileName = Path.GetFileName(targetFile);
-                var sourcePath = Path.Combine(reskinArtSourceFolder, fileName);
-                if (File.Exists(sourcePath))
+                if (File.Exists(Path.Combine(reskinArtSourceFolder, fileName)))
                 {
-                    File.Copy(sourcePath, targetFile, overwrite: true);
+                    pendingOverwrites.Add(fileName);
+                }
+                else
+                {
+                    missingFiles.Add(fileName);
+                }
+            }
+
+            reskinPendingOverwrites = pendingOverwrites;
+            reskinMissingFiles = missingFiles;
+            reskinScannedSourceFolder = reskinArtSourceFolder;
+            reskinScannedTargetFolder = reskinTargetFolder;
+
+            SetStatus(
+                pendingOverwrites.Count > 0
+                    ? $"掃描完成：將覆蓋 {pendingOverwrites.Count} 張 / 缺少 {missingFiles.Count} 張。尚未修改任何檔案，請確認清單後按「確認覆蓋」。"
+                    : $"掃描完成：沒有同名 PNG 可覆蓋，缺少 {missingFiles.Count} 張。尚未修改任何檔案。",
+                pendingOverwrites.Count > 0 ? MessageType.Info : MessageType.Warning);
+        }
+
+        private void ApplyReskinOverwrites()
+        {
+            if (reskinPendingOverwrites == null || reskinPendingOverwrites.Count == 0)
+            {
+                return;
+            }
+
+            if (!EditorUtility.DisplayDialog(
+                "確認換皮覆蓋",
+                $"即將以「{reskinScannedSourceFolder}」的同名 PNG\n" +
+                $"覆蓋「{reskinScannedTargetFolder}」內共 {reskinPendingOverwrites.Count} 張圖片。\n\n" +
+                "此操作會直接覆蓋檔案且無法復原，確定繼續嗎？",
+                "確定覆蓋",
+                "取消"))
+            {
+                return;
+            }
+
+            var targetAbsPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", reskinScannedTargetFolder));
+            var overwriteCount = 0;
+            var skipped = new System.Collections.Generic.List<string>();
+            foreach (var fileName in reskinPendingOverwrites)
+            {
+                var sourcePath = Path.Combine(reskinScannedSourceFolder, fileName);
+                var targetPath = Path.Combine(targetAbsPath, fileName);
+                if (File.Exists(sourcePath) && File.Exists(targetPath))
+                {
+                    File.Copy(sourcePath, targetPath, overwrite: true);
                     overwriteCount++;
                 }
                 else
                 {
-                    reskinMissingFiles.Add(fileName);
+                    skipped.Add(fileName);
                 }
             }
 
             AssetDatabase.Refresh();
+            reskinPendingOverwrites = null;
 
             var msg = $"換皮完成。已覆蓋 {overwriteCount} 張圖片。";
-            if (reskinMissingFiles.Count > 0)
+            if (skipped.Count > 0)
+            {
+                msg += $" 有 {skipped.Count} 張在掃描後遺失，已跳過：{string.Join("、", skipped)}。";
+            }
+            if (reskinMissingFiles != null && reskinMissingFiles.Count > 0)
             {
                 msg += $" 找不到對應美術：{reskinMissingFiles.Count} 張（見下方清單）。";
                 SetStatus(msg, MessageType.Warning);
             }
             else
             {
-                SetStatus(msg, MessageType.Info);
+                SetStatus(msg, skipped.Count > 0 ? MessageType.Warning : MessageType.Info);
             }
         }
 

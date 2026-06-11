@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.5.0</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.5.1</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -457,6 +457,7 @@
     <a href="#reskin">換皮系統</a>
     <a href="#update">版本更新</a>
     <a href="#faq">常見問題</a>
+    <a href="#changelog">版本紀錄</a>
   </nav>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
@@ -716,7 +717,7 @@ TXT_score_[THICK:2]</code></pre>
   </table>
 
   <div class="callout info">
-    <strong>換皮工具（舊版）</strong>：可指定美術來源資料夾與 Unity 目標資料夾，執行「換皮掃描」後自動覆蓋同名 PNG。找不到對應美術的檔名會列出成待辦清單。<br>
+    <strong>換皮工具（舊版）</strong>：可指定美術來源資料夾與 Unity 目標資料夾。<span class="tag tag-new">v2.5.1</span> 起改為兩段式：先「掃描換皮（預覽）」列出將覆蓋與缺少的清單（不修改任何檔案），確認清單後再按「確認覆蓋」並通過確認對話框，才會真正覆蓋同名 PNG。找不到對應美術的檔名會列出成待辦清單。<br>
     <strong>SkinTheme 批次換皮（v2.5）</strong>：可跨多個 Prefab 批次替換 Sprite 參照，詳見 <a href="#reskin">換皮系統</a>。
   </div>
 
@@ -758,7 +759,12 @@ TXT_score_[THICK:2]</code></pre>
   <p>換皮系統提供兩種模式，視情況搭配使用：</p>
 
   <h3>模式 A：同名 PNG 覆蓋（舊版，單資料夾）</h3>
-  <p>指定「美術來源資料夾」與「Unity 目標資料夾」，執行「<strong>換皮掃描</strong>」後，工具把新 PNG 覆蓋到 Unity 目標資料夾裡同名的舊 PNG。適合單一資料夾、檔名相同的換皮情境。找不到對應檔名的圖片會列成待辦清單。</p>
+  <p>指定「美術來源資料夾」與「Unity 目標資料夾」，分兩段執行 <span class="tag tag-new">v2.5.1</span>：</p>
+  <ol>
+    <li>點「<strong>掃描換皮（預覽，不會修改檔案）</strong>」：工具比對兩個資料夾，列出「將覆蓋 N 張 / 缺少 M 張」與完整檔名清單，此時不修改任何檔案。</li>
+    <li>確認清單無誤後點「<strong>確認覆蓋 N 張 PNG</strong>」，並在確認對話框按「確定覆蓋」，工具才把新 PNG 覆蓋到 Unity 目標資料夾裡同名的舊 PNG。</li>
+  </ol>
+  <p>適合單一資料夾、檔名相同的換皮情境。找不到對應檔名的圖片會列成待辦清單。掃描後若更改任一資料夾路徑，舊掃描結果會自動作廢，需重新掃描。</p>
   <div class="callout warn">此模式只能覆蓋「同名檔案」，若新舊圖檔名不同，或 Sprite 分散在多個 Atlas 裡，請改用 SkinTheme 批次換皮。</div>
 
   <h3>模式 B：SkinTheme 批次換皮（推薦）</h3>
@@ -795,7 +801,8 @@ TXT_score_[THICK:2]</code></pre>
 
   <div class="panel">
     <h3 style="margin-top:0"><span class="tag tag-ps">PS</span>　PS 端更新</h3>
-    <p>執行 <code>PhotoshopUiPackageExporter.jsx</code>，對話框右上角點 <strong>Check for Updates</strong>。工具會連線 GitHub 比對版本號，確認後自動下載最新 JSX 並覆蓋當前檔案，下次執行即為新版。</p>
+    <p>執行 <code>PhotoshopUiPackageExporter.jsx</code>，對話框右上角點 <strong>Check for Updates</strong>。工具會連線 GitHub 比對版本號，確認後自動下載最新 JSX 並覆蓋當前檔案，下次執行即為新版。<br>
+    <span class="tag tag-new">v2.5.1</span> 起更新檢查在對話框內執行、<strong>不再關閉匯出對話框</strong>，已填好的路徑與選項全部保留；只有在實際下載安裝新版時才會關閉（新版需重新執行腳本才會生效）。</p>
     <ul>
       <li>Windows：使用 PowerShell WebClient 下載。</li>
       <li>Mac：使用 curl 下載。</li>
@@ -859,9 +866,22 @@ TXT_score_[THICK:2]</code></pre>
   <h3>Layout Group 沒有自動偵測成功？<span class="tag tag-new">v2.4</span></h3>
   <p>自動偵測需要群組內所有子層的 X（垂直 layout）或 Y（水平 layout）座標一致（±3px 容差）。若子層位置略有偏移超出容差，可在群組名稱加 <code>[H]</code> 或 <code>[V]</code> 強制指定方向。命名標記永遠優先於自動偵測。</p>
 
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <h2 id="changelog">版本紀錄</h2>
+
+  <h3>v2.5.1（2026-06-11）— 優化計畫 Phase 0：緊急安全修正</h3>
+  <ul>
+    <li><strong>Unity 換皮工具改為兩段式</strong>（U1）：原「執行換皮掃描」按鈕會直接覆蓋目標 PNG 且無確認。現改為先「掃描換皮（預覽）」列出將覆蓋/缺少清單（不動檔案），再經「確認覆蓋」按鈕與確認對話框才執行覆蓋；掃描後更改路徑會自動作廢掃描結果。</li>
+    <li><strong>PS 端 Check for Updates 不再關閉匯出對話框</strong>（U2）：更新檢查改在對話框內執行，已填的路徑與選項全部保留；僅在實際安裝新版時關閉對話框（需重跑腳本載入新版）。</li>
+    <li><strong>版本號統一</strong>：修正先前 JSX（2.4.2）/ Unity（2.5.0）/ README（2.2.0）版本漂移，全部統一為 v2.5.1。</li>
+  </ul>
+
+  <h3>v2.5.0 以前</h3>
+  <p class="muted-note" style="font-size:13px; color:var(--muted)">v2.5：SkinTheme 批次換皮。v2.4.x：Layout Group 自動排版、BTN_ 自動掛 Button、SpriteAtlas 自動設定、材質球顏色優先比對、字級 pt→px 修正、更新流程改走 raw.githubusercontent.com。詳見各章節中的版本標籤。</p>
+
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.5.0 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.5.1 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 
