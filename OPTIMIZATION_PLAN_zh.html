@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PS → Unity UI 工具 — 優化計畫（基準 v2.4.2）</title>
+  <style>
+    :root {
+      --bg: #0a0e1a;
+      --paper: #0f1524;
+      --panel: #0f1524;
+      --panel-alt: #101a2b;
+      --ink: #c8d6e8;
+      --muted: #6b7a99;
+      --line: #1e2d4a;
+      --accent: #00e5ff;
+      --accent-soft: rgba(0, 229, 255, 0.10);
+      --magenta: #ff00c8;
+      --magenta-soft: rgba(255, 0, 200, 0.12);
+      --ok: #00ff9f;
+      --ok-soft: rgba(0, 255, 159, 0.10);
+      --warn: #ffd600;
+      --warn-soft: rgba(255, 214, 0, 0.10);
+      --red: #ff2d6b;
+      --red-soft: rgba(255, 45, 107, 0.10);
+      --code-bg: #050810;
+      --code-fg: #00e5ff;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background:
+        repeating-linear-gradient(0deg, rgba(0,229,255,0.03) 0 1px, transparent 1px 4px),
+        radial-gradient(circle at 12% 0%, rgba(0,229,255,0.12), transparent 34%),
+        radial-gradient(circle at 88% 8%, rgba(255,0,200,0.10), transparent 32%),
+        var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+      line-height: 1.7;
+    }
+
+    main {
+      width: min(1040px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 40px 0 80px;
+    }
+
+    header {
+      padding: 28px 30px 26px;
+      border: 1px solid var(--line);
+      border-bottom: 1px solid rgba(0,229,255,0.65);
+      border-radius: 8px;
+      background: var(--paper);
+      margin-bottom: 28px;
+    }
+
+    h1 { margin: 0 0 8px; font-size: 26px; color: #fff; letter-spacing: 0.5px; }
+    h2 {
+      margin: 48px 0 14px;
+      font-size: 21px;
+      color: var(--accent);
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 8px;
+    }
+    h3 { margin: 26px 0 8px; font-size: 16px; color: #e6eefb; }
+
+    .lead { color: var(--muted); margin: 0; font-size: 14.5px; }
+
+    .badge {
+      display: inline-block;
+      font-size: 12px;
+      padding: 2px 10px;
+      border: 1px solid var(--accent);
+      border-radius: 99px;
+      color: var(--accent);
+      background: var(--accent-soft);
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+
+    nav { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+    nav a {
+      font-size: 13px;
+      color: var(--ink);
+      text-decoration: none;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 5px 12px;
+      background: var(--panel-alt);
+    }
+    nav a:hover { border-color: var(--accent); color: var(--accent); }
+
+    table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; }
+    th, td { border: 1px solid var(--line); padding: 9px 12px; text-align: left; vertical-align: top; }
+    th { background: var(--panel-alt); color: #e6eefb; white-space: nowrap; }
+    td code, p code, li code {
+      background: var(--code-bg);
+      color: var(--code-fg);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 12.5px;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 12px 14px;
+      overflow-x: auto;
+    }
+    pre code { background: none; padding: 0; color: var(--code-fg); font-size: 13px; }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 16px 20px;
+      margin: 14px 0;
+    }
+
+    .callout { border-radius: 8px; padding: 12px 16px; margin: 14px 0; font-size: 14px; border: 1px solid; }
+    .callout.info { border-color: rgba(0,229,255,0.4); background: var(--accent-soft); }
+    .callout.warn { border-color: rgba(255,214,0,0.4); background: var(--warn-soft); }
+    .callout.danger { border-color: rgba(255,45,107,0.4); background: var(--red-soft); }
+    .callout.ok { border-color: rgba(0,255,159,0.4); background: var(--ok-soft); }
+
+    .tag {
+      display: inline-block;
+      font-size: 11px;
+      padding: 1px 8px;
+      border-radius: 99px;
+      border: 1px solid;
+      margin-right: 6px;
+      white-space: nowrap;
+    }
+    .tag-red { color: var(--red); border-color: var(--red); background: var(--red-soft); }
+    .tag-warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+    .tag-ok { color: var(--ok); border-color: var(--ok); background: var(--ok-soft); }
+    .tag-cyan { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+    .tag-magenta { color: var(--magenta); border-color: var(--magenta); background: var(--magenta-soft); }
+
+    .phase {
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 18px 22px;
+      margin: 18px 0;
+    }
+    .phase.urgent { border-left-color: var(--red); }
+    .phase h3 { margin-top: 0; }
+    .phase .meta { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+
+    ul, ol { padding-left: 22px; }
+    li { margin: 5px 0; }
+
+    .muted { color: var(--muted); font-size: 13px; }
+
+    footer {
+      margin-top: 56px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    @media (max-width: 640px) {
+      main { padding: 24px 0 56px; }
+      header { padding: 20px 16px; }
+      .phase, .panel { padding-left: 14px; padding-right: 14px; }
+      table { display: block; overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+<main>
+
+  <header>
+    <h1>優化計畫 <span class="badge">基準版本 v2.4.2</span></h1>
+    <p class="lead">Photoshop → Unity UI 工具（PS_To_Unity_v2）優化方向、問題診斷與階段排程。<br>
+    文件日期：2026-06-11　·　配合文件：GUIDE_zh.html、README_zh.md</p>
+  </header>
+
+  <nav>
+    <a href="#rules">流程規範</a>
+    <a href="#font">字型精度診斷</a>
+    <a href="#uiux">UI/UX 問題清單</a>
+    <a href="#phases">階段排程</a>
+    <a href="#backlog">後續待辦池</a>
+    <a href="#open">待確認事項</a>
+    <a href="#howto">執行方式</a>
+  </nav>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <h2 id="rules">流程規範（每次優化必做）</h2>
+  <div class="panel">
+    <ol>
+      <li><strong>版本號</strong>：每完成一個階段即 bump 版本號。行為變更或 JSON 格式新增欄位 → 升 <strong>minor</strong>（如 2.5.0）；純修正 → 升 <strong>patch</strong>（如 2.4.3）。</li>
+      <li><strong>需同步更新版本號的位置</strong>（Phase 1 完成版本號單一來源之前，以下全部手動同步）：
+        <ul>
+          <li><code>PhotoshopUiPackageExporter.jsx</code> 的 <code>SCRIPT_VERSION</code></li>
+          <li><code>PhotoshopUiImporterWindow.cs</code> 的 <code>ToolVersion</code></li>
+          <li><code>GUIDE_zh.html</code>：header 標題徽章、頁尾版本</li>
+          <li><code>README.md</code> 與 <code>README_zh.md</code> 的「目前版本」</li>
+        </ul>
+      </li>
+      <li><strong>HTML 文件</strong>：每階段完成後在 GUIDE_zh.html 更新對應段落與 FAQ，並記錄 changelog。</li>
+      <li><strong>驗收</strong>：每階段附「驗收標準」，由使用者在 Photoshop / Unity 實機驗證通過後才進入下一階段。</li>
+    </ol>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <h2 id="font">字型精度診斷（核心痛點）</h2>
+  <p>使用者回報：<strong>「文字大小與內外框（描邊）粗細一直對不準」</strong>。程式碼追查後確認以下 5 個誤差來源：</p>
+
+  <table>
+    <tr><th>#</th><th>誤差來源</th><th>位置</th><th>說明</th></tr>
+    <tr>
+      <td>F1</td>
+      <td><strong>字級 pt / px 單位混用</strong> <span class="tag tag-ok">已排除</span></td>
+      <td>JSX <code>readFontSize()</code> ↔ <code>TmpMapper.Apply()</code></td>
+      <td>確認專案 PSD 慣用 <strong>72 DPI</strong>，此條件下 1 pt = 1 px，程式碼換算結果一致，字級問題不在這裡。若未來設計稿改用其他 DPI 再重新評估。</td>
+    </tr>
+    <tr>
+      <td>F2</td>
+      <td><strong>描邊換算分母錯誤（Padding vs gradientScale）</strong></td>
+      <td><code>TmpMapper.ConvertPhotoshopStrokeWidth()</code></td>
+      <td>實際 Font Asset（GenSenRounded-M SDF）：Sampling Point Size = 25、Padding = 5、SDFAA 模式。<br>
+      TMP 在 SDFAA 模式下 <code>gradientScale = Padding + 1 = 6</code>，正確公式為：<br>
+      <code>_OutlineWidth = strokePx × SamplingPointSize / (gradientScale × fontSize)</code><br>
+      = <code>strokePx × 25 / (6 × fontSize)</code>　→　ratio ≈ 4.17<br>
+      但程式碼用 <code>Padding（5）</code> 而非 <code>Padding+1（6）</code>，ratio = 5，導致<strong>描邊系統性偏厚約 20%</strong>。<br>
+      修正：分母改為 <code>atlasPadding + 1</code>，或動態讀取 Font Asset 的 <code>faceInfo</code> 計算。</td>
+    </tr>
+    <tr>
+      <td>F3</td>
+      <td><strong>描邊超限被無聲截斷</strong></td>
+      <td>同上，<code>Clamp(…, 0.01f, 1.0f)</code></td>
+      <td>SDF 描邊的物理上限受 atlas padding 限制。遊戲 UI 常見 4~8px 粗描邊容易超限，被 clamp 後永遠比 PS 細且無任何提示。應改為超限時於 Validate 報告中明確警告並建議重建 Font Asset 提高 padding。</td>
+    </tr>
+    <tr>
+      <td>F4</td>
+      <td><strong>未讀取描邊位置（外/中/內）</strong></td>
+      <td>JSX <code>frameFX</code> 讀取段</td>
+      <td>目前只讀 size / color / opacity。PS 描邊位置（<code>Styl</code>：outside / center / inside）影響整體視覺寬度達半個描邊寬。Unity 端可用 <code>_FaceDilate</code> 補償（需實測驗證）。</td>
+    </tr>
+    <tr>
+      <td>F5</td>
+      <td><strong>材質庫比對容差放大誤差</strong></td>
+      <td><code>TmpMapper.FindLibraryMaterial()</code></td>
+      <td>寬度容差 15%：即使換算正確，重用庫存材質球仍可能再偏 15%。待 F1~F3 修正後收緊容差。</td>
+    </tr>
+  </table>
+
+  <div class="callout info">
+    <strong>校準基準</strong>：建立一個固定的「校準 PSD」（多組字級 × 描邊寬組合），每次調整文字相關程式後匯出比對，作為回歸測試基準。
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <h2 id="uiux">UI/UX 問題清單</h2>
+
+  <h3><span class="tag tag-red">高</span>會造成損失或誤操作</h3>
+  <table>
+    <tr><th>#</th><th>問題</th><th>位置</th><th>修正方向</th></tr>
+    <tr>
+      <td>U1</td>
+      <td>「執行換皮掃描」名實不符：按鈕叫「掃描」，實際<strong>直接覆蓋目標 PNG 且無確認對話框</strong></td>
+      <td>Unity <code>ExecuteReskin()</code></td>
+      <td>改為兩段式：先掃描列出「將覆蓋 N 張 / 缺少 M 張」預覽 → 使用者確認後才執行覆蓋</td>
+    </tr>
+    <tr>
+      <td>U2</td>
+      <td>「Check for Updates」直接關閉匯出對話框，已調好的設定全部丟失</td>
+      <td>PS 對話框 <code>dialog.close(2)</code></td>
+      <td>更新檢查改為不關閉對話框，或檢查後返回原對話框並保留所有欄位值</td>
+    </tr>
+  </table>
+
+  <h3><span class="tag tag-warn">中</span>增加理解成本、引導失敗</h3>
+  <table>
+    <tr><th>#</th><th>問題</th><th>修正方向</th></tr>
+    <tr>
+      <td>U3</td>
+      <td>Unity 端三顆路徑按鈕語意重疊（套用標準輸出路徑 / 圖片位置跟隨來源 / 建立專案資料夾），需閱讀文件才知道何時按哪顆</td>
+      <td>收斂為單一路徑：填專案名稱 → 自動偵測資料夾是否存在 → 存在即套用、不存在則詢問一鍵建立</td>
+    </tr>
+    <tr>
+      <td>U4</td>
+      <td>步驟有編號 1~4 但無完成狀態；前置條件未滿足仍可按 Generate，得到錯誤而非引導</td>
+      <td>前置條件未滿足時按鈕 disable 並標示缺項（如「尚未套用 Package」）</td>
+    </tr>
+    <tr>
+      <td>U5</td>
+      <td>必填項（含文字節點時的 TMP Font Asset）無即時提示，要等 Generate 失敗才知道</td>
+      <td>套用 Package 當下即可判斷有無文字節點，缺字型時立即標紅該欄位</td>
+    </tr>
+    <tr>
+      <td>U6</td>
+      <td>Validate / 預覽（Dry-run）/ Generate 三鈕等大並排，主要動作無視覺主次，且 Validate 與預覽功能重疊</td>
+      <td>合併為「檢查」+「Generate Prefab」（主視覺按鈕，內建檢查）</td>
+    </tr>
+    <tr>
+      <td>U7</td>
+      <td>換皮工具（獨立、低頻、具破壞性）插在主匯入流程中間</td>
+      <td>移至獨立分頁或折疊區塊底部</td>
+    </tr>
+    <tr>
+      <td>U8</td>
+      <td>「參考解析度自動跟隨 Layout」toggle 與「套用 Layout 尺寸」按鈕並存，兩個控制項做一件事</td>
+      <td>保留 toggle；僅在 toggle 關閉時顯示手動套用按鈕</td>
+    </tr>
+  </table>
+
+  <h3><span class="tag tag-ok">低</span>細節打磨</h3>
+  <table>
+    <tr><th>#</th><th>問題</th><th>修正方向</th></tr>
+    <tr><td>U9</td><td>PS 對話框全英文，與 Unity 端及文件（中文）不一致</td><td>PS 對話框中文化（或雙語）</td></tr>
+    <tr><td>U10</td><td>Layout JSON 路徑欄位常駐主畫面，但絕大多數情況跟隨 PNG 資料夾即可</td><td>收進進階區，主畫面僅留輸出資料夾</td></tr>
+    <tr><td>U11</td><td>「Use fast layer duplicate export」暴露內部實作細節，使用者無從判斷</td><td>自動判斷或收進進階區</td></tr>
+    <tr><td>U12</td><td>「Export selected text layers as PNG」依賴開對話框前的選取狀態，勾選當下看不到選了哪些圖層</td><td>顯示「目前選取：N 個文字圖層（名稱…）」</td></tr>
+    <tr><td>U13</td><td>匯出結果只有一個 alert，資訊一閃即逝</td><td>輸出簡要匯出報告檔（與後續「匯出報告」功能合併）</td></tr>
+  </table>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <h2 id="phases">階段排程</h2>
+
+  <div class="callout warn">
+    <strong>版號修正（2026-06-11 Phase 0 執行時發現）</strong>：本計畫原以 v2.4.2 為基準，但倉庫實際狀態為 JSX = 2.4.2、Unity 端 = 2.5.0（SkinTheme 等 v2.5 功能已存在）、README = 2.2.0，版本已漂移。為避免 Unity 端版號倒退，Phase 0 改出 <strong>v2.5.1</strong>（統一全部位置），後續 Phase 版號順延：Phase 1 → v2.6.0、Phase 2 → v2.7.0、Phase 3 → v2.8.0。
+  </div>
+
+  <div class="phase urgent">
+    <h3><span class="tag tag-red">Phase 0</span>緊急安全修正 → v2.5.1（原訂 v2.4.3）<span class="tag tag-ok">已實作，待驗收</span></h3>
+    <p class="meta">範圍小（各約十數行）、風險低、但問題會造成實際損失，不等大版本。</p>
+    <ul>
+      <li>U1：換皮改為「掃描預覽 → 確認 → 覆蓋」兩段式</li>
+      <li>U2：Check for Updates 不再關閉匯出對話框 / 保留欄位值</li>
+    </ul>
+    <p><strong>驗收標準</strong>：換皮在覆蓋前必出現確認清單；PS 端點更新檢查後返回對話框、原設定仍在。</p>
+  </div>
+
+  <div class="phase">
+    <h3><span class="tag tag-cyan">Phase 1</span>字型精度 + 版本基建 → v2.6.0（原訂 v2.5.0）</h3>
+    <p class="meta">針對核心痛點「文字大小與描邊對不準」，並讓之後每次迭代的版本同步成本下降。</p>
+    <ol>
+      <li><strong>F2</strong>：描邊換算分母從 <code>atlasPadding</code> 改為 <code>atlasPadding + 1</code>（= gradientScale），修正系統性偏厚 20% 的問題。建議同步改為從 Font Asset 動態讀取，避免未來換字型時又出現同樣問題</li>
+      <li><strong>F3</strong>：換算結果超過 1.0 時不再無聲 clamp，於 Validate / Generate 報告明確警告並附建議 padding 值（以目前字型為例：36pt 文字描邊上限約 8.6px）</li>
+      <li><strong>F4</strong>：JSX 補讀 stroke position；Unity 端以 <code>_FaceDilate</code> 補償居中描邊（實驗項，需實測）</li>
+      <li><strong>基建</strong>：建立 <code>version.json</code> 單一版本來源 + bump script（改一處自動同步 JSX / CS / GUIDE / README）</li>
+      <li><strong>校準 PSD</strong>：建立固定字級 × 描邊組合的測試檔，作為回歸基準</li>
+    </ol>
+    <p><strong>驗收標準</strong>：用校準 PSD 匯出，於 Unity 疊半透明 PS 截圖比對，72 與 144 DPI 文件的文字大小皆一致；常用描邊寬度視覺誤差肉眼不可辨；超限描邊出現明確警告。</p>
+  </div>
+
+  <div class="phase">
+    <h3><span class="tag tag-cyan">Phase 2</span>Unity 端 UX 重整 → v2.7.0（原訂 v2.6.0）</h3>
+    <ul>
+      <li>U3：路徑按鈕收斂，以<strong>「建立專案資料夾」為主流程</strong>（最常用）；「套用標準輸出路徑」與「圖片位置跟隨來源」降為進階折疊選項</li>
+      <li>U4 / U5：步驟完成狀態、按鈕 disable 引導、必填即時標紅</li>
+      <li>U6：Validate 與預覽合併，Generate 做主視覺按鈕</li>
+      <li>U7 / U8：換皮移位、參考解析度控制項簡化</li>
+      <li>F5：收緊材質庫比對容差（依 Phase 1 修正後實測決定數值）</li>
+    </ul>
+    <p><strong>驗收標準</strong>：新使用者不看文件可完成「套用 Package → Generate」完整流程；每個錯誤狀態都有明確下一步指引。</p>
+  </div>
+
+  <div class="phase">
+    <h3><span class="tag tag-cyan">Phase 3</span>PS 端打磨 + 還原度 → v2.8.0（原訂 v2.7.0）</h3>
+    <ul>
+      <li>U9 ~ U12：PS 對話框中文化、選項收納進階區、選取狀態顯示</li>
+      <li>U13 + 匯出報告：總圖量、總大小、超大單圖警告、skipped 清單，輸出可回看的報告檔</li>
+      <li>像素雜湊去重：以匯出後 PNG 像素雜湊比對，正確撿回 v2.4.2 停用的去重功能（不誤殺同寬不同字的文字圖）</li>
+      <li>漸層文字：讀取 PS Gradient Overlay 上下色 → TMP <code>colorGradient</code> 四角頂點色</li>
+    </ul>
+    <p><strong>驗收標準</strong>：重複底圖正確共用、文字圖不被誤合併；漸層標題文字還原上下色；匯出後產生報告檔。</p>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <h2 id="backlog">後續待辦池（Phase 4+，依屆時痛點排序）</h2>
+  <table>
+    <tr><th>項目</th><th>說明</th></tr>
+    <tr><td>9-slice 支援</td><td>命名標記記錄 border，Unity 端設 Sprite border + Image type = Sliced，大幅縮小圖集</td></tr>
+    <tr><td>Drop Shadow → TMP Underlay</td><td>補齊常見字效對應</td></tr>
+    <tr><td>Btn 自動掛元件</td><td><code>Btn_</code> 前綴自動加 Button（含 transition），延伸 Toggle / ScrollView 標記</td></tr>
+    <tr><td>一鍵 Generate</td><td>套用 Package → 建資料夾 → 填路徑 → 檢查 → Generate 收成一鍵（Phase 2 完成後評估必要性）</td></tr>
+    <tr><td>JSX 模組化</td><td>開發時拆檔、發佈時 build 合併單檔，維持現有單檔更新機制；主檔已 2,668 行</td></tr>
+  </table>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <h2 id="open">待確認事項</h2>
+  <div class="callout ok">
+    Q1（PSD DPI）、Q3（路徑按鈕習慣）、Q4（Font Asset 設定）已全部確認。
+  </div>
+  <div class="callout warn">
+    <strong>Q2 仍待確認</strong>：提供一組實際對照數據「PS 裡某文字的字級與描邊 px ↔ 目前 Unity 產出後的視覺結果」，用來驗證 F2 偏厚 20% 的方向是否與實際體感一致，並作為 Phase 1 完成後的驗收基準。
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <h2 id="howto">執行方式</h2>
+  <div class="panel">
+    <p><strong>分工模式</strong>：規劃討論於 Claude Project；程式實作於 <strong>Claude Code（桌面版）</strong>，指向本機 PS_To_Unity_v2 倉庫；Photoshop / Unity 實機驗收由使用者執行。</p>
+    <ul>
+      <li>本文件放入倉庫根目錄，作為 Claude Code 的執行依據。</li>
+      <li><strong>一個 Phase 一個對話</strong>：依序執行，勿一次跨多階段。</li>
+      <li>每個 Phase 開始前，先請 Claude Code 說明「打算改哪些檔案與原因」再放行。</li>
+      <li>每個 Phase 結束：bump 版本 → 更新 GUIDE_zh.html 與 README → git commit → 使用者實機驗收 → 通過後進入下一階段。</li>
+    </ul>
+  </div>
+
+  <footer>
+    PS → Unity UI Tool 優化計畫 · 基準 v2.4.2 · 2026-06-11<br>
+    配合文件：GUIDE_zh.html · <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" style="color:var(--accent)">GitHub</a>
+  </footer>
+
+</main>
+</body>
+</html>

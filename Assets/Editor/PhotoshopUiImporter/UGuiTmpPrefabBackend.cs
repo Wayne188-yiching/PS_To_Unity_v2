@@ -135,7 +135,10 @@ namespace PhotoshopToUnity.EditorImporter
             switch (node.NormalizedType)
             {
                 case "image":
-                    return new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+                    var imageGo = new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+                    if (objectName.StartsWith("BTN_", StringComparison.OrdinalIgnoreCase))
+                        imageGo.AddComponent<Button>();
+                    return imageGo;
                 case "text":
                     return new GameObject(objectName, typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
                 default:

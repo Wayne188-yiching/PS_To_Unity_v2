@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.4.2";
+var SCRIPT_VERSION = "2.5.1";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 (function () {
@@ -13,11 +13,6 @@ var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_
     var options = showExportDialog(sourceDoc);
 
     if (!options) {
-        return;
-    }
-
-    if (options._action === "update") {
-        checkAndUpdateScript();
         return;
     }
 
@@ -46,11 +41,12 @@ var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_
 //  Self-update helpers
 // ---------------------------------------------------------------------------
 
+// Returns true only when a new version was downloaded and installed.
 function checkAndUpdateScript() {
     var selfPath = $.fileName;
     if (!selfPath) {
         alert("Cannot determine script file location.\nMake sure the script is saved to disk before updating.");
-        return;
+        return false;
     }
 
     var tempPath = Folder.temp.fsName + "/.pstu_update_" + (new Date().getTime()) + ".jsx";
@@ -62,13 +58,13 @@ function checkAndUpdateScript() {
             "Please check your internet connection or visit:\n" +
             "https://github.com/Wayne188-yiching/PS_To_Unity_v2"
         );
-        return;
+        return false;
     }
 
     var tempFile = new File(tempPath);
     if (!tempFile.exists) {
         alert("Update failed: download did not complete.");
-        return;
+        return false;
     }
 
     tempFile.encoding = "UTF-8";
@@ -79,7 +75,7 @@ function checkAndUpdateScript() {
 
     if (!newContent || newContent.length < 100) {
         alert("Update failed: downloaded file appears empty or corrupt.");
-        return;
+        return false;
     }
 
     var vMatch = newContent.match(/SCRIPT_VERSION\s*=\s*["']([^"']+)["']/);
@@ -87,7 +83,7 @@ function checkAndUpdateScript() {
 
     if (remoteVersion === SCRIPT_VERSION) {
         alert("You already have the latest version (v" + SCRIPT_VERSION + ").");
-        return;
+        return false;
     }
 
     var msg =
@@ -96,7 +92,7 @@ function checkAndUpdateScript() {
         "Local:  v" + SCRIPT_VERSION + "\n\n" +
         "Update and overwrite the current script file?";
     if (!confirm(msg)) {
-        return;
+        return false;
     }
 
     var selfFile = new File(selfPath);
@@ -110,6 +106,7 @@ function checkAndUpdateScript() {
     selfFile.close();
 
     alert("Update complete!\nRe-run the script to use version v" + remoteVersion + ".");
+    return true;
 }
 
 function downloadUrlToFile(url, destPath) {
@@ -147,7 +144,12 @@ function showExportDialog(doc) {
     var updateButton = headerGroup.add("button", undefined, "Check for Updates");
     updateButton.alignment = "right";
     updateButton.onClick = function () {
-        dialog.close(2);
+        // U2: run the update check inside the dialog so configured fields survive.
+        // Only close when a new version was actually installed (a re-run is required to load it).
+        var updated = checkAndUpdateScript();
+        if (updated) {
+            dialog.close(0);
+        }
     };
 
     var intro = dialog.add("statictext", undefined, "Export non-text layer PNGs and a named layout JSON for Unity. Text layers stay as TMP nodes.");
@@ -313,9 +315,6 @@ function showExportDialog(doc) {
     };
 
     var accepted = dialog.show();
-    if (accepted === 2) {
-        return { _action: "update" };
-    }
     return accepted === 1 ? dialog.result : null;
 }
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Photoshop → Unity UI 工具 v2.4 — 完整使用說明</title>
+  <title>Photoshop → Unity UI 工具 v2.5 — 完整使用說明</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.4.2</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.5.1</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -454,8 +454,10 @@
     <a href="#unity-window">Unity 匯入工具</a>
     <a href="#folders">專案資料夾結構</a>
     <a href="#text">文字與材質</a>
+    <a href="#reskin">換皮系統</a>
     <a href="#update">版本更新</a>
     <a href="#faq">常見問題</a>
+    <a href="#changelog">版本紀錄</a>
   </nav>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
@@ -578,6 +580,7 @@ Mac：    /Applications/Adobe Photoshop [版本]/Presets/Scripts/</code></pre>
     <tr><td><code>REF_</code></td><td>參考用圖層，匯出時跳過。</td></tr>
     <tr><td><code>IMG_</code></td><td>圖片前綴（前綴本身會從 PNG 檔名中移除）。</td></tr>
     <tr><td><code>TXT_</code></td><td>文字前綴（前綴本身會從節點名稱中移除）。</td></tr>
+    <tr><td><code>BTN_</code> <span class="tag tag-new">v2.4.3</span></td><td>圖片節點以 <code>BTN_</code> 開頭時（不分大小寫），Unity 匯入後自動在該 GameObject 加上 <code>Button</code> 元件，省去手動加掛步驟。</td></tr>
   </table>
 
   <h3>文字圖層輸出控制</h3>
@@ -681,7 +684,11 @@ TXT_score_[THICK:2]</code></pre>
 └── TimeLine/</code></pre>
 
   <div class="callout ok">
-    <strong>SpriteAtlas 自動設定</strong>：建立後 SpriteAtlas 的 Objects for Packing 已指向 <code>SpriteAtlas/</code> 資料夾，PS 匯出的圖片放入對應語言子資料夾後，在 Unity 手動點「Pack Preview」即可打包。
+    <strong>SpriteAtlas 自動設定 <span class="tag tag-new">v2.4.3</span></strong>：建立後 SpriteAtlas 自動套用專案標準設定——
+    Packing（無旋轉、無緊密排列、Padding 4）、
+    Texture（sRGB、Bilinear、無 Mip Maps）、
+    Android / iOS 平台（ASTC 6×6、2048、Best）。
+    Objects for Packing 已指向 <code>SpriteAtlas/</code> 資料夾，放入圖片後在 Unity 點「Pack Preview」即可打包。
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
@@ -710,7 +717,8 @@ TXT_score_[THICK:2]</code></pre>
   </table>
 
   <div class="callout info">
-    <strong>換皮工具</strong>：同一區塊下還有「換皮工具（美術圖覆蓋）」，可指定美術來源資料夾與 Unity 目標資料夾，執行「換皮掃描」後自動覆蓋同名 PNG。找不到對應美術的檔名會列出成待辦清單。
+    <strong>換皮工具（舊版）</strong>：可指定美術來源資料夾與 Unity 目標資料夾。<span class="tag tag-new">v2.5.1</span> 起改為兩段式：先「掃描換皮（預覽）」列出將覆蓋與缺少的清單（不修改任何檔案），確認清單後再按「確認覆蓋」並通過確認對話框，才會真正覆蓋同名 PNG。找不到對應美術的檔名會列出成待辦清單。<br>
+    <strong>SkinTheme 批次換皮（v2.5）</strong>：可跨多個 Prefab 批次替換 Sprite 參照，詳見 <a href="#reskin">換皮系統</a>。
   </div>
 
   <h3>4. 執行</h3>
@@ -729,7 +737,7 @@ TXT_score_[THICK:2]</code></pre>
     <li>PS 文字圖層的 <strong>Layer Style → Color Overlay</strong> 效果，填色顏色寫入 <code>color</code> 欄位，Unity 端套用至 TMP 頂點色。</li>
     <li>Unity Generate 時，依序執行材質球解析：
       <ol style="margin:6px 0 0; padding-left:20px">
-        <li>若設定了「TMP 材質球資料夾」，先掃描資料夾內所有材質球，找到色差 &lt; 8% 且寬度誤差 &lt; 15% 的即直接重用，<strong>不新增</strong>。</li>
+        <li>若設定了「TMP 材質球資料夾」，先掃描資料夾內所有材質球，以 Outline 顏色（RGB 各差 &lt; 8%）為第一條件過濾，再從符合色條件的材質球中選 Thickness 最接近的直接重用，<strong>不新增</strong>。<span class="tag tag-new">v2.4.3</span> 改為顏色優先比對，確保不同字號的同色外框都能穩定找到同一顆材質球。</li>
         <li>未找到匹配 → 從預設材質球複製一份，套用 <code>_OutlineColor</code> / <code>_OutlineWidth</code>，儲存至 <code>Assets/Temp/{名稱}/Font/GeneratedMaterials/</code>。</li>
         <li>無 Stroke 資料的文字節點直接套用預設材質球，不做任何處理。</li>
       </ol>
@@ -746,11 +754,55 @@ TXT_score_[THICK:2]</code></pre>
   <p>在圖層名稱加上 <code>[MAT:名稱]</code> 標記，Unity 端會優先以此 token 為鍵，從材質球資料夾或 GeneratedMaterials 中尋找對應材質。</p>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
+  <h2 id="reskin">換皮系統 <span class="tag tag-new">v2.5</span></h2>
+
+  <p>換皮系統提供兩種模式，視情況搭配使用：</p>
+
+  <h3>模式 A：同名 PNG 覆蓋（舊版，單資料夾）</h3>
+  <p>指定「美術來源資料夾」與「Unity 目標資料夾」，分兩段執行 <span class="tag tag-new">v2.5.1</span>：</p>
+  <ol>
+    <li>點「<strong>掃描換皮（預覽，不會修改檔案）</strong>」：工具比對兩個資料夾，列出「將覆蓋 N 張 / 缺少 M 張」與完整檔名清單，此時不修改任何檔案。</li>
+    <li>確認清單無誤後點「<strong>確認覆蓋 N 張 PNG</strong>」，並在確認對話框按「確定覆蓋」，工具才把新 PNG 覆蓋到 Unity 目標資料夾裡同名的舊 PNG。</li>
+  </ol>
+  <p>適合單一資料夾、檔名相同的換皮情境。找不到對應檔名的圖片會列成待辦清單。掃描後若更改任一資料夾路徑，舊掃描結果會自動作廢，需重新掃描。</p>
+  <div class="callout warn">此模式只能覆蓋「同名檔案」，若新舊圖檔名不同，或 Sprite 分散在多個 Atlas 裡，請改用 SkinTheme 批次換皮。</div>
+
+  <h3>模式 B：SkinTheme 批次換皮（推薦）</h3>
+  <p>適合「一套新美術，套用到 10～20 個 Prefab」的情境。以「舊 Sprite → 新 Sprite」為單位定義對應表，工具掃描指定資料夾下所有 Prefab，自動替換符合的 <code>Image.sprite</code> 參照，<strong>完全不動任何 Script / Button / Animator / RectTransform</strong>。</p>
+
+  <h3>SkinTheme 使用流程</h3>
+  <ol>
+    <li>在 Project 視窗目標位置 右鍵 → <code>Create → Photoshop UI Importer → Skin Theme</code>，建立 <code>SkinTheme.asset</code>。</li>
+    <li>在 Inspector 填入：
+      <ul>
+        <li><strong>Target Prefab Folder Asset</strong>：將含有目標 Prefab 的資料夾從 Project 視窗<strong>拖入</strong>此欄位。</li>
+        <li><strong>Entries</strong>：每一列填入「舊 Sprite（現在 Prefab 用的）」與「新 Sprite（新美術）」，可加多列。</li>
+        <li><strong>Excluded Prefabs</strong>（選填）：不想被換皮的 Prefab 加入此清單。</li>
+      </ul>
+    </li>
+    <li>在 Importer_v2 面板 → 換皮工具 → 選 SkinTheme → 點「<strong>套用換皮到所有 Prefab</strong>」。</li>
+    <li>確認 Dialog 後工具逐一掃描 Prefab，結果顯示「X 個 Prefab 更新，共替換 Y 個 Sprite」。</li>
+  </ol>
+
+  <div class="callout warn">
+    <strong>注意</strong>：套用換皮會直接修改 <code>.prefab</code> 檔案，操作前建議先用 Git commit 備份，或確認可復原。
+  </div>
+
+  <table>
+    <tr><th>比較項目</th><th>模式 A（同名覆蓋）</th><th>模式 B（SkinTheme）</th></tr>
+    <tr><td>適用情境</td><td>單資料夾、同檔名換圖</td><td>多 Prefab、不同檔名批次換皮</td></tr>
+    <tr><td>設定成本</td><td>低（只選資料夾）</td><td>中（建 SkinTheme 一次，之後一鍵）</td></tr>
+    <tr><td>影響範圍</td><td>指定資料夾內的 PNG 檔</td><td>指定資料夾內所有 Prefab 的 Sprite 參照</td></tr>
+    <tr><td>是否會動 Script / Button</td><td>否（只覆蓋 PNG 檔）</td><td>否（只改 Image.sprite）</td></tr>
+  </table>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="update">版本更新</h2>
 
   <div class="panel">
     <h3 style="margin-top:0"><span class="tag tag-ps">PS</span>　PS 端更新</h3>
-    <p>執行 <code>PhotoshopUiPackageExporter.jsx</code>，對話框右上角點 <strong>Check for Updates</strong>。工具會連線 GitHub 比對版本號，確認後自動下載最新 JSX 並覆蓋當前檔案，下次執行即為新版。</p>
+    <p>執行 <code>PhotoshopUiPackageExporter.jsx</code>，對話框右上角點 <strong>Check for Updates</strong>。工具會連線 GitHub 比對版本號，確認後自動下載最新 JSX 並覆蓋當前檔案，下次執行即為新版。<br>
+    <span class="tag tag-new">v2.5.1</span> 起更新檢查在對話框內執行、<strong>不再關閉匯出對話框</strong>，已填好的路徑與選項全部保留；只有在實際下載安裝新版時才會關閉（新版需重新執行腳本才會生效）。</p>
     <ul>
       <li>Windows：使用 PowerShell WebClient 下載。</li>
       <li>Mac：使用 curl 下載。</li>
@@ -759,7 +811,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <div class="panel">
     <h3 style="margin-top:0"><span class="tag tag-unity">Unity</span>　Unity 端更新</h3>
-    <p>在 Importer_v2 視窗標題列點 <strong>從 GitHub 更新工具</strong>。工具連線 GitHub Contents API 取得最新腳本清單，顯示版本對比後，確認即自動下載所有 <code>.cs</code> 並覆蓋本地，Unity 自動重新編譯。</p>
+    <p>在 Importer_v2 視窗標題列點 <strong>從 GitHub 更新工具</strong>。工具直接從 <code>raw.githubusercontent.com</code> 下載所有已知 <code>.cs</code> 檔（不呼叫 GitHub API，不受速率限制），顯示版本對比後，確認即自動覆蓋本地，Unity 自動重新編譯。</p>
     <div class="callout warn">更新後腳本內容會立即覆蓋，Unity 編譯完成前工具暫時無法使用，屬正常現象。</div>
   </div>
 
@@ -795,7 +847,13 @@ TXT_score_[THICK:2]</code></pre>
   <p>工具讀取 PS <strong>Color Overlay</strong> 效果的顏色作為 TMP 頂點色。若文字使用的是 <strong>Gradient Overlay</strong>（漸層），目前版本僅支援純色，漸層上下色需等待後續版本支援。</p>
 
   <h3>材質球資料夾設定後，Generate 還是一直新建材質球？</h3>
-  <p>比對條件為：RGB 每個色板差異 &lt; 8%，且寬度誤差 &lt; 15%。若庫中材質球顏色差異超出此範圍則視為不符，工具會自動新建。可確認庫中材質球的 <code>_OutlineColor</code> 是否與 PS 設定的 Stroke 色相近。</p>
+  <p>v2.4.3 起改為顏色優先比對：先以 RGB 各差 &lt; 8% 篩選候選材質球，再從候選中選 Thickness 最接近的。若庫中沒有任何材質球顏色符合（差異超出 8%），工具才會自動新建。可確認庫中材質球的 <code>_OutlineColor</code> 是否與 PS 設定的 Stroke 色相近。</p>
+
+  <h3>SkinTheme 套用後，Prefab 的 Script / Button 還在嗎？</h3>
+  <p>是，SkinTheme 只修改 <code>Image.sprite</code> 參照，完全不動 Script 序列化欄位、Button onClick 事件、Animator、RectTransform 等任何其他元件。</p>
+
+  <h3>Unity 更新時出現 403 速率限制錯誤？</h3>
+  <p>v2.4.3 起已修正：Unity 端更新不再呼叫 GitHub Contents API（舊版會觸發每小時 60 次的速率上限），改為直接從 <code>raw.githubusercontent.com</code> 下載已知清單，不受速率限制。若使用舊版工具遇到 403，請先手動複製最新 <code>PhotoshopUiImporterWindow.cs</code> 到 Unity，再執行一次更新即可。</p>
 
   <h3>文字在 PS 顯示 36pt，Unity 卻變成 29pt？<span class="tag tag-new">v2.4.1 已修正</span></h3>
   <p>v2.4.0 之前使用 <code>textItem.size</code>，這個 API 拿到的是「設計時原始字體」，不含 Free Transform 縮放。若文字圖層被自由變形縮放過，PS 字元面板顯示的是「縮放後的有效字體」（impliedFontSize），兩者會不同。<br>
@@ -808,9 +866,22 @@ TXT_score_[THICK:2]</code></pre>
   <h3>Layout Group 沒有自動偵測成功？<span class="tag tag-new">v2.4</span></h3>
   <p>自動偵測需要群組內所有子層的 X（垂直 layout）或 Y（水平 layout）座標一致（±3px 容差）。若子層位置略有偏移超出容差，可在群組名稱加 <code>[H]</code> 或 <code>[V]</code> 強制指定方向。命名標記永遠優先於自動偵測。</p>
 
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <h2 id="changelog">版本紀錄</h2>
+
+  <h3>v2.5.1（2026-06-11）— 優化計畫 Phase 0：緊急安全修正</h3>
+  <ul>
+    <li><strong>Unity 換皮工具改為兩段式</strong>（U1）：原「執行換皮掃描」按鈕會直接覆蓋目標 PNG 且無確認。現改為先「掃描換皮（預覽）」列出將覆蓋/缺少清單（不動檔案），再經「確認覆蓋」按鈕與確認對話框才執行覆蓋；掃描後更改路徑會自動作廢掃描結果。</li>
+    <li><strong>PS 端 Check for Updates 不再關閉匯出對話框</strong>（U2）：更新檢查改在對話框內執行，已填的路徑與選項全部保留；僅在實際安裝新版時關閉對話框（需重跑腳本載入新版）。</li>
+    <li><strong>版本號統一</strong>：修正先前 JSX（2.4.2）/ Unity（2.5.0）/ README（2.2.0）版本漂移，全部統一為 v2.5.1。</li>
+  </ul>
+
+  <h3>v2.5.0 以前</h3>
+  <p class="muted-note" style="font-size:13px; color:var(--muted)">v2.5：SkinTheme 批次換皮。v2.4.x：Layout Group 自動排版、BTN_ 自動掛 Button、SpriteAtlas 自動設定、材質球顏色優先比對、字級 pt→px 修正、更新流程改走 raw.githubusercontent.com。詳見各章節中的版本標籤。</p>
+
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.4.2 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.5.1 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

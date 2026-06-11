@@ -31,7 +31,12 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinTargetFolder = string.Empty;
         private System.Collections.Generic.List<string> reskinMissingFiles;
         private Vector2 reskinMissingScrollPos;
-        private const string ToolVersion = "2.4.2";
+        private System.Collections.Generic.List<string> reskinPendingOverwrites;
+        private Vector2 reskinOverwriteScrollPos;
+        private string reskinScannedSourceFolder;
+        private string reskinScannedTargetFolder;
+        private PsUiSkinTheme activeSkinTheme;
+        private const string ToolVersion = "2.5.1";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -255,9 +260,46 @@ namespace PhotoshopToUnity.EditorImporter
                 DrawFolderPathField("美術來源資料夾", ref reskinArtSourceFolder, false);
                 DrawFolderPathField("Unity 目標資料夾", ref reskinTargetFolder, true);
 
-                if (GUILayout.Button("執行換皮掃描", GUILayout.Height(34)))
+                // 路徑變更後舊掃描結果失效，必須重新掃描才能覆蓋
+                if (reskinPendingOverwrites != null &&
+                    (reskinScannedSourceFolder != reskinArtSourceFolder ||
+                     reskinScannedTargetFolder != reskinTargetFolder))
                 {
-                    ExecuteReskin();
+                    reskinPendingOverwrites = null;
+                    reskinMissingFiles = null;
+                }
+
+                if (GUILayout.Button("掃描換皮（預覽，不會修改檔案）", GUILayout.Height(34)))
+                {
+                    ScanReskin();
+                }
+
+                if (reskinPendingOverwrites != null)
+                {
+                    EditorGUILayout.Space(4);
+                    var missingCount = reskinMissingFiles != null ? reskinMissingFiles.Count : 0;
+                    EditorGUILayout.LabelField(
+                        $"掃描結果：將覆蓋 {reskinPendingOverwrites.Count} 張 / 缺少 {missingCount} 張",
+                        EditorStyles.boldLabel);
+
+                    if (reskinPendingOverwrites.Count > 0)
+                    {
+                        reskinOverwriteScrollPos = EditorGUILayout.BeginScrollView(reskinOverwriteScrollPos, GUILayout.MaxHeight(120));
+                        foreach (var name in reskinPendingOverwrites)
+                        {
+                            EditorGUILayout.LabelField(name, EditorStyles.miniLabel);
+                        }
+                        EditorGUILayout.EndScrollView();
+
+                        if (GUILayout.Button($"確認覆蓋 {reskinPendingOverwrites.Count} 張 PNG", GUILayout.Height(34)))
+                        {
+                            ApplyReskinOverwrites();
+                        }
+                    }
+                    else
+                    {
+                        EditorGUILayout.HelpBox("美術來源資料夾內沒有與目標同名的 PNG，無可覆蓋項目。", MessageType.Info);
+                    }
                 }
 
                 if (reskinMissingFiles != null && reskinMissingFiles.Count > 0)
@@ -272,11 +314,100 @@ namespace PhotoshopToUnity.EditorImporter
                     EditorGUILayout.EndScrollView();
                 }
             }
+
+            EditorGUILayout.Space(4);
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
+            {
+                EditorGUILayout.LabelField("SkinTheme 批次換皮", EditorStyles.boldLabel);
+                activeSkinTheme = (PsUiSkinTheme)EditorGUILayout.ObjectField(
+                    "Skin Theme", activeSkinTheme, typeof(PsUiSkinTheme), false);
+
+                if (activeSkinTheme != null)
+                {
+                    var folder = activeSkinTheme.targetPrefabFolderAsset != null
+                        ? AssetDatabase.GetAssetPath(activeSkinTheme.targetPrefabFolderAsset)
+                        : "（未設定）";
+                    EditorGUILayout.LabelField($"目標資料夾：{folder}", EditorStyles.miniLabel);
+
+                    DrawFolderPathField("新美術來源資料夾", ref activeSkinTheme.sourceArtFolder, false);
+                    if (GUI.changed) EditorUtility.SetDirty(activeSkinTheme);
+
+                    if (GUILayout.Button("掃描 Prefab，自動填入舊 Sprite", GUILayout.Height(28)))
+                        ScanSkinTheme();
+
+                    if (GUILayout.Button("套用換皮到所有 Prefab", GUILayout.Height(34)))
+                        ExecuteSkinTheme();
+                }
+            }
         }
 
-        private void ExecuteReskin()
+        private void ScanSkinTheme()
         {
-            reskinMissingFiles = new System.Collections.Generic.List<string>();
+            if (activeSkinTheme == null) return;
+
+            if (activeSkinTheme.targetPrefabFolderAsset == null)
+            {
+                SetStatus("請先拖入目標 Prefab 資料夾再掃描。", MessageType.Warning);
+                return;
+            }
+
+            var added = PsUiSkinApplier.ScanAndFillOldSprites(activeSkinTheme);
+            SetStatus(
+                added > 0
+                    ? $"掃描完成，找到 {added} 個 Sprite。請在 SkinTheme Inspector 為每筆填入對應的新 Sprite。"
+                    : "掃描完成，沒有新增項目（所有 Sprite 已在清單中）。",
+                added > 0 ? MessageType.Info : MessageType.Warning);
+        }
+
+        private void ExecuteSkinTheme()
+        {
+            if (activeSkinTheme == null) return;
+
+            var folder = activeSkinTheme.targetPrefabFolderAsset != null
+                ? AssetDatabase.GetAssetPath(activeSkinTheme.targetPrefabFolderAsset)
+                : "（未設定）";
+
+            if (!EditorUtility.DisplayDialog(
+                "套用換皮",
+                $"目標資料夾：{folder}\n\n" +
+                "• 同名項目（New Sprite 為空或同名）→ 從美術來源資料夾覆蓋 PNG 檔案\n" +
+                "• 不同名項目（New Sprite 不同）→ 替換 Prefab 裡的 Sprite 參照\n\n" +
+                "此操作直接修改檔案，確定繼續嗎？",
+                "確定套用",
+                "取消"))
+                return;
+
+            var r = PsUiSkinApplier.Apply(activeSkinTheme);
+
+            if (!string.IsNullOrEmpty(r.errorMessage))
+            {
+                SetStatus(r.errorMessage, MessageType.Error);
+                return;
+            }
+
+            var parts = new System.Collections.Generic.List<string>();
+            if (r.filesOverwritten > 0)
+                parts.Add($"覆蓋 {r.filesOverwritten} 個 PNG");
+            if (r.prefabsChanged > 0)
+                parts.Add($"{r.prefabsChanged} 個 Prefab 替換 {r.spritesReplaced} 個 Sprite 參照");
+            if (r.missingFiles != null && r.missingFiles.Count > 0)
+                parts.Add($"找不到 {r.missingFiles.Count} 個（見 Console）");
+
+            var msg = parts.Count > 0
+                ? "換皮完成：" + string.Join("，", parts) + "。"
+                : "換皮完成，沒有任何變更。";
+
+            if (r.missingFiles != null)
+                foreach (var f in r.missingFiles)
+                    Debug.LogWarning($"[SkinTheme] 找不到：{f}");
+
+            SetStatus(msg, r.filesOverwritten + r.prefabsChanged > 0 ? MessageType.Info : MessageType.Warning);
+        }
+
+        private void ScanReskin()
+        {
+            reskinPendingOverwrites = null;
+            reskinMissingFiles = null;
 
             if (string.IsNullOrWhiteSpace(reskinArtSourceFolder) || !Directory.Exists(reskinArtSourceFolder))
             {
@@ -304,33 +435,85 @@ namespace PhotoshopToUnity.EditorImporter
                 return;
             }
 
-            var overwriteCount = 0;
+            var pendingOverwrites = new System.Collections.Generic.List<string>();
+            var missingFiles = new System.Collections.Generic.List<string>();
             foreach (var targetFile in targetFiles)
             {
                 var fileName = Path.GetFileName(targetFile);
-                var sourcePath = Path.Combine(reskinArtSourceFolder, fileName);
-                if (File.Exists(sourcePath))
+                if (File.Exists(Path.Combine(reskinArtSourceFolder, fileName)))
                 {
-                    File.Copy(sourcePath, targetFile, overwrite: true);
+                    pendingOverwrites.Add(fileName);
+                }
+                else
+                {
+                    missingFiles.Add(fileName);
+                }
+            }
+
+            reskinPendingOverwrites = pendingOverwrites;
+            reskinMissingFiles = missingFiles;
+            reskinScannedSourceFolder = reskinArtSourceFolder;
+            reskinScannedTargetFolder = reskinTargetFolder;
+
+            SetStatus(
+                pendingOverwrites.Count > 0
+                    ? $"掃描完成：將覆蓋 {pendingOverwrites.Count} 張 / 缺少 {missingFiles.Count} 張。尚未修改任何檔案，請確認清單後按「確認覆蓋」。"
+                    : $"掃描完成：沒有同名 PNG 可覆蓋，缺少 {missingFiles.Count} 張。尚未修改任何檔案。",
+                pendingOverwrites.Count > 0 ? MessageType.Info : MessageType.Warning);
+        }
+
+        private void ApplyReskinOverwrites()
+        {
+            if (reskinPendingOverwrites == null || reskinPendingOverwrites.Count == 0)
+            {
+                return;
+            }
+
+            if (!EditorUtility.DisplayDialog(
+                "確認換皮覆蓋",
+                $"即將以「{reskinScannedSourceFolder}」的同名 PNG\n" +
+                $"覆蓋「{reskinScannedTargetFolder}」內共 {reskinPendingOverwrites.Count} 張圖片。\n\n" +
+                "此操作會直接覆蓋檔案且無法復原，確定繼續嗎？",
+                "確定覆蓋",
+                "取消"))
+            {
+                return;
+            }
+
+            var targetAbsPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", reskinScannedTargetFolder));
+            var overwriteCount = 0;
+            var skipped = new System.Collections.Generic.List<string>();
+            foreach (var fileName in reskinPendingOverwrites)
+            {
+                var sourcePath = Path.Combine(reskinScannedSourceFolder, fileName);
+                var targetPath = Path.Combine(targetAbsPath, fileName);
+                if (File.Exists(sourcePath) && File.Exists(targetPath))
+                {
+                    File.Copy(sourcePath, targetPath, overwrite: true);
                     overwriteCount++;
                 }
                 else
                 {
-                    reskinMissingFiles.Add(fileName);
+                    skipped.Add(fileName);
                 }
             }
 
             AssetDatabase.Refresh();
+            reskinPendingOverwrites = null;
 
             var msg = $"換皮完成。已覆蓋 {overwriteCount} 張圖片。";
-            if (reskinMissingFiles.Count > 0)
+            if (skipped.Count > 0)
+            {
+                msg += $" 有 {skipped.Count} 張在掃描後遺失，已跳過：{string.Join("、", skipped)}。";
+            }
+            if (reskinMissingFiles != null && reskinMissingFiles.Count > 0)
             {
                 msg += $" 找不到對應美術：{reskinMissingFiles.Count} 張（見下方清單）。";
                 SetStatus(msg, MessageType.Warning);
             }
             else
             {
-                SetStatus(msg, MessageType.Info);
+                SetStatus(msg, skipped.Count > 0 ? MessageType.Warning : MessageType.Info);
             }
         }
 
@@ -561,6 +744,41 @@ namespace PhotoshopToUnity.EditorImporter
             var folderObject = AssetDatabase.LoadAssetAtPath<Object>(atlasFolder);
             if (folderObject != null)
                 SpriteAtlasExtensions.Add(atlas, new Object[] { folderObject });
+
+            // Packing 設定
+            var packing = atlas.GetPackingSettings();
+            packing.enableRotation     = false;
+            packing.enableTightPacking = false;
+            packing.padding            = 4;
+            atlas.SetPackingSettings(packing);
+
+            // Texture 設定
+            var texture = atlas.GetTextureSettings();
+            texture.readable        = false;
+            texture.generateMipMaps = false;
+            texture.sRGB            = true;
+            texture.filterMode      = FilterMode.Bilinear;
+            atlas.SetTextureSettings(texture);
+
+            // Android 平台覆蓋
+            atlas.SetPlatformSettings(new TextureImporterPlatformSettings
+            {
+                name               = "Android",
+                overridden         = true,
+                maxTextureSize     = 2048,
+                format             = TextureImporterFormat.ASTC_6x6,
+                compressionQuality = (int)TextureCompressionQuality.Best,
+            });
+
+            // iOS 平台覆蓋（Unity 內部名稱為 "iPhone"）
+            atlas.SetPlatformSettings(new TextureImporterPlatformSettings
+            {
+                name               = "iPhone",
+                overridden         = true,
+                maxTextureSize     = 2048,
+                format             = TextureImporterFormat.ASTC_6x6,
+                compressionQuality = (int)TextureCompressionQuality.Best,
+            });
 
             EditorUtility.SetDirty(atlas);
             AssetDatabase.SaveAssets();
@@ -961,75 +1179,60 @@ namespace PhotoshopToUnity.EditorImporter
 
         private void UpdateFromGitHub()
         {
-            const string apiUrl =
-                "https://api.github.com/repos/Wayne188-yiching/PS_To_Unity_v2/contents/Assets/Editor/PhotoshopUiImporter";
-            var urlPattern = new System.Text.RegularExpressions.Regex(
-                @"""download_url""\s*:\s*""(https://raw\.githubusercontent\.com/[^""]+\.cs)""");
+            // 直接使用 raw.githubusercontent.com 下載，不呼叫 GitHub API
+            // 避免 unauthenticated API 每小時 60 次的速率限制（403）
+            const string rawBase =
+                "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/Assets/Editor/PhotoshopUiImporter/";
+
+            var fileNames = new[]
+            {
+                "IUiPrefabBackend.cs",
+                "ImageImportService.cs",
+                "LayoutReader.cs",
+                "PathUtility.cs",
+                "PhotoshopUiImporterWindow.cs",
+                "PhotoshopUiLayout.cs",
+                "SimpleJsonReader.cs",
+                "SkinMap.cs",
+                "SkinResolver.cs",
+                "TMPStyleMap.cs",
+                "TmpMapper.cs",
+                "UGuiTmpPrefabBackend.cs",
+                "PsUiSkinTheme.cs",
+                "PsUiSkinApplier.cs",
+            };
 
             EditorUtility.DisplayProgressBar("更新工具", "正在連線 GitHub...", 0.05f);
             try
             {
-                // Step 1: 取得目錄下的檔案清單
-                string apiJson;
+                // Step 1: 取得遠端版本號（只下載 Window 檔，不耗 API 配額）
+                string remoteVersion = null;
                 using (var wc = new System.Net.WebClient())
                 {
                     wc.Headers["User-Agent"] = "PhotoshopUiImporter-Updater/1.0";
-                    apiJson = wc.DownloadString(apiUrl);
-                }
-
-                var urlMatches = urlPattern.Matches(apiJson);
-                if (urlMatches.Count == 0)
-                {
-                    SetStatus("無法解析 GitHub 回應，請確認網路連線或稍後再試。", MessageType.Error);
-                    return;
-                }
-
-                var fileUrls = new System.Collections.Generic.List<string>();
-                foreach (System.Text.RegularExpressions.Match m in urlMatches)
-                {
-                    fileUrls.Add(m.Groups[1].Value);
-                }
-
-                // Step 2: 取得遠端版本號（預覽用）
-                string remoteVersion = null;
-                foreach (var url in fileUrls)
-                {
-                    if (!url.EndsWith("PhotoshopUiImporterWindow.cs"))
-                    {
-                        continue;
-                    }
-
-                    using (var wc = new System.Net.WebClient())
-                    {
-                        wc.Headers["User-Agent"] = "PhotoshopUiImporter-Updater/1.0";
-                        var raw = wc.DownloadString(url);
-                        var vm = System.Text.RegularExpressions.Regex.Match(raw, @"ToolVersion\s*=\s*""([^""]+)""");
-                        if (vm.Success)
-                        {
-                            remoteVersion = vm.Groups[1].Value;
-                        }
-                    }
-
-                    break;
+                    var raw = wc.DownloadString(rawBase + "PhotoshopUiImporterWindow.cs");
+                    var vm = System.Text.RegularExpressions.Regex.Match(raw, @"ToolVersion\s*=\s*""([^""]+)""");
+                    if (vm.Success)
+                        remoteVersion = vm.Groups[1].Value;
                 }
 
                 EditorUtility.ClearProgressBar();
 
-                // Step 3: 顯示確認 Dialog
+                // Step 2: 顯示確認 Dialog
                 var versionLine = remoteVersion != null
                     ? $"GitHub 版本：v{remoteVersion}　/　本地版本：v{ToolVersion}\n\n"
                     : string.Empty;
 
                 if (!EditorUtility.DisplayDialog(
                     "更新 Photoshop UI Importer",
-                    $"{versionLine}將覆蓋 Assets/Editor/PhotoshopUiImporter/ 下共 {fileUrls.Count} 個腳本。\n更新後 Unity 會自動重新編譯。\n\n確定要繼續嗎？",
+                    $"{versionLine}將覆蓋 Assets/Editor/PhotoshopUiImporter/ 下共 {fileNames.Length} 個腳本。\n更新後 Unity 會自動重新編譯。\n\n確定要繼續嗎？",
                     "確定更新",
                     "取消"))
                 {
                     return;
                 }
 
-                // Step 4: 找本地腳本所在目錄
+                // Step 3: 找本地腳本所在目錄
                 var guids = AssetDatabase.FindAssets("PhotoshopUiImporterWindow t:Script");
                 if (guids.Length == 0)
                 {
@@ -1041,25 +1244,24 @@ namespace PhotoshopToUnity.EditorImporter
                 var localDir = Path.GetDirectoryName(
                     Path.GetFullPath(Path.Combine(Application.dataPath, "..", scriptAssetPath)));
 
-                // Step 5: 逐一下載並覆蓋
+                // Step 4: 逐一下載並覆蓋
                 using (var wc = new System.Net.WebClient())
                 {
                     wc.Headers["User-Agent"] = "PhotoshopUiImporter-Updater/1.0";
-                    for (var i = 0; i < fileUrls.Count; i++)
+                    for (var i = 0; i < fileNames.Length; i++)
                     {
-                        var url = fileUrls[i];
-                        var fileName = Path.GetFileName(url);
+                        var fileName = fileNames[i];
                         EditorUtility.DisplayProgressBar(
                             "更新工具",
-                            $"下載 {fileName}（{i + 1}/{fileUrls.Count}）",
-                            (float)(i + 1) / fileUrls.Count);
-                        var content = wc.DownloadString(url);
+                            $"下載 {fileName}（{i + 1}/{fileNames.Length}）",
+                            (float)(i + 1) / fileNames.Length);
+                        var content = wc.DownloadString(rawBase + fileName);
                         File.WriteAllText(Path.Combine(localDir, fileName), content, Encoding.UTF8);
                     }
                 }
 
                 AssetDatabase.Refresh();
-                SetStatus($"更新完成，已下載 {fileUrls.Count} 個腳本。Unity 正在重新編譯。", MessageType.Info);
+                SetStatus($"更新完成，已下載 {fileNames.Length} 個腳本。Unity 正在重新編譯。", MessageType.Info);
             }
             catch (System.Net.WebException webEx)
             {
