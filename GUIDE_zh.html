@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Photoshop → Unity UI 工具 v2.5 — 完整使用說明</title>
+  <title>Photoshop → Unity UI 工具 v2.6 — 完整使用說明</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.5.1</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.6.0</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -748,6 +748,17 @@ TXT_score_[THICK:2]</code></pre>
     <strong>材質球重用邏輯</strong>：同一頁面若多個文字用了接近的字框顏色，工具會自動共用同一顆材質球，避免 GeneratedMaterials 資料夾膨脹。
   </div>
 
+  <h3>描邊寬度換算 <span class="tag tag-new">v2.6</span></h3>
+  <p>PS 描邊 px 換算為 TMP <code>_OutlineWidth</code>（0~1）的公式：</p>
+  <pre><code>_OutlineWidth = strokePx × samplingPointSize ÷ (atlasPadding + 1) ÷ fontSize</code></pre>
+  <ul>
+    <li><code>samplingPointSize</code> 與 <code>atlasPadding</code> 自動從你指定的 TMP Font Asset 讀取，換字型不需改任何設定。</li>
+    <li>v2.6.0 修正：分母改用 <code>atlasPadding + 1</code>（TMP 的 gradientScale），修正先前描邊系統性偏厚約 20% 的問題。</li>
+  </ul>
+  <div class="callout warn">
+    <strong>描邊超限警告 <span class="tag tag-new">v2.6</span></strong>：SDF 描邊有物理上限（受 atlasPadding 限制）。換算結果超過 1.0 時，Generate 完成後狀態列會顯示超限筆數，Console 列出各節點的描邊 px、目前上限與<strong>建議的 atlasPadding</strong>。依建議值重建 Font Asset（Window → TextMeshPro → Font Asset Creator，調高 Padding）後重新 Generate 即可。
+  </div>
+
   <h3>手動指定材質球</h3>
   <pre><code>PS 圖層名稱：TXT_title_[MAT:title_yellow_outline]
             TXT_score_[MAT:reward_white_red_outline]</code></pre>
@@ -869,6 +880,13 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
 
+  <h3>v2.6.0（2026-06-11）— 優化計畫 Phase 1：字型精度 + 版本基建</h3>
+  <ul>
+    <li><strong>描邊換算修正</strong>（F2）：PS 描邊 px → TMP <code>_OutlineWidth</code> 的換算分母由 <code>atlasPadding</code> 改為 <code>atlasPadding + 1</code>（= gradientScale），修正先前描邊系統性偏厚約 20% 的問題；且 <code>samplingPointSize</code> 與 <code>atlasPadding</code> 改為從指定的 TMP Font Asset 動態讀取，未來更換字型不需改程式。</li>
+    <li><strong>描邊超限明確警告</strong>（F3）：換算結果超過 SDF 物理上限（1.0）時不再無聲截斷。Generate 完成後狀態列顯示超限筆數，Console 列出每個超限節點的「描邊 px / 字級 / 目前上限 / 建議 atlasPadding」，可依建議值重建 Font Asset 後重跑。</li>
+    <li><strong>版本單一來源</strong>：新增 <code>version.json</code> + <code>bump-version.ps1</code>，一個指令同步 JSX / Unity / GUIDE / README 全部版本號（<code>.\bump-version.ps1 -NewVersion X.Y.Z</code>，加 <code>-Check</code> 可只檢查不修改）。</li>
+  </ul>
+
   <h3>v2.5.1（2026-06-11）— 優化計畫 Phase 0：緊急安全修正</h3>
   <ul>
     <li><strong>Unity 換皮工具改為兩段式</strong>（U1）：原「執行換皮掃描」按鈕會直接覆蓋目標 PNG 且無確認。現改為先「掃描換皮（預覽）」列出將覆蓋/缺少清單（不動檔案），再經「確認覆蓋」按鈕與確認對話框才執行覆蓋；掃描後更改路徑會自動作廢掃描結果。</li>
@@ -881,7 +899,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.5.1 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.6.0 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

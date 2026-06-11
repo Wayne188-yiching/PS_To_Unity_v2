@@ -36,7 +36,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.5.1";
+        private const string ToolVersion = "2.6.0";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -659,7 +659,22 @@ namespace PhotoshopToUnity.EditorImporter
             EditorUtility.DisplayProgressBar("生成 Prefab", "完成...", 1.0f);
             Selection.activeObject = prefab;
             EditorGUIUtility.PingObject(prefab);
-            SetStatus($"Prefab 生成完成：{AssetDatabase.GetAssetPath(prefab)}", MessageType.Info);
+
+            // F3：把描邊超限警告聚合後一次顯示，並輸出至 Console 方便回查節點名稱。
+            if (tmpMapper.OutlineOverflowWarnings.Count > 0)
+            {
+                foreach (var w in tmpMapper.OutlineOverflowWarnings)
+                    Debug.LogWarning($"[OutlineOverflow] {w}");
+
+                var summary = $"Prefab 生成完成（{AssetDatabase.GetAssetPath(prefab)}），" +
+                              $"但有 {tmpMapper.OutlineOverflowWarnings.Count} 個文字描邊超出 SDF 物理上限被截斷，" +
+                              "詳見 Console 警告。建議按建議值重建對應 TMP Font Asset 的 atlasPadding 後重跑。";
+                SetStatus(summary, MessageType.Warning);
+            }
+            else
+            {
+                SetStatus($"Prefab 生成完成：{AssetDatabase.GetAssetPath(prefab)}", MessageType.Info);
+            }
         }
 
 

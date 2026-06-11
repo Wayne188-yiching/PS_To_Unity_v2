@@ -1,0 +1,44 @@
+{
+  "version": "2.6.0",
+  "phase": "Phase 1 — Font precision + version infra",
+  "updated": "2026-06-11",
+  "_notes": "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
+  "surfaces": [
+    {
+      "file": "PhotoshopExporter/PhotoshopUiPackageExporter.jsx",
+      "pattern": "(?m)^var\\s+SCRIPT_VERSION\\s*=\\s*\"[^\"]+\";",
+      "replacement": "var SCRIPT_VERSION = \"{version}\";"
+    },
+    {
+      "file": "PhotoshopExporter/PhotoshopUiPackageUpdater.jsx",
+      "pattern": "(?m)^var\\s+SCRIPT_VERSION\\s*=\\s*\"[^\"]+\";",
+      "replacement": "var SCRIPT_VERSION = \"{version}\";",
+      "optional": true
+    },
+    {
+      "file": "Assets/Editor/PhotoshopUiImporter/PhotoshopUiImporterWindow.cs",
+      "pattern": "private\\s+const\\s+string\\s+ToolVersion\\s*=\\s*\"[^\"]+\";",
+      "replacement": "private const string ToolVersion = \"{version}\";"
+    },
+    {
+      "file": "README.md",
+      "pattern": "(?m)^v\\d+\\.\\d+\\.\\d+$",
+      "replacement": "v{version}"
+    },
+    {
+      "file": "README_zh.md",
+      "pattern": "目前版本：v\\d+\\.\\d+\\.\\d+",
+      "replacement": "目前版本：v{version}"
+    },
+    {
+      "file": "GUIDE_zh.html",
+      "pattern": "Photoshop → Unity UI 工具 v\\d+\\.\\d+ — 完整使用說明",
+      "replacement": "Photoshop → Unity UI 工具 v{majorMinor} — 完整使用說明"
+    },
+    {
+      "file": "GUIDE_zh.html",
+      "pattern": "<span class=\"badge\">v\\d+\\.\\d+\\.\\d+</span>",
+      "replacement": "<span class=\"badge\">v{version}</span>"
+    }
+  ]
+}

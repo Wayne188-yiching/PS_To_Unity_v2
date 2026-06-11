@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using TMPro;
 using UnityEditor;
@@ -11,6 +12,9 @@ namespace PhotoshopToUnity.EditorImporter
         private readonly string materialLibraryFolder;
         private readonly TMP_FontAsset defaultFontAsset;
         private readonly Material defaultMaterialPreset;
+
+        // F3: 描邊換算超出 SDF 上限時收集警告，由呼叫端在 Generate 結束時集中顯示。
+        public readonly List<string> OutlineOverflowWarnings = new List<string>();
 
         public TmpMapper(TMP_FontAsset defaultFontAsset, Material defaultMaterialPreset, string generatedMaterialFolder = null, string materialLibraryFolder = null)
         {
@@ -70,7 +74,8 @@ namespace PhotoshopToUnity.EditorImporter
             outlineColor.a = Mathf.Clamp01(node.outlineOpacity <= 0f ? 1f : node.outlineOpacity);
 
             // 先從材質庫尋找相近的現成材質球，找到就直接用，不新增
-            var targetWidth = ConvertPhotoshopStrokeWidth(node.outlineWidth, node.fontSize);
+            var fontAssetForSdf = defaultFontAsset != null ? defaultFontAsset : TMP_Settings.defaultFontAsset;
+            var targetWidth = ConvertPhotoshopStrokeWidth(node, fontAssetForSdf);
             var libraryMatch = FindLibraryMaterial(outlineColor, targetWidth);
             if (libraryMatch != null)
                 return libraryMatch;
@@ -110,15 +115,53 @@ namespace PhotoshopToUnity.EditorImporter
             return material;
         }
 
-        private static float ConvertPhotoshopStrokeWidth(float strokeWidthPixels, float fontSize)
+        // F2 + F3: 把 PS 描邊像素換算為 TMP _OutlineWidth (0..1)
+        // 公式推導：
+        //   outlinePixels = _OutlineWidth × gradientScale × (fontSize / samplingPointSize)
+        //   其中 gradientScale = atlasPadding + 1（TMP 的 SDF 有效擴張範圍）
+        //   反解 _OutlineWidth = strokePx × samplingPointSize / gradientScale / fontSize
+        //
+        // 舊版寫死 sdfRatio = 5（假設 SamplingPointSize=25 / Padding=5），換字型就會錯。
+        // 改為從 Font Asset 動態讀取 samplingPointSize 與 atlasPadding，並把分母從
+        // atlasPadding 改為 atlasPadding + 1，修正之前系統性偏厚的問題。
+        //
+        // 上限超過 1.0 時不再無聲 clamp，會記錄到 OutlineOverflowWarnings，讓呼叫端集中提示。
+        private float ConvertPhotoshopStrokeWidth(PhotoshopUiNode node, TMP_FontAsset fontAsset)
         {
-            // TMP SDF formula: _OutlineWidth = strokePx × (SamplingPointSize / Padding) / fontSize
-            // Derived from: outlinePixels = _OutlineWidth × Padding × (fontSize / SamplingPointSize)
-            // Common TMP default: SamplingPointSize=25, Padding=5 → ratio = 5
-            // Clamp upper bound raised to 1.0 to support large strokes
-            var referenceSize = fontSize > 0f ? fontSize : 40f;
-            const float sdfRatio = 5f; // SamplingPointSize(25) / Padding(5)
-            return Mathf.Clamp(strokeWidthPixels * sdfRatio / referenceSize, 0.01f, 1.0f);
+            var strokeWidthPixels = node.outlineWidth;
+            var referenceSize = node.fontSize > 0f ? node.fontSize : 40f;
+
+            // 從 Font Asset 動態讀取，讀不到才退回保守預設值（25 / 5）。
+            float samplingPointSize = 25f;
+            float atlasPadding = 5f;
+            if (fontAsset != null)
+            {
+                samplingPointSize = fontAsset.faceInfo.pointSize > 0f
+                    ? fontAsset.faceInfo.pointSize
+                    : samplingPointSize;
+                atlasPadding = fontAsset.atlasPadding > 0
+                    ? fontAsset.atlasPadding
+                    : atlasPadding;
+            }
+
+            var gradientScale = atlasPadding + 1f;
+            var ratio = samplingPointSize / gradientScale; // 等價於舊 sdfRatio
+            var rawWidth = strokeWidthPixels * ratio / referenceSize;
+
+            // F3：超出 SDF 物理上限時記錄警告，並提示重建 Font Asset 所需的 padding。
+            if (rawWidth > 1.0f)
+            {
+                var maxPixelsAtCurrentPadding = referenceSize / ratio;
+                var requiredPadding = Mathf.CeilToInt(
+                    strokeWidthPixels * samplingPointSize / referenceSize) - 1;
+                var nodeName = string.IsNullOrWhiteSpace(node.name) ? "(unnamed)" : node.name;
+                var fontName = fontAsset != null ? fontAsset.name : "(no font asset)";
+                OutlineOverflowWarnings.Add(
+                    $"「{nodeName}」描邊 {strokeWidthPixels:0.##}px @ 字級 {referenceSize:0.##} 已超出 SDF 上限（{maxPixelsAtCurrentPadding:0.##}px，字型 {fontName} atlasPadding={atlasPadding:0}）。" +
+                    $"建議重建該字型 Font Asset，atlasPadding ≥ {requiredPadding}。");
+            }
+
+            return Mathf.Clamp(rawWidth, 0.01f, 1.0f);
         }
 
         private Material FindLibraryMaterial(Color targetOutlineColor, float targetOutlineWidth)
