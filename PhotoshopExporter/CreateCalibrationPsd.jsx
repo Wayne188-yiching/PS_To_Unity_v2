@@ -23,10 +23,13 @@
     var docW = MARGIN * 2 + CELL_W * STROKE_WIDTHS.length;
     var docH = MARGIN * 2 + CELL_H * FONT_SIZES.length;
 
+    // Only rulerUnits is touched. typeUnits is deliberately left alone: every
+    // size below passes an explicit UnitValue anyway, and the typeUnits setter
+    // throws an uncatchable "general Photoshop error" on some Photoshop builds.
     var originalRulerUnits = app.preferences.rulerUnits;
-    var originalTypeUnits = app.preferences.typeUnits;
     app.preferences.rulerUnits = Units.PIXELS;
-    app.preferences.typeUnits = TypeUnits.POINTS;
+
+    var failures = [];
 
     try {
         var doc = app.documents.add(
@@ -61,23 +64,38 @@
                 ];
 
                 if (strokePx > 0) {
-                    applyStroke(strokePx, 255, 255, 255);
+                    doc.activeLayer = layer;
+                    try {
+                        applyStroke(strokePx, 255, 255, 255);
+                    } catch (eStroke) {
+                        failures.push(layer.name + ": " + eStroke.message);
+                    }
                 }
             }
         }
 
-        alert(
+        var summary =
             "CalibrationBoard created.\n\n" +
             "Rows: font sizes " + FONT_SIZES.join(" / ") + " pt\n" +
             "Columns: stroke widths " + STROKE_WIDTHS.join(" / ") + " px\n\n" +
             "Next steps:\n" +
             "1. Save as CalibrationBoard.psd\n" +
             "2. Export with PhotoshopUiPackageExporter.jsx\n" +
-            "3. Generate in Unity and overlay a 50% PS screenshot to compare"
-        );
+            "3. Generate in Unity and overlay a 50% PS screenshot to compare";
+
+        if (failures.length > 0) {
+            summary +=
+                "\n\nWARNING: stroke failed on " + failures.length + " layer(s):\n" +
+                failures.join("\n");
+        }
+
+        alert(summary);
     } finally {
-        app.preferences.rulerUnits = originalRulerUnits;
-        app.preferences.typeUnits = originalTypeUnits;
+        try {
+            app.preferences.rulerUnits = originalRulerUnits;
+        } catch (ePrefs) {
+            // Never let preference restore mask the real error.
+        }
     }
 
     function makeColor(r, g, b) {
@@ -103,7 +121,9 @@
         stroke.putBoolean(charIDToTypeID("enab"), true);
         stroke.putEnumerated(charIDToTypeID("Styl"), charIDToTypeID("FStl"), charIDToTypeID("OutF")); // outside
         stroke.putEnumerated(charIDToTypeID("PntT"), charIDToTypeID("FrFl"), charIDToTypeID("SClr"));
-        stroke.putUnitDouble(charIDToTypeID("Md  "), charIDToTypeID("#Prc"), 100);
+        // Blend mode is an enum (BlnM/Nrml); writing it as a percent UnitDouble
+        // makes executeAction throw a general Photoshop error.
+        stroke.putEnumerated(charIDToTypeID("Md  "), charIDToTypeID("BlnM"), charIDToTypeID("Nrml"));
         stroke.putUnitDouble(charIDToTypeID("Opct"), charIDToTypeID("#Prc"), 100);
         stroke.putUnitDouble(charIDToTypeID("Sz  "), charIDToTypeID("#Pxl"), sizePx);
 
