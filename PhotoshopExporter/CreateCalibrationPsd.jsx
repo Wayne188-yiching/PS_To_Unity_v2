@@ -41,6 +41,13 @@
             DocumentFill.WHITE
         );
 
+        // Mid-gray background: the strokes are white, so a white canvas would
+        // make them invisible and defeat the overlay comparison.
+        doc.activeLayer = doc.backgroundLayer;
+        doc.selection.selectAll();
+        doc.selection.fill(makeColor(128, 128, 128));
+        doc.selection.deselect();
+
         for (var row = 0; row < FONT_SIZES.length; row++) {
             for (var col = 0; col < STROKE_WIDTHS.length; col++) {
                 var fontSize = FONT_SIZES[row];
