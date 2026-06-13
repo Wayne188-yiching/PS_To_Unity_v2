@@ -764,15 +764,23 @@ TXT_score_[THICK:2]</code></pre>
   </div>
 
   <h3>描邊厚度補償係數 <span class="tag tag-new">v2.6.2</span></h3>
-  <p>SDF 描邊邊緣是半透明 falloff（非硬邊），即使物理寬度與 PS 完全一致，視覺重心仍會比 PS 略寬。Importer_v2 視窗的「3. 文字、材質與換皮」區提供一條 <strong>描邊厚度補償係數</strong> 滑桿（範圍 0.3 ~ 1.5，預設 1.0），值會即時存入 EditorPrefs 跨 session 保留。</p>
-  <p><strong>校正方法</strong>（一次性）：</p>
+  <p>Importer_v2 視窗的「3. 文字、材質與換皮」區提供一條 <strong>描邊厚度補償係數</strong> 滑桿（範圍 0.3 ~ 1.5，預設 1.0），值會即時存入 EditorPrefs 跨 session 保留。</p>
+  <div class="callout ok">
+    <strong>正常情況下保持 1.0 不需動</strong>。Phase 1 校準實測：當 Unity TMP 用的字型與字重<strong>與 PS 設計稿完全一致</strong>（例如 PS 用 SourceHanSansTC-Bold、Unity 也烘同名 SDF）時，物理公式 <code>W = strokePx × sampling / (2 × atlasPadding × fontSize)</code> 直接命中，補償係數 = 1.000 描邊厚度就跟 PS 重合。
+  </div>
+  <p><strong>什麼情況才需要動補償係數？</strong></p>
+  <ul>
+    <li><strong>換用非思源系列字型</strong>（例如圓體、明體、其他廠商 SDF）：不同字型的 antialias falloff 寬度不同，可能視覺上比 PS 偏厚或偏細，這時用校準板回推合適值。</li>
+    <li>PS 與 Unity <strong>故意</strong>用不同字型／字重（例如設計稿用 Bold、實際 UI 用 Regular）：補償係數可微調描邊讓比例好看。</li>
+  </ul>
+  <p><strong>校正方法</strong>（必要時）：</p>
   <ol>
-    <li>在 PS 執行「Create Calibration PSD」生成 <code>CalibrationBoard.psd</code>，存檔後用 UI Package Exporter 匯出。</li>
-    <li>Unity Generate 校準板。把 PS 截圖（100% 縮放）丟進 Scene 疊在生成的 UI 上、50% 透明度比對。</li>
-    <li>若 Unity 描邊比 PS 偏厚：把補償係數調低（先試 <code>0.85</code>），重新 Generate；偏細則調高。逐次微調直到肉眼難辨差異。</li>
-    <li>確定後不需再動，所有後續 Generate 都會自動套用該係數。</li>
+    <li>PS 端執行「Create Calibration PSD」生成 <code>CalibrationBoard.psd</code>，存檔後用 UI Package Exporter 匯出。</li>
+    <li>Unity Generate 校準板，把 PS 截圖（100% 縮放）丟進 Scene 疊在生成的 UI 上、50% 透明度比對。</li>
+    <li>Unity 描邊比 PS 偏厚 → 補償係數調低；偏細 → 調高。二分法逼近直到肉眼難辨差異。</li>
+    <li>確定後不需再動，所有後續 Generate 自動套用。</li>
   </ol>
-  <p>係數作用點是公式末端的純倍乘，不影響超限警告的判斷（仍以原始物理寬度為準）。</p>
+  <p>係數作用點是公式末端的純倍乘，<strong>不影響超限警告的判斷</strong>（仍以原始物理寬度為準）。</p>
 
   <h3>手動指定材質球</h3>
   <pre><code>PS 圖層名稱：TXT_title_[MAT:title_yellow_outline]
