@@ -82,9 +82,18 @@ namespace PhotoshopToUnity.EditorImporter
             var isVisualNode = node.NormalizedType == "image" || node.NormalizedType == "text";
             var isLayoutGroup = node.NormalizedType == "group" && !string.IsNullOrWhiteSpace(node.layoutType);
 
-            if (isVisualNode || isLayoutGroup)
+            // 響應式模式下，一般 group 不再展開成 canvas 尺寸的透明容器，
+            // 改用自身 PS bounds 建 Rect，子節點 anchor 才能相對 group 邊緣生效
+            var isSizedGroup = context.useResponsiveAnchor
+                               && !isLayoutGroup
+                               && node.NormalizedType == "group"
+                               && node.width > 0f
+                               && node.height > 0f;
+            var hasOwnRect = isVisualNode || isLayoutGroup || isSizedGroup;
+
+            if (hasOwnRect)
             {
-                ApplyNodeRect(rectTransform, node, parentX, parentY, parentWidth, parentHeight, parentPivot);
+                ApplyNodeRect(rectTransform, node, parentX, parentY, parentWidth, parentHeight, parentPivot, context.useResponsiveAnchor);
             }
             else
             {
@@ -117,7 +126,7 @@ namespace PhotoshopToUnity.EditorImporter
 
             foreach (var child in node.children)
             {
-                if (isVisualNode || isLayoutGroup)
+                if (hasOwnRect)
                 {
                     CreateNode(child, rectTransform, node.x, node.y, node.width, node.height, rectTransform.pivot, context);
                 }
@@ -157,20 +166,40 @@ namespace PhotoshopToUnity.EditorImporter
             rectTransform.localRotation = Quaternion.identity;
         }
 
-        private static void ApplyNodeRect(RectTransform rectTransform, PhotoshopUiNode node, float parentX, float parentY, float parentWidth, float parentHeight, Vector2 parentPivot)
+        private static void ApplyNodeRect(RectTransform rectTransform, PhotoshopUiNode node, float parentX, float parentY, float parentWidth, float parentHeight, Vector2 parentPivot, bool useResponsiveAnchor)
         {
             var left = node.x - parentX;
             var top = node.y - parentY;
             var width = node.width;
             var height = node.height;
 
-            rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
-            rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-            rectTransform.pivot = new Vector2(0.5f, 0.5f);
-            rectTransform.anchoredPosition = new Vector2(
-                left + width * 0.5f - parentWidth * 0.5f,
-                parentHeight * 0.5f - top - height * 0.5f);
-            rectTransform.sizeDelta = new Vector2(width, height);
+            // Stretch（anchorMin != anchorMax）尚未支援，先退回 center fixed 避免 sizeDelta 語意錯誤
+            var isFixedAnchor = Mathf.Approximately(node.anchorMin.x, node.anchorMax.x)
+                                && Mathf.Approximately(node.anchorMin.y, node.anchorMax.y);
+
+            if (useResponsiveAnchor && isFixedAnchor)
+            {
+                var anchor = node.anchorMin;
+                var pivot = node.pivot;
+                rectTransform.anchorMin = anchor;
+                rectTransform.anchorMax = anchor;
+                rectTransform.pivot = pivot;
+                // PS y 向下、Unity y 向上；在參考解析度下與 center 路徑算出相同的螢幕位置
+                rectTransform.anchoredPosition = new Vector2(
+                    left + width * pivot.x - parentWidth * anchor.x,
+                    parentHeight * (1f - anchor.y) - top - height * (1f - pivot.y));
+                rectTransform.sizeDelta = new Vector2(width, height);
+            }
+            else
+            {
+                rectTransform.anchorMin = new Vector2(0.5f, 0.5f);
+                rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+                rectTransform.pivot = new Vector2(0.5f, 0.5f);
+                rectTransform.anchoredPosition = new Vector2(
+                    left + width * 0.5f - parentWidth * 0.5f,
+                    parentHeight * 0.5f - top - height * 0.5f);
+                rectTransform.sizeDelta = new Vector2(width, height);
+            }
 
             rectTransform.localScale = Vector3.one;
             rectTransform.localRotation = Quaternion.identity;

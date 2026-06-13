@@ -12,11 +12,17 @@ namespace PhotoshopToUnity.EditorImporter
         private readonly string materialLibraryFolder;
         private readonly TMP_FontAsset defaultFontAsset;
         private readonly Material defaultMaterialPreset;
+        private readonly float outlineThicknessMultiplier;
 
         // F3: 描邊換算超出 SDF 上限時收集警告，由呼叫端在 Generate 結束時集中顯示。
         public readonly List<string> OutlineOverflowWarnings = new List<string>();
 
-        public TmpMapper(TMP_FontAsset defaultFontAsset, Material defaultMaterialPreset, string generatedMaterialFolder = null, string materialLibraryFolder = null)
+        public TmpMapper(
+            TMP_FontAsset defaultFontAsset,
+            Material defaultMaterialPreset,
+            string generatedMaterialFolder = null,
+            string materialLibraryFolder = null,
+            float outlineThicknessMultiplier = 1.0f)
         {
             this.defaultFontAsset = defaultFontAsset;
             this.defaultMaterialPreset = defaultMaterialPreset;
@@ -24,6 +30,7 @@ namespace PhotoshopToUnity.EditorImporter
                 ? "Assets/GeneratedMaterials"
                 : generatedMaterialFolder;
             this.materialLibraryFolder = materialLibraryFolder;
+            this.outlineThicknessMultiplier = Mathf.Clamp(outlineThicknessMultiplier, 0.3f, 1.5f);
         }
 
         public void Apply(TextMeshProUGUI target, PhotoshopUiNode node)
@@ -82,7 +89,9 @@ namespace PhotoshopToUnity.EditorImporter
 
             Directory.CreateDirectory(PathUtility.ToAbsolutePath(generatedMaterialFolder));
 
-            var token = string.IsNullOrWhiteSpace(node.materialToken) ? BuildOutlineToken(node) : node.materialToken;
+            // PS 端 materialToken 不含字級（如 outline_ffffff_8），跨字級會撞名、
+            // 各字級共用同一顆材質導致描邊比例全錯，一律改用含字級的 BuildOutlineToken
+            var token = BuildOutlineToken(node);
             var materialName = $"{MakeSafeFileName(baseMaterial.name)}_{MakeSafeFileName(token)}";
             var materialPath = $"{generatedMaterialFolder}/{materialName}.mat";
             var material = AssetDatabase.LoadAssetAtPath<Material>(materialPath);
@@ -109,6 +118,19 @@ namespace PhotoshopToUnity.EditorImporter
             {
                 material.SetFloat(ShaderUtilities.ID_OutlineWidth, targetWidth);
             }
+
+            // 實測（校正板 bbox 量測）：TMP outline 以字緣為中心向內外各擴 targetWidth，
+            // 內側會吃掉字面；PS 描邊是「外部」語意（字面不動、全部朝外）。
+            // 把字面同步外推 targetWidth（= strokePx 換算值的一半），描邊內緣剛好
+            // 落回原字緣 → 字面不變、描邊全朝外，與 PS 一致。
+            if (material.HasProperty(ShaderUtilities.ID_FaceDilate))
+            {
+                material.SetFloat(ShaderUtilities.ID_FaceDilate, targetWidth);
+            }
+
+            // 注意：不要嘗試設定 _ScaleRatioA — TMP 的 ShaderUtilities.GetPadding 會在
+            // 材質被文字使用時自動呼叫 UpdateShaderRatios 重算覆寫（實測 ratioA =
+            // (gradientScale-1)/gradientScale，已納入 ConvertPhotoshopStrokeWidth 公式）。
 
             EditorUtility.SetDirty(material);
             AssetDatabase.SaveAssets();
@@ -144,16 +166,24 @@ namespace PhotoshopToUnity.EditorImporter
                     : atlasPadding;
             }
 
-            var gradientScale = atlasPadding + 1f;
-            var ratio = samplingPointSize / gradientScale; // 等價於舊 sdfRatio
-            var rawWidth = strokeWidthPixels * ratio / referenceSize;
+            // 實測模型（校正板 bbox 量測，三組數據吻合）：
+            //   外擴 px = (_FaceDilate + _OutlineWidth) × ratioA × gradientScale × fontSize / sampling
+            //   其中 TMP 自動維護 ratioA = (gradientScale − 1) / gradientScale（UpdateShaderRatios），
+            //   gradientScale = atlasPadding + 1，故 ratioA × gradientScale 化簡為 atlasPadding。
+            // 設 _FaceDilate = _OutlineWidth = W：字面外推 W、描邊內緣落回原字緣，
+            // 重現 PS「外部描邊」語意（字面不縮、N px 全朝外）。
+            //   N = 2W × atlasPadding × fontSize / sampling
+            //   → W = N × sampling / (2 × atlasPadding × fontSize)
+            var ratio = samplingPointSize / atlasPadding;
+            var rawWidth = strokeWidthPixels * ratio / referenceSize; // 外擴 N px 所需的 2W 總量
+            var halfWidth = rawWidth * 0.5f;
 
             // F3：超出 SDF 物理上限時記錄警告，並提示重建 Font Asset 所需的 padding。
             if (rawWidth > 1.0f)
             {
                 var maxPixelsAtCurrentPadding = referenceSize / ratio;
                 var requiredPadding = Mathf.CeilToInt(
-                    strokeWidthPixels * samplingPointSize / referenceSize) - 1;
+                    strokeWidthPixels * samplingPointSize / referenceSize);
                 var nodeName = string.IsNullOrWhiteSpace(node.name) ? "(unnamed)" : node.name;
                 var fontName = fontAsset != null ? fontAsset.name : "(no font asset)";
                 OutlineOverflowWarnings.Add(
@@ -161,7 +191,13 @@ namespace PhotoshopToUnity.EditorImporter
                     $"建議重建該字型 Font Asset，atlasPadding ≥ {requiredPadding}。");
             }
 
-            return Mathf.Clamp(rawWidth, 0.01f, 1.0f);
+            // 補償係數：SDF 描邊邊緣是半透明 falloff（非硬邊），即使物理寬度與 PS 相同，
+            // 視覺重心會比 PS 略寬。Window 提供 0.3~1.5 的滑桿讓使用者用校準板回推合適值。
+            // 預設 1.0（不補償，維持物理寬度等於 PS）。
+            var compensated = halfWidth * outlineThicknessMultiplier;
+
+            // 上限 0.5：dilate(0.5) + outline 外擴(0.5) = 1.0 恰為 SDF 物理極限
+            return Mathf.Clamp(compensated, 0.005f, 0.5f);
         }
 
         private Material FindLibraryMaterial(Color targetOutlineColor, float targetOutlineWidth)
@@ -221,7 +257,11 @@ namespace PhotoshopToUnity.EditorImporter
         private static string BuildOutlineToken(PhotoshopUiNode node)
         {
             var color = string.IsNullOrWhiteSpace(node.outlineColor) ? "outline" : node.outlineColor.Trim().TrimStart('#');
-            return $"outline_{color}_{Mathf.RoundToInt(node.outlineWidth)}";
+            // _OutlineWidth 是「相對字級」的比值：同樣 2px 描邊，24pt 與 72pt 需要的
+            // _OutlineWidth 差三倍，因此產生的材質球必須以「顏色+描邊px+字級」為單位，
+            // 不能跨字級共用（否則後處理的字級會覆蓋先處理的，造成各字級粗細全錯）。
+            var sizeKey = Mathf.RoundToInt(node.fontSize > 0f ? node.fontSize : 40f);
+            return $"outline_{color}_{Mathf.RoundToInt(node.outlineWidth)}_{sizeKey}";
         }
 
         private static string MakeSafeFileName(string value)

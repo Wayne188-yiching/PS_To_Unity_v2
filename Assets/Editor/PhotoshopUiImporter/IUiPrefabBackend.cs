@@ -18,5 +18,6 @@ namespace PhotoshopToUnity.EditorImporter
         public string prefabOutputFolder;
         public string prefabName;
         public Vector2 referenceResolution = new Vector2(1920f, 1080f);
+        public bool useResponsiveAnchor;
     }
 }

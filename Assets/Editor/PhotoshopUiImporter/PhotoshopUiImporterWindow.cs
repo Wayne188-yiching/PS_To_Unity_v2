@@ -21,12 +21,18 @@ namespace PhotoshopToUnity.EditorImporter
         private Material defaultTmpMaterialPreset;
         private bool autoReferenceResolution = true;
         private Vector2 referenceResolution = new Vector2(1920f, 1080f);
+        private bool useResponsiveAnchor;
         private Vector2 scrollPosition;
         private string statusMessage;
         private MessageType statusType = MessageType.Info;
         private bool showAdvancedPackage;
         private bool showAdvancedOutput;
         private string materialLibraryFolder = string.Empty;
+        // F2 補償係數：SDF 描邊視覺 falloff 比 PS 重，使用者用校準板回推合適值。
+        // 值由 OnEnable 從 EditorPrefs 還原；範圍 0.3 ~ 1.5，預設 1.0。
+        private float outlineThicknessMultiplier = 1.0f;
+        private const string PrefKeyOutlineThicknessMultiplier =
+            "PhotoshopUiImporter.OutlineThicknessMultiplier";
         private string reskinArtSourceFolder = string.Empty;
         private string reskinTargetFolder = string.Empty;
         private System.Collections.Generic.List<string> reskinMissingFiles;
@@ -36,7 +42,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.6.1";
+        private const string ToolVersion = "2.6.2";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -45,6 +51,11 @@ namespace PhotoshopToUnity.EditorImporter
             var window = GetWindow<PhotoshopUiImporterWindow>("Importer_v2");
             window.minSize = new Vector2(560, 600);
             window.Show();
+        }
+
+        private void OnEnable()
+        {
+            outlineThicknessMultiplier = EditorPrefs.GetFloat(PrefKeyOutlineThicknessMultiplier, 1.0f);
         }
 
         private void OnGUI()
@@ -228,6 +239,10 @@ namespace PhotoshopToUnity.EditorImporter
             {
                 referenceResolution.y = 1080f;
             }
+
+            useResponsiveAnchor = EditorGUILayout.ToggleLeft(
+                "啟用響應式 anchor（實驗性：套用 PS anchor 與 group 實際尺寸）",
+                useResponsiveAnchor);
         }
 
         private void DrawTypographySection()
@@ -249,6 +264,37 @@ namespace PhotoshopToUnity.EditorImporter
                 EditorGUILayout.HelpBox(
                     "若 UI Package 含 text 節點，至少要指定預設 TMP Font Asset。若要穩定重現文字風格，建議同時指定 TMP 材質球。",
                     MessageType.Info);
+
+                // F2 補償：用校準板比對後可微調，存 EditorPrefs，跨 session 保留。
+                EditorGUILayout.Space(4);
+                EditorGUILayout.LabelField("描邊厚度補償（v2.6）", EditorStyles.boldLabel);
+                using (var check = new EditorGUI.ChangeCheckScope())
+                {
+                    var newValue = EditorGUILayout.Slider(
+                        new GUIContent(
+                            "描邊厚度補償係數",
+                            "Unity SDF 描邊邊緣是半透明 falloff，視覺重心比 PS 重。\n" +
+                            "用 CalibrationBoard 比對：Unity 偏厚 → 調低（如 0.85）；偏細 → 調高。\n" +
+                            "預設 1.0（不補償，物理寬度 = PS）。"),
+                        outlineThicknessMultiplier, 0.3f, 1.5f);
+                    if (check.changed)
+                    {
+                        outlineThicknessMultiplier = newValue;
+                        EditorPrefs.SetFloat(PrefKeyOutlineThicknessMultiplier, newValue);
+                    }
+                }
+                if (Mathf.Abs(outlineThicknessMultiplier - 1.0f) < 0.001f)
+                {
+                    EditorGUILayout.HelpBox(
+                        "目前 = 1.0（不補償）。若描邊比 PS 視覺偏厚，調低（如 0.85）後重新 Generate；用 CalibrationBoard 疊圖比對找到合適值。",
+                        MessageType.None);
+                }
+                else
+                {
+                    EditorGUILayout.HelpBox(
+                        $"目前補償係數 = {outlineThicknessMultiplier:0.00}（預設 1.0）。Generate 時所有 _OutlineWidth 都會乘上這個數值。",
+                        MessageType.Info);
+                }
             }
         }
 
@@ -640,8 +686,12 @@ namespace PhotoshopToUnity.EditorImporter
             var generatedMaterialFolder = string.IsNullOrWhiteSpace(projectFolder)
                 ? "Assets/GeneratedMaterials"
                 : $"Assets/Temp/{projectFolder}/Font/GeneratedMaterials";
-            var tmpMapper = new TmpMapper(defaultTmpFontAsset, defaultTmpMaterialPreset, generatedMaterialFolder,
-                string.IsNullOrWhiteSpace(materialLibraryFolder) ? null : materialLibraryFolder);
+            var tmpMapper = new TmpMapper(
+                defaultTmpFontAsset,
+                defaultTmpMaterialPreset,
+                generatedMaterialFolder,
+                string.IsNullOrWhiteSpace(materialLibraryFolder) ? null : materialLibraryFolder,
+                outlineThicknessMultiplier);
             var backend = new UGuiTmpPrefabBackend();
             var prefabName = Path.GetFileNameWithoutExtension(layoutJsonPath);
 
@@ -653,7 +703,8 @@ namespace PhotoshopToUnity.EditorImporter
                 tmpMapper = tmpMapper,
                 prefabOutputFolder = prefabFolder,
                 prefabName = prefabName,
-                referenceResolution = referenceResolution
+                referenceResolution = referenceResolution,
+                useResponsiveAnchor = useResponsiveAnchor
             });
 
             EditorUtility.DisplayProgressBar("生成 Prefab", "完成...", 1.0f);

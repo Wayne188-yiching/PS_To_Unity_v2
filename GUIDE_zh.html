@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.6.1</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.6.2</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -763,6 +763,17 @@ TXT_score_[THICK:2]</code></pre>
     <strong>描邊超限警告 <span class="tag tag-new">v2.6</span></strong>：SDF 描邊有物理上限（受 atlasPadding 限制）。換算結果超過 1.0 時，Generate 完成後狀態列會顯示超限筆數，Console 列出各節點的描邊 px、目前上限與<strong>建議的 atlasPadding</strong>。依建議值重建 Font Asset（Window → TextMeshPro → Font Asset Creator，調高 Padding）後重新 Generate 即可。
   </div>
 
+  <h3>描邊厚度補償係數 <span class="tag tag-new">v2.6.2</span></h3>
+  <p>SDF 描邊邊緣是半透明 falloff（非硬邊），即使物理寬度與 PS 完全一致，視覺重心仍會比 PS 略寬。Importer_v2 視窗的「3. 文字、材質與換皮」區提供一條 <strong>描邊厚度補償係數</strong> 滑桿（範圍 0.3 ~ 1.5，預設 1.0），值會即時存入 EditorPrefs 跨 session 保留。</p>
+  <p><strong>校正方法</strong>（一次性）：</p>
+  <ol>
+    <li>在 PS 執行「Create Calibration PSD」生成 <code>CalibrationBoard.psd</code>，存檔後用 UI Package Exporter 匯出。</li>
+    <li>Unity Generate 校準板。把 PS 截圖（100% 縮放）丟進 Scene 疊在生成的 UI 上、50% 透明度比對。</li>
+    <li>若 Unity 描邊比 PS 偏厚：把補償係數調低（先試 <code>0.85</code>），重新 Generate；偏細則調高。逐次微調直到肉眼難辨差異。</li>
+    <li>確定後不需再動，所有後續 Generate 都會自動套用該係數。</li>
+  </ol>
+  <p>係數作用點是公式末端的純倍乘，不影響超限警告的判斷（仍以原始物理寬度為準）。</p>
+
   <h3>手動指定材質球</h3>
   <pre><code>PS 圖層名稱：TXT_title_[MAT:title_yellow_outline]
             TXT_score_[MAT:reward_white_red_outline]</code></pre>
@@ -883,6 +894,13 @@ TXT_score_[THICK:2]</code></pre>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
+
+  <h3>v2.6.2（2026-06-13）— 描邊厚度補償係數（F2 視覺微調）</h3>
+  <ul>
+    <li><strong>新增 UI 滑桿：描邊厚度補償係數</strong>（範圍 0.3 ~ 1.5、預設 1.0），即時存入 EditorPrefs 跨 session 保留。SDF 描邊邊緣的半透明 falloff 會讓視覺重心比 PS 略寬，靠這條滑桿用校準板回推合適值。</li>
+    <li>不動既有換算公式，只在末端純倍乘；超限警告判斷仍以原始物理寬度為準，不受影響。</li>
+    <li>校正流程文件化：見「文字與材質球 → 描邊厚度補償係數」章節。</li>
+  </ul>
 
   <h3>v2.6.1（2026-06-12）— PS 選單整合：單一入口</h3>
   <ul>
