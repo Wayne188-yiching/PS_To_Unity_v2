@@ -1,5 +1,5 @@
 {
-    "version":  "2.6.3",
+    "version":  "2.6.4",
     "phase":  "Phase 1 — Font precision + version infra",
     "updated":  "2026-06-14",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",

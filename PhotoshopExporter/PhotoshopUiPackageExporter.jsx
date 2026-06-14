@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.6.3";
+var SCRIPT_VERSION = "2.6.4";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 (function () {
@@ -80,9 +80,23 @@ function checkAndUpdateScript() {
 
     var vMatch = newContent.match(/SCRIPT_VERSION\s*=\s*["']([^"']+)["']/);
     var remoteVersion = vMatch ? vMatch[1] : "unknown";
+    var cmp = compareSemver(remoteVersion, SCRIPT_VERSION);
 
-    if (remoteVersion === SCRIPT_VERSION) {
+    if (cmp === 0) {
         alert("You already have the latest version (v" + SCRIPT_VERSION + ").");
+        return false;
+    }
+
+    if (cmp < 0) {
+        // Local is newer than what's published on GitHub (typical during local
+        // development before a push). Do not offer to overwrite - that would
+        // silently downgrade unreleased work.
+        alert(
+            "Local version is newer than GitHub.\n\n" +
+            "Local:  v" + SCRIPT_VERSION + "\n" +
+            "GitHub: v" + remoteVersion + "\n\n" +
+            "Nothing to do."
+        );
         return false;
     }
 
@@ -107,6 +121,25 @@ function checkAndUpdateScript() {
 
     alert("Update complete!\nRe-run the script to use version v" + remoteVersion + ".");
     return true;
+}
+
+// Returns -1 if a < b, 0 if equal, 1 if a > b. Treats non-numeric / missing
+// segments as 0 so "2.6" and "2.6.0" compare equal. Unknown versions
+// (parse failure) compare as 0 - caller treats that as "no update needed".
+function compareSemver(a, b) {
+    if (a === b) return 0;
+    var as = String(a || "0").split(".");
+    var bs = String(b || "0").split(".");
+    var len = Math.max(as.length, bs.length);
+    for (var i = 0; i < len; i++) {
+        var av = parseInt(as[i], 10);
+        var bv = parseInt(bs[i], 10);
+        if (isNaN(av)) av = 0;
+        if (isNaN(bv)) bv = 0;
+        if (av < bv) return -1;
+        if (av > bv) return 1;
+    }
+    return 0;
 }
 
 function downloadUrlToFile(url, destPath) {

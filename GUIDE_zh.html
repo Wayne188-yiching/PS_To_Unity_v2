@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.6.3</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.6.4</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -902,6 +902,12 @@ TXT_score_[THICK:2]</code></pre>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
+
+  <h3>v2.6.4（2026-06-14）— Check for Updates 改用 semver 比較</h3>
+  <ul>
+    <li>原本只判斷「版本字串相等與否」就提示覆蓋——本地比 GitHub 新時也會跳出「Update and overwrite」對話框，按「是」會把本地新版降回 GitHub 舊版。</li>
+    <li>新增 <code>compareSemver</code> 並改寫流程：本地較新時顯示「Local is newer than GitHub. Nothing to do.」、本地較舊才提示覆蓋、相等則顯示「latest」。</li>
+  </ul>
 
   <h3>v2.6.3（2026-06-14）— PS 端關閉自動 anchor 推測（hotfix）</h3>
   <ul>

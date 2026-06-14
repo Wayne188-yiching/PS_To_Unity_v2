@@ -6,7 +6,7 @@ It exports a Photoshop UI as a UI Package, then rebuilds the layout in Unity as 
 
 ## Version
 
-v2.6.3
+v2.6.4
 
 ## Main Workflow
 
