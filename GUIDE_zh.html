@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.6.2</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.6.3</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -902,6 +902,14 @@ TXT_score_[THICK:2]</code></pre>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
+
+  <h3>v2.6.3（2026-06-14）— PS 端關閉自動 anchor 推測（hotfix）</h3>
+  <ul>
+    <li><strong>問題</strong>：先前 <code>inferLayout</code> 會依圖層 bbox 自動推測 anchor（fixed / stretch / 角落）並寫進 layout.json。實測在含群組 effect 的 PSD 上推測結果常常錯誤，會把 331×246 的圖層誤認成 stretch_full、把固定位置的圖層 pivot 標成 (0.5, 0.5) 但 anchor 標成角落，importer 端寫進 RectTransform 之後位置全錯。</li>
+    <li><strong>修正</strong>：<code>inferLayout</code> 一律回傳 <code>center fixed</code>（anchor = pivot = (0.5, 0.5)），所有沒有命名標記的圖層都改用「中心固定 + 原寸 sizeDelta」放置。命名標記（<code>ANCHOR_TL</code> / <code>STRETCH_X</code> / <code>PIVOT_*</code> 等）的 opt-in 響應式行為不受影響，仍由 <code>parseLayoutTag</code> 處理。</li>
+    <li><strong>影響</strong>：所有現有 PSD 需重新執行 UI Package Exporter 才會套用新規則。Unity 端排版會與 PS 設計稿 1:1 對齊；若 Canvas referenceResolution 與 PSD canvas 不一致仍會在 Game View 邊緣裁切，建議把 CanvasScaler 的 referenceResolution 設成與 PSD canvas 相同（例如 2340×1080），或在需要響應式時於 PS 圖層加 <code>ANCHOR_*</code> 命名標記。</li>
+    <li><strong>已知未修</strong>：群組 bounds 受 PS Layer Effect（陰影 / 描邊）影響時會超出父群組或 canvas，需後續單獨修。中心固定模式下子節點位置不受影響，先不動。</li>
+  </ul>
 
   <h3>v2.6.2（2026-06-13）— 描邊厚度補償係數（F2 視覺微調）</h3>
   <ul>

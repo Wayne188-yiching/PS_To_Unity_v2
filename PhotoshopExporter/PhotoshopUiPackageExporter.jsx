@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.6.2";
+var SCRIPT_VERSION = "2.6.3";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 (function () {
@@ -1077,40 +1077,16 @@ function dedupeLayoutGroupImages(children) {
     return children;
 }
 
+// v2.6.3 hotfix: bbox-based auto inference produced wildly wrong anchors
+// (e.g. a 331x246 layer inside a 2258-wide parent matched "auto_stretch_full"
+// due to ancestor bounds reuse, and ".pivot != anchor" mismatches scattered
+// positions on every Generate). Game UI mockups are overwhelmingly fixed
+// position + fixed size, so the conservative default is "center fixed" for
+// every layer. Designers opt into responsive behavior via PS layer naming
+// tags (ANCHOR_TL / STRETCH_X / etc.) which parseLayoutTag still honors.
+// parentBounds is unused here but kept in the signature for compatibility.
 function inferLayout(bounds, parentBounds) {
-    if (!parentBounds || parentBounds.width <= 0 || parentBounds.height <= 0) {
-        return fixedLayout("auto_top_left", 0, 1);
-    }
-
-    var localLeft = bounds.left - parentBounds.left;
-    var localTop = bounds.top - parentBounds.top;
-    var localRight = localLeft + bounds.width;
-    var localBottom = localTop + bounds.height;
-    var rightMargin = parentBounds.width - localRight;
-    var bottomMargin = parentBounds.height - localBottom;
-    var edgeX = Math.max(8, parentBounds.width * 0.04);
-    var edgeY = Math.max(8, parentBounds.height * 0.04);
-    var fillsX = bounds.width >= parentBounds.width * 0.9 && localLeft <= edgeX && rightMargin <= edgeX;
-    var fillsY = bounds.height >= parentBounds.height * 0.9 && localTop <= edgeY && bottomMargin <= edgeY;
-
-    if (fillsX && fillsY) {
-        return stretchLayout("auto_stretch_full", true, true, 0.5, 0.5);
-    }
-
-    var horizontal = localCenterRatio(localLeft, bounds.width, parentBounds.width);
-    var vertical = localCenterRatio(localTop, bounds.height, parentBounds.height);
-    var anchorX = horizontal < 0.36 ? 0 : (horizontal > 0.64 ? 1 : 0.5);
-    var anchorY = vertical < 0.36 ? 1 : (vertical > 0.64 ? 0 : 0.5);
-
-    if (fillsX) {
-        return stretchLayout("auto_stretch_x", true, false, 0.5, anchorY);
-    }
-
-    if (fillsY) {
-        return stretchLayout("auto_stretch_y", false, true, anchorX, 0.5);
-    }
-
-    return fixedLayout("auto_" + anchorName(anchorX, anchorY), anchorX, anchorY);
+    return fixedLayout("auto_center", 0.5, 0.5);
 }
 
 function localCenterRatio(start, size, parentSize) {
