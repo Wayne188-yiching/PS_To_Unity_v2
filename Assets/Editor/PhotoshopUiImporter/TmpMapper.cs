@@ -50,7 +50,11 @@ namespace PhotoshopToUnity.EditorImporter
             target.characterSpacing = node.characterSpacing;
             target.lineSpacing = node.lineSpacing;
             target.color = ParseColor(node.color, Color.white);
-            target.alignment = ParseAlignment(node.alignment, TextAlignmentOptions.Left);
+            // v2.7.2：PS Point Text 圖層 bbox 通常比實際字形寬，且 PS 視覺上字形是「居中」於 bbox。
+            // 原 fallback = Left 會讓沒帶 alignment 欄位的短文字（按鈕標題等）貼在 bbox 左邊緣，
+            // 與旁邊獨立的 icon 圖層合起來會像「文字 + 空隙 + icon」造成順序顛倒的錯覺。
+            // 改成 Center 預設更貼近 PS 視覺；exporter 有寫 alignment 時仍以該值為準。
+            target.alignment = ParseAlignment(node.alignment, TextAlignmentOptions.Center);
 
             var fontAsset = defaultFontAsset != null ? defaultFontAsset : TMP_Settings.defaultFontAsset;
             if (fontAsset != null)

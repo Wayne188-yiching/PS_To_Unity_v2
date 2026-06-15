@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.7.1";
+var SCRIPT_VERSION = "2.7.2";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 (function () {

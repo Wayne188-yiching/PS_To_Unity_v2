@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.7.1</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.7.2</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -903,6 +903,13 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
 
+  <h3>v2.7.2（2026-06-15）— Phase 2 hotfix：TMP 對齊 fallback 改為 Center</h3>
+  <ul>
+    <li><strong>問題</strong>：PS Point Text 圖層 bbox（寫進 layout.json 的 <code>width/height</code>）通常比實際字形外輪廓寬，TMP RectTransform 直接套這個 bbox 後，若 <code>alignment</code> 用原本的 <code>Left</code> fallback，字形會貼在 bbox 左邊緣。配上同按鈕內獨立的 icon 圖層（icon 走自己的 X 座標），視覺上會出現「文字 + 假空隙 + icon」的左右順序錯覺（例如「跳過」按鈕的 ▶| 看起來跑到右邊）。</li>
+    <li><strong>修正</strong>：<a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2/blob/main/Assets/Editor/PhotoshopUiImporter/TmpMapper.cs">TmpMapper.Apply</a> 把 <code>ParseAlignment</code> 的 fallback 從 <code>TextAlignmentOptions.Left</code> 改為 <code>TextAlignmentOptions.Center</code>。exporter 有明確寫 alignment 欄位時仍以該值為準，只影響「沒帶對齊資訊」的情況，對 PS Point Text 短按鈕標題是更貼近設計稿的選擇。</li>
+    <li><strong>長期</strong>：根治需 JSX exporter 把 <code>width/height</code> 改寫為「字形實際外輪廓」而非「PS layer bbox」，並補上 alignment 欄位。已排程到 Phase 3。</li>
+  </ul>
+
   <h3>v2.7.1（2026-06-15）— Phase 2 hotfix：換皮 Foldout assertion</h3>
   <ul>
     <li><strong>修正</strong>：v2.7.0 把換皮工具 Foldout 直接放在所有 VerticalScope 外面，Unity 6 IMGUI 會在每幀丟出 <code>kDontSaveInEditor / kAllowDontSaveObjectsToPersistent</code> assertion（Console 大量紅字）。改為把 Foldout 包進 <code>EditorGUILayout.VerticalScope(EditorStyles.helpBox)</code>，與檔內其他 Foldout 一致。</li>
@@ -968,7 +975,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.7.1 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.7.2 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 
