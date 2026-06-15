@@ -45,7 +45,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.7.0";
+        private const string ToolVersion = "2.7.1";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -323,18 +323,20 @@ namespace PhotoshopToUnity.EditorImporter
         private void DrawReskinSection()
         {
             // U7：換皮工具屬獨立、低頻、具破壞性的功能，預設摺疊收進主流程之後。
+            // Foldout 必須包在 VerticalScope 內，否則 Unity 6 IMGUI 會丟出
+            // kDontSaveInEditor / kAllowDontSaveObjectsToPersistent 的 assertion。
             EditorGUILayout.Space(8);
-            showReskinFoldout = EditorGUILayout.Foldout(
-                showReskinFoldout,
-                "換皮工具（低頻 / 具破壞性，預設收起）",
-                true);
-            if (!showReskinFoldout)
-            {
-                return;
-            }
-
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
+                showReskinFoldout = EditorGUILayout.Foldout(
+                    showReskinFoldout,
+                    "換皮工具（低頻 / 具破壞性，預設收起）",
+                    true);
+                if (!showReskinFoldout)
+                {
+                    return;
+                }
+
                 EditorGUILayout.LabelField("換皮工具（美術圖覆蓋）", EditorStyles.boldLabel);
                 DrawFolderPathField("美術來源資料夾", ref reskinArtSourceFolder, false);
                 DrawFolderPathField("Unity 目標資料夾", ref reskinTargetFolder, true);
