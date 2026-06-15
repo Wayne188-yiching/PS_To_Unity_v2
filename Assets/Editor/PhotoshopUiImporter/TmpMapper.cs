@@ -211,6 +211,10 @@ namespace PhotoshopToUnity.EditorImporter
             // 第一步：找所有顏色相近的候選材質球
             // 顏色是材質球的主要識別依據（綠框、黑框、金框），Thickness 是次要條件
             const float colorTolerance = 0.08f; // ±20/255 per channel
+            // F5：Phase 1 把描邊換算系統性偏厚的 20% 修掉後，材質庫比對放寬到舊容差會把
+            // 不夠像的材質誤認成「夠近」。改為硬性 10% 門檻，超過直接淘汰，讓上層改走
+            // 「新增材質球」路徑而非借用視覺差異明顯的舊材質。
+            const float maxWidthDiffRatio = 0.10f;
             Material bestMatch = null;
             float bestWidthDiff = float.MaxValue;
 
@@ -243,6 +247,10 @@ namespace PhotoshopToUnity.EditorImporter
                 var widthDiff = targetOutlineWidth > 0f
                     ? Mathf.Abs(matWidth / targetOutlineWidth - 1f)
                     : Mathf.Abs(matWidth);
+
+                // F5：超過 10% 直接淘汰，避免借用視覺差異明顯的舊材質
+                if (widthDiff > maxWidthDiffRatio)
+                    continue;
 
                 if (widthDiff < bestWidthDiff)
                 {

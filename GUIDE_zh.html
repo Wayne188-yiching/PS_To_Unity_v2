@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Photoshop → Unity UI 工具 v2.6 — 完整使用說明</title>
+  <title>Photoshop → Unity UI 工具 v2.7 — 完整使用說明</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.6.4</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.7.0</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -902,6 +902,18 @@ TXT_score_[THICK:2]</code></pre>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
+
+  <h3>v2.7.0（2026-06-15）— 優化計畫 Phase 2：Unity 端 UX 重整</h3>
+  <ul>
+    <li><strong>路徑按鈕收斂</strong>（U3）：原本「套用標準輸出路徑 / 圖片位置跟隨來源 / 建立專案資料夾」三鈕並排，現以「建立專案資料夾」為主視覺主流程（含 Atlas / Font / Prefab 標準結構）；另外兩顆路徑變體與手動覆寫欄位全部移入「進階設定」折疊區，主畫面更乾淨。</li>
+    <li><strong>就緒狀態與按鈕引導</strong>（U4）：執行區 Generate 按鈕在前置條件未齊備時 disable，並以 HelpBox 條列缺項（如「尚未套用 Package」、「尚未填寫專案資料夾名稱」、「此 Package 含文字節點，請指定預設 TMP Font Asset」）。</li>
+    <li><strong>必填項即時提示</strong>（U5）：套用 Package 當下立即偵測是否含文字節點；若含文字節點而尚未指定 TMP Font Asset，「預設 TMP Font Asset」欄位即時標紅並出現 Error HelpBox，不再等 Generate 失敗才知道。</li>
+    <li><strong>執行區三鈕合併</strong>（U6）：原「Validate / 預覽（Dry-run）/ Generate Prefab」三顆等大並排，合併為「檢查 Layout（含節點數、圖片數、缺字型警告等預覽資訊）」+ 主視覺加粗加大的「Generate Prefab」，主要動作視覺主次清楚。</li>
+    <li><strong>換皮工具搬位 + 折疊</strong>（U7）：換皮（手動覆蓋 + SkinTheme 批次）整段移到主流程之後，並包進「換皮工具（低頻 / 具破壞性，預設收起）」Foldout，新使用者不會誤觸這組破壞性操作。</li>
+    <li><strong>參考解析度按鈕簡化</strong>（U8）：「參考解析度自動跟隨 Layout」toggle 開啟時自動隱藏「套用 Layout 尺寸」按鈕，避免兩個控制項做同一件事；toggle 關閉的手動模式才顯示。</li>
+    <li><strong>材質庫比對容差收緊</strong>（F5）：Phase 1 把描邊換算系統性偏厚 20% 修正後，材質庫 <code>FindLibraryMaterial</code> 由「永遠選最接近的舊材質」改為「<code>widthDiff</code> 超過 10% 直接淘汰」，找不到符合的就走新增材質球路徑，避免借用視覺差異明顯的舊材質。</li>
+    <li><strong>版本同步腳本小修</strong>：<code>bump-version.ps1</code> 的 README 規則改為 <code>(?m)^v\d+\.\d+\.\d+\s*$</code>，相容 CRLF 換行（先前 CRLF 結尾的 README.md 會被誤判為「pattern not found」）。</li>
+  </ul>
 
   <h3>v2.6.4（2026-06-14）— Check for Updates 改用 semver 比較</h3>
   <ul>

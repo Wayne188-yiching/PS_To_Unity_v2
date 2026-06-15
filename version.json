@@ -1,7 +1,7 @@
 {
-    "version":  "2.6.4",
+    "version":  "2.7.0",
     "phase":  "Phase 1 — Font precision + version infra",
-    "updated":  "2026-06-14",
+    "updated":  "2026-06-15",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [
                      {
@@ -22,7 +22,7 @@
                      },
                      {
                          "file":  "README.md",
-                         "pattern":  "(?m)^v\\d+\\.\\d+\\.\\d+$",
+                         "pattern":  "(?m)^v\\d+\\.\\d+\\.\\d+\\s*$",
                          "replacement":  "v{version}"
                      },
                      {

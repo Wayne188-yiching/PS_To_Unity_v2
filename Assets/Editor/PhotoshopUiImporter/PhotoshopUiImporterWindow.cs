@@ -27,6 +27,9 @@ namespace PhotoshopToUnity.EditorImporter
         private MessageType statusType = MessageType.Info;
         private bool showAdvancedPackage;
         private bool showAdvancedOutput;
+        private bool showReskinFoldout;
+        // U5：套用 Package 後立刻記錄是否含文字節點，供 Typography 區即時標紅 / Action 區擋按鈕
+        private bool packageHasTextNode;
         private string materialLibraryFolder = string.Empty;
         // F2 補償係數：SDF 描邊視覺 falloff 比 PS 重，使用者用校準板回推合適值。
         // 值由 OnEnable 從 EditorPrefs 還原；範圍 0.3 ~ 1.5，預設 1.0。
@@ -42,7 +45,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.6.4";
+        private const string ToolVersion = "2.7.0";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -67,8 +70,8 @@ namespace PhotoshopToUnity.EditorImporter
                 DrawPackageSection();
                 DrawOutputSection();
                 DrawTypographySection();
-                DrawReskinSection();
                 DrawActionSection();
+                DrawReskinSection();
 
                 if (!string.IsNullOrWhiteSpace(statusMessage))
                 {
@@ -187,27 +190,31 @@ namespace PhotoshopToUnity.EditorImporter
                     EditorGUILayout.HelpBox($"圖片來源若在 Unity 專案外，Generate 時會複製到：{importFolder}", MessageType.None);
                 }
 
-                using (new EditorGUILayout.HorizontalScope())
+                // U3：主流程改以「建立專案資料夾」為主視覺按鈕（最常用），其餘變體收進進階區。
+                var createStyle = new GUIStyle(GUI.skin.button)
                 {
-                    if (GUILayout.Button("套用標準輸出路徑", GUILayout.Height(28)))
-                    {
-                        UseStandardOutputFolders();
-                    }
-
-                    if (GUILayout.Button("圖片位置跟隨來源", GUILayout.Height(28)))
-                    {
-                        AutoSelectImportFolderFromSource();
-                    }
-                }
-
-                if (GUILayout.Button("建立專案資料夾", GUILayout.Height(28)))
+                    fontStyle = FontStyle.Bold
+                };
+                if (GUILayout.Button("建立專案資料夾（含 Atlas / Font / Prefab 標準結構）", createStyle, GUILayout.Height(34)))
                 {
                     CreateProjectFolders();
                 }
 
-                showAdvancedOutput = EditorGUILayout.Foldout(showAdvancedOutput, "進階設定", true);
+                showAdvancedOutput = EditorGUILayout.Foldout(showAdvancedOutput, "進階設定（路徑變體與手動覆寫）", true);
                 if (showAdvancedOutput)
                 {
+                    using (new EditorGUILayout.HorizontalScope())
+                    {
+                        if (GUILayout.Button("套用標準輸出路徑", GUILayout.Height(24)))
+                        {
+                            UseStandardOutputFolders();
+                        }
+
+                        if (GUILayout.Button("圖片位置跟隨來源", GUILayout.Height(24)))
+                        {
+                            AutoSelectImportFolderFromSource();
+                        }
+                    }
                     DrawFolderPathField("Unity 圖片匯入資料夾", ref importFolder, true);
                     DrawFolderPathField("Prefab 輸出資料夾", ref prefabFolder, true);
                 }
@@ -219,7 +226,8 @@ namespace PhotoshopToUnity.EditorImporter
             using (new EditorGUILayout.HorizontalScope())
             {
                 autoReferenceResolution = EditorGUILayout.Toggle("參考解析度自動跟隨 Layout", autoReferenceResolution);
-                if (GUILayout.Button("套用 Layout 尺寸", GUILayout.Width(120)))
+                // U8：toggle 開啟時 Layout 尺寸會自動套用，按鈕僅在手動模式下顯示
+                if (!autoReferenceResolution && GUILayout.Button("套用 Layout 尺寸", GUILayout.Width(120)))
                 {
                     ApplyReferenceResolutionFromLayout(true);
                 }
@@ -249,8 +257,22 @@ namespace PhotoshopToUnity.EditorImporter
         {
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
-                EditorGUILayout.LabelField("3. 文字、材質與換皮", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("3. 文字與材質", EditorStyles.boldLabel);
+
+                // U5：含文字節點而缺字型 → 欄位標紅 + 明確錯誤 HelpBox
+                var needsFont = packageHasTextNode && defaultTmpFontAsset == null;
+                var prevColor = GUI.color;
+                if (needsFont)
+                {
+                    GUI.color = new Color(1f, 0.55f, 0.55f);
+                }
                 defaultTmpFontAsset = (TMP_FontAsset)EditorGUILayout.ObjectField("預設 TMP Font Asset", defaultTmpFontAsset, typeof(TMP_FontAsset), false);
+                GUI.color = prevColor;
+                if (needsFont)
+                {
+                    EditorGUILayout.HelpBox("此 UI Package 含文字節點，請先指定預設 TMP Font Asset，否則 Generate 無法執行。", MessageType.Error);
+                }
+
                 defaultTmpMaterialPreset = (Material)EditorGUILayout.ObjectField("預設 TMP 材質球", defaultTmpMaterialPreset, typeof(Material), false);
                 DrawFolderPathField("TMP 材質球資料夾（選填）", ref materialLibraryFolder, true);
                 skinMap = (SkinMap)EditorGUILayout.ObjectField("Skin Map（選填）", skinMap, typeof(SkinMap), false);
@@ -300,6 +322,17 @@ namespace PhotoshopToUnity.EditorImporter
 
         private void DrawReskinSection()
         {
+            // U7：換皮工具屬獨立、低頻、具破壞性的功能，預設摺疊收進主流程之後。
+            EditorGUILayout.Space(8);
+            showReskinFoldout = EditorGUILayout.Foldout(
+                showReskinFoldout,
+                "換皮工具（低頻 / 具破壞性，預設收起）",
+                true);
+            if (!showReskinFoldout)
+            {
+                return;
+            }
+
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 EditorGUILayout.LabelField("換皮工具（美術圖覆蓋）", EditorStyles.boldLabel);
@@ -568,19 +601,30 @@ namespace PhotoshopToUnity.EditorImporter
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
                 EditorGUILayout.LabelField("4. 執行", EditorStyles.boldLabel);
-                using (new EditorGUILayout.HorizontalScope())
+
+                // U4：就緒狀態 = 前置條件齊備才允許 Generate；未就緒列出缺項，避免按下後得到模糊錯誤。
+                var missing = ComputeMissingPrerequisites();
+                if (missing.Count > 0)
                 {
-                    if (GUILayout.Button("Validate", GUILayout.Height(34)))
-                    {
-                        ValidateLayout();
-                    }
+                    EditorGUILayout.HelpBox(
+                        "尚未就緒，缺少：" + string.Join("、", missing),
+                        MessageType.Warning);
+                }
 
-                    if (GUILayout.Button("預覽（Dry-run）", GUILayout.Height(34)))
-                    {
-                        PreviewLayout();
-                    }
+                // U6：原 Validate + 預覽（Dry-run）合併為「檢查 Layout」，與主視覺 Generate 兩鈕並列。
+                if (GUILayout.Button("檢查 Layout（不生成 Prefab）", GUILayout.Height(28)))
+                {
+                    CheckLayout();
+                }
 
-                    if (GUILayout.Button("Generate Prefab", GUILayout.Height(34)))
+                using (new EditorGUI.DisabledScope(missing.Count > 0))
+                {
+                    var generateStyle = new GUIStyle(GUI.skin.button)
+                    {
+                        fontStyle = FontStyle.Bold,
+                        fontSize = 14
+                    };
+                    if (GUILayout.Button("Generate Prefab", generateStyle, GUILayout.Height(44)))
                     {
                         GeneratePrefab();
                     }
@@ -588,16 +632,39 @@ namespace PhotoshopToUnity.EditorImporter
             }
         }
 
-        private void PreviewLayout()
+        // U4：彙整 Generate 前置條件，回傳缺項中文敘述。空清單代表就緒。
+        private System.Collections.Generic.List<string> ComputeMissingPrerequisites()
+        {
+            var missing = new System.Collections.Generic.List<string>();
+            if (string.IsNullOrWhiteSpace(layoutJsonPath) || !File.Exists(layoutJsonPath))
+            {
+                missing.Add("尚未套用 Package");
+            }
+            if (string.IsNullOrWhiteSpace(projectFolder))
+            {
+                missing.Add("尚未填寫專案資料夾名稱");
+            }
+            if (packageHasTextNode && defaultTmpFontAsset == null)
+            {
+                missing.Add("此 Package 含文字節點，請指定預設 TMP Font Asset");
+            }
+            return missing;
+        }
+
+        // U6：合併原 Validate（讀 layout / 報節點數）與 Preview（圖片數量、缺字型警告）為單一檢查動作。
+        private void CheckLayout()
         {
             if (!LayoutReader.TryRead(layoutJsonPath, out var layout, out var result))
             {
-                SetStatus(BuildErrorMessage("Layout 讀取失敗", result.errors), MessageType.Error);
+                SetStatus(BuildErrorMessage("Layout 檢查失敗", result.errors), MessageType.Error);
                 return;
             }
 
+            ApplyReferenceResolutionFromLayout(layout, false);
+            packageHasTextNode = ContainsTextNode(layout?.nodes);
+
             var totalNodes = CountNodes(layout.nodes);
-            var hasText = ContainsTextNode(layout.nodes);
+            var hasText = packageHasTextNode;
 
             var imageInfo = "尚未指定圖片來源資料夾";
             if (!string.IsNullOrWhiteSpace(sourceImageFolder) && Directory.Exists(sourceImageFolder))
@@ -607,17 +674,19 @@ namespace PhotoshopToUnity.EditorImporter
             }
 
             var sb = new StringBuilder();
+            sb.AppendLine("Layout 檢查成功。");
             sb.AppendLine($"節點總數：{totalNodes}");
             sb.AppendLine($"含文字節點：{(hasText ? "是" : "否")}");
             sb.AppendLine($"圖片來源：{imageInfo}");
             sb.AppendLine($"圖片匯入路徑：{(string.IsNullOrWhiteSpace(importFolder) ? "（未設定）" : importFolder)}");
-            sb.AppendLine($"Prefab 路徑：{(string.IsNullOrWhiteSpace(prefabFolder) ? "（未設定）" : prefabFolder)}");
+            sb.Append($"Prefab 路徑：{(string.IsNullOrWhiteSpace(prefabFolder) ? "（未設定）" : prefabFolder)}");
             if (hasText && defaultTmpFontAsset == null)
             {
+                sb.AppendLine();
                 sb.Append("⚠ 含文字節點，但尚未指定 TMP 字型資源");
             }
 
-            SetStatus(sb.ToString().TrimEnd(), MessageType.Info);
+            SetStatus(sb.ToString(), hasText && defaultTmpFontAsset == null ? MessageType.Warning : MessageType.Info);
         }
 
         private void ValidateLayout()
@@ -629,7 +698,23 @@ namespace PhotoshopToUnity.EditorImporter
             }
 
             ApplyReferenceResolutionFromLayout(layout, false);
+            packageHasTextNode = ContainsTextNode(layout?.nodes);
             SetStatus($"Layout 驗證成功。節點數：{CountNodes(layout.nodes)}", MessageType.Info);
+        }
+
+        // U5：套用 Package 後重新讀 Layout 判斷有無文字節點，失敗時保守不阻擋
+        private void RefreshPackageTextNodeFlag()
+        {
+            if (string.IsNullOrWhiteSpace(layoutJsonPath) || !File.Exists(layoutJsonPath))
+            {
+                packageHasTextNode = false;
+                return;
+            }
+
+            if (LayoutReader.TryRead(layoutJsonPath, out var layout, out _))
+            {
+                packageHasTextNode = ContainsTextNode(layout?.nodes);
+            }
         }
 
         private void GeneratePrefab()
@@ -867,6 +952,8 @@ namespace PhotoshopToUnity.EditorImporter
 
             layoutJsonPath = layoutPath;
             ApplyReferenceResolutionFromLayout(false);
+            // U5：套用 Package 當下偵測是否含文字節點，供 Typography 區即時提示
+            RefreshPackageTextNodeFlag();
             sourceImageFolder = FindPackageImageFolder(packageRootPath, layoutPath);
             if (string.IsNullOrWhiteSpace(sourceImageFolder))
             {
