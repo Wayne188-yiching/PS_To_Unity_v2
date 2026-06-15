@@ -174,7 +174,7 @@ function showExportDialog(doc) {
     headerGroup.alignChildren = ["fill", "center"];
     var versionLabel = headerGroup.add("statictext", undefined, "v" + SCRIPT_VERSION);
     versionLabel.justify = "left";
-    var updateButton = headerGroup.add("button", undefined, "Check for Updates");
+    var updateButton = headerGroup.add("button", undefined, "Update Exporter Only");
     updateButton.alignment = "right";
     updateButton.onClick = function () {
         // U2: run the update check inside the dialog so configured fields survive.

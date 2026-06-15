@@ -25,7 +25,7 @@
     var exporterButton = mainPanel.add("button", undefined, "UI Package Exporter");
     var namerButton = mainPanel.add("button", undefined, "Layer Auto Namer");
     var spineButton = mainPanel.add("button", undefined, "Photoshop To Spine");
-    var updaterButton = mainPanel.add("button", undefined, "Update / Refresh Plugin");
+    var updaterButton = mainPanel.add("button", undefined, "Update Everything (git pull)");
 
     var devPanel = dialog.add("panel", undefined, "Calibration / Debug");
     devPanel.orientation = "column";
