@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Photoshop → Unity UI 工具 v2.7 — 完整使用說明</title>
+  <title>Photoshop → Unity UI 工具 v2.8 — 完整使用說明</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.7.2</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.8.0</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -902,6 +902,18 @@ TXT_score_[THICK:2]</code></pre>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
+
+  <h3>v2.8.0（2026-06-15）— 優化計畫 Phase 3：PS 端打磨 + 還原度</h3>
+  <ul>
+    <li><strong>漸層文字</strong>：JSX exporter 讀 PS Gradient Overlay 的首末 color stop + angle，寫進 <code>layout.json</code> 的新欄位（<code>gradientStartColor / gradientEndColor / gradientAngle</code>）。Unity 端 TmpMapper.Apply 設 <code>TMP.enableVertexGradient + colorGradient</code>（上下色，角度落在 (135, 315) 視為反向自動交換）。schema 升至 <code>2.8</code>。</li>
+    <li><strong>匯出報告 export_report.txt</strong>（含 U13）：取代原本一閃即逝的 alert。在 PNG 輸出資料夾旁產生報告檔，含：時間 / 版本 / 各類別統計（圖層、文字節點含描邊與漸層筆數、群組、跳過分類、快取未變更）/ 像素雜湊去重結果 / PNG 總數與總大小 / 最大單檔 / 超大警告（>500KB）清單 / Layout JSON 路徑。Alert 改為一句摘要 + 報告路徑。</li>
+    <li><strong>像素雜湊去重</strong>：撿回 v2.4.2 停用的去重。匯出完成後對每張 PNG 算 FNV-1a 32-bit + 檔長 hash，同 hash 視為內容相同 → 保留第一張，其餘刪除並把 <code>node.imagePath</code> 改指 canonical。同步清理 export cache 對應記錄。文字圖（差一個像素 hash 也不同）不會被誤合併。</li>
+    <li><strong>PS 對話框中文化</strong>（U9）：對話框所有 label / button / checkbox / alert / 提示訊息全面改為繁體中文。</li>
+    <li><strong>Layout JSON 路徑收進進階區</strong>（U10）：對話框主畫面只留「PNG 輸出資料夾」+「Unity Atlas 輸出」+「匯出選項」；Layout JSON 檔案路徑改藏在「顯示進階設定」勾選後才出現的折疊區，預設用 PNG 資料夾旁同名 <code>.json</code>。</li>
+    <li><strong>移除 fast duplicate 選項</strong>（U11）：原 <code>Use fast layer duplicate export when possible</code> 選項暴露內部實作，使用者無從判斷。改為內部固定 <code>true</code>（仍會自動 fallback 到 merged-copy），不再給選項。</li>
+    <li><strong>顯示選取文字圖層</strong>（U12）：「把目前選取的文字圖層強制輸出為 PNG」勾選下方即時顯示「目前選取：N 個文字圖層（前 5 個名稱）」readonly 標籤，勾選前就能確認影響範圍。</li>
+    <li><strong>順帶</strong>：<code>bump-version.ps1</code> README 規則改為 <code>[ \t\r]*$</code>，正確相容 CRLF 結尾（先前在 .NET 多行模式下 <code>$</code> 對 CRLF 的位置處理導致 pattern not found）。</li>
+  </ul>
 
   <h3>v2.7.2（2026-06-15）— Phase 2 hotfix：TMP 對齊 fallback 改為 Center</h3>
   <ul>

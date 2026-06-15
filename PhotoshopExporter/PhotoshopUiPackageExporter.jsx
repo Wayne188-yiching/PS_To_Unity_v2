@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.7.2";
+var SCRIPT_VERSION = "2.8.0";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 (function () {
@@ -18,22 +18,18 @@ var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_
 
     try {
         var result = exportUiPackage(sourceDoc, options);
-        alert(
-            "UI Package export complete.\n\n" +
-            "Layers exported: " + result.imageCount + "\n" +
-            "Text nodes: " + result.textCount + "\n" +
-            "Groups: " + result.groupCount + "\n\n" +
-            "Skipped empty/unsupported layers: " + result.skippedCount + "\n" +
-            "Skipped hidden layers: " + result.skipHidden + "\n" +
-            "Skipped IGNORE/REF layers: " + result.skipIgnoreRef + "\n" +
-            "Skipped adjustment layers: " + result.skipAdjustment + "\n" +
-            "Skipped clipping layers: " + result.skipClipping + "\n" +
-            "Unchanged PNGs skipped: " + result.unchangedCount + "\n\n" +
-            "PNG folder:\n" + result.imageFolder.fsName + "\n\n" +
-            "Layout JSON:\n" + result.layoutJsonFile.fsName
-        );
+        // U13：詳細統計改寫到 export_report.txt（可回看），alert 只給一句摘要 + 報告位置
+        var dedupLine = "";
+        if (result.dedupStats && result.dedupStats.dedupedCount > 0) {
+            dedupLine = "\n像素去重合併：" + result.dedupStats.dedupedCount + " 張（省 " + formatBytes(result.dedupStats.savedBytes) + "）";
+        }
+        var summary =
+            "UI Package 匯出完成。\n\n" +
+            "圖層：" + result.imageCount + "　文字：" + result.textCount + "　群組：" + result.groupCount + dedupLine + "\n\n" +
+            "詳細報告：\n" + result.reportFile.fsName;
+        alert(summary);
     } catch (e) {
-        alert("UI Package export failed.\n\nError: " + e.message);
+        alert("UI Package 匯出失敗。\n\n錯誤：" + e.message);
     }
 })();
 
@@ -167,25 +163,23 @@ function showExportDialog(doc) {
     dialog.orientation = "column";
     dialog.alignChildren = "fill";
 
-    // Header: version label + update button
+    // Header（U9 中文化）
     var headerGroup = dialog.add("group");
     headerGroup.orientation = "row";
     headerGroup.alignment = "fill";
     headerGroup.alignChildren = ["fill", "center"];
     var versionLabel = headerGroup.add("statictext", undefined, "v" + SCRIPT_VERSION);
     versionLabel.justify = "left";
-    var updateButton = headerGroup.add("button", undefined, "Update Exporter Only");
+    var updateButton = headerGroup.add("button", undefined, "檢查更新");
     updateButton.alignment = "right";
     updateButton.onClick = function () {
-        // U2: run the update check inside the dialog so configured fields survive.
-        // Only close when a new version was actually installed (a re-run is required to load it).
         var updated = checkAndUpdateScript();
         if (updated) {
             dialog.close(0);
         }
     };
 
-    var intro = dialog.add("statictext", undefined, "Export non-text layer PNGs and a named layout JSON for Unity. Text layers stay as TMP nodes.");
+    var intro = dialog.add("statictext", undefined, "把非文字圖層輸出為 PNG + 命名 Layout JSON 給 Unity。文字圖層維持為 TMP 節點。");
     intro.characters = 82;
 
     var defaultImageOutput = defaultImageFolder(doc);
@@ -195,39 +189,88 @@ function showExportDialog(doc) {
     var imageFolderGroup = dialog.add("group");
     imageFolderGroup.orientation = "row";
     imageFolderGroup.alignChildren = ["fill", "center"];
-    imageFolderGroup.add("statictext", undefined, "PNG output folder:");
+    imageFolderGroup.add("statictext", undefined, "PNG 輸出資料夾：");
     var imageFolderText = imageFolderGroup.add("edittext", undefined, defaultImageOutput.fsName);
     imageFolderText.characters = 56;
-    var browseImageButton = imageFolderGroup.add("button", undefined, "Browse...");
+    var browseImageButton = imageFolderGroup.add("button", undefined, "選擇…");
 
-    var layoutGroup = dialog.add("group");
-    layoutGroup.orientation = "row";
-    layoutGroup.alignChildren = ["fill", "center"];
-    layoutGroup.add("statictext", undefined, "Layout JSON file:");
-    var layoutText = layoutGroup.add("edittext", undefined, defaultLayoutOutput.fsName);
-    layoutText.characters = 56;
-    var browseLayoutButton = layoutGroup.add("button", undefined, "Browse...");
-
-    var unityPanel = dialog.add("panel", undefined, "Unity Atlas output");
+    var unityPanel = dialog.add("panel", undefined, "Unity Atlas 輸出");
     unityPanel.orientation = "column";
     unityPanel.alignChildren = "left";
 
-    var useUnityAtlas = unityPanel.add("checkbox", undefined, "Output PNGs to Unity Atlas/SpriteAtlas language folder");
+    var useUnityAtlas = unityPanel.add("checkbox", undefined, "輸出到 Unity Atlas/SpriteAtlas 語言資料夾");
     useUnityAtlas.value = false;
 
     var languageGroup = unityPanel.add("group");
     languageGroup.orientation = "row";
     languageGroup.alignChildren = ["left", "center"];
-    languageGroup.add("statictext", undefined, "Language folder:");
+    languageGroup.add("statictext", undefined, "語言資料夾：");
     var languageList = languageGroup.add("dropdownlist", undefined, ["Base", "CHS", "CHT", "EN"]);
     languageList.selection = 0;
     languageList.enabled = false;
 
-    var unityNote = unityPanel.add("statictext", undefined, "When enabled, PNG output folder is treated as the Unity package root. PNGs go to Atlas/SpriteAtlas/{Language}.");
+    var unityNote = unityPanel.add("statictext", undefined, "啟用後 PNG 輸出資料夾視為 Unity 套件根目錄，PNG 將進 Atlas/SpriteAtlas/{Language}。");
     unityNote.characters = 82;
 
     useUnityAtlas.onClick = function () {
         languageList.enabled = useUnityAtlas.value;
+    };
+
+    var optionPanel = dialog.add("panel", undefined, "匯出選項");
+    optionPanel.orientation = "column";
+    optionPanel.alignChildren = "left";
+
+    var ignoreHidden = optionPanel.add("checkbox", undefined, "忽略隱藏 / 已關閉的圖層");
+    ignoreHidden.value = true;
+
+    var skipReference = optionPanel.add("checkbox", undefined, "略過 IGNORE_ 與 REF_ 圖層");
+    skipReference.value = true;
+
+    var useExportCache = optionPanel.add("checkbox", undefined, "使用匯出快取（未變更的 PNG 跳過）");
+    useExportCache.value = true;
+
+    // U11：移除「Use fast layer duplicate」選項，改成永遠先試 fast、失敗自動退 merged-copy
+
+    var textOutputGroup = optionPanel.add("group");
+    textOutputGroup.orientation = "row";
+    textOutputGroup.alignChildren = ["left", "center"];
+    textOutputGroup.add("statictext", undefined, "預設文字圖層處理：");
+    var textOutputList = textOutputGroup.add("dropdownlist", undefined, ["TMP 文字節點", "PNG 圖片"]);
+    textOutputList.selection = 0;
+
+    var selectedTextAsImage = optionPanel.add("checkbox", undefined, "把目前選取的文字圖層強制輸出為 PNG");
+    selectedTextAsImage.value = false;
+
+    // U12：顯示目前選取的文字圖層數與名稱，讓使用者勾選前就知道會影響哪些圖層
+    var selectedTextSummary = summarizeSelectedTextLayers(doc);
+    var selectedSummaryText = selectedTextSummary.count > 0
+        ? "目前選取：" + selectedTextSummary.count + " 個文字圖層（" + selectedTextSummary.names.join("、") + "）"
+        : "目前選取：0 個文字圖層";
+    var selectedSummaryLabel = optionPanel.add("statictext", undefined, selectedSummaryText);
+    selectedSummaryLabel.characters = 82;
+
+    var autoRouteNonSourceHanFonts = optionPanel.add("checkbox", undefined, "非思源系列字型自動匯出為 PNG");
+    autoRouteNonSourceHanFonts.value = true;
+
+    var note = optionPanel.add("statictext", undefined, "勾選「目前選取的文字圖層為 PNG」前，請先在 Photoshop 圖層面板選好要轉的文字圖層。");
+    note.characters = 82;
+
+    // U10：Layout JSON 路徑收進進階折疊區，預設藏起來。
+    var advCheckbox = dialog.add("checkbox", undefined, "顯示進階設定（自訂 Layout JSON 路徑）");
+    advCheckbox.value = false;
+
+    var layoutGroup = dialog.add("group");
+    layoutGroup.orientation = "row";
+    layoutGroup.alignChildren = ["fill", "center"];
+    layoutGroup.add("statictext", undefined, "Layout JSON 檔案：");
+    var layoutText = layoutGroup.add("edittext", undefined, defaultLayoutOutput.fsName);
+    layoutText.characters = 56;
+    var browseLayoutButton = layoutGroup.add("button", undefined, "選擇…");
+    layoutGroup.visible = false;
+
+    advCheckbox.onClick = function () {
+        layoutGroup.visible = advCheckbox.value;
+        dialog.layout.layout(true);
     };
 
     imageFolderText.onChange = function () {
@@ -246,7 +289,7 @@ function showExportDialog(doc) {
     };
 
     browseImageButton.onClick = function () {
-        var selected = Folder.selectDialog("Choose output folder for PNG files");
+        var selected = Folder.selectDialog("選擇 PNG 輸出資料夾");
         if (selected) {
             imageFolderText.text = selected.fsName;
             if (!layoutPathTouched) {
@@ -256,50 +299,18 @@ function showExportDialog(doc) {
     };
 
     browseLayoutButton.onClick = function () {
-        var selected = File.saveDialog("Choose Layout JSON file", "JSON:*.json");
+        var selected = File.saveDialog("選擇 Layout JSON 檔案", "JSON:*.json");
         if (selected) {
             layoutPathTouched = true;
             layoutText.text = ensureJsonExtension(selected.fsName);
         }
     };
 
-    var optionPanel = dialog.add("panel", undefined, "Export options");
-    optionPanel.orientation = "column";
-    optionPanel.alignChildren = "left";
-
-    var ignoreHidden = optionPanel.add("checkbox", undefined, "Ignore hidden / closed layers");
-    ignoreHidden.value = true;
-
-    var skipReference = optionPanel.add("checkbox", undefined, "Skip IGNORE_ and REF_ layers");
-    skipReference.value = true;
-
-    var useExportCache = optionPanel.add("checkbox", undefined, "Use export cache to skip unchanged PNGs");
-    useExportCache.value = true;
-
-    var useFastLayerDuplicate = optionPanel.add("checkbox", undefined, "Use fast layer duplicate export when possible");
-    useFastLayerDuplicate.value = true;
-
-    var textOutputGroup = optionPanel.add("group");
-    textOutputGroup.orientation = "row";
-    textOutputGroup.alignChildren = ["left", "center"];
-    textOutputGroup.add("statictext", undefined, "Default text layers:");
-    var textOutputList = textOutputGroup.add("dropdownlist", undefined, ["TMP text nodes", "PNG images"]);
-    textOutputList.selection = 0;
-
-    var selectedTextAsImage = optionPanel.add("checkbox", undefined, "Export currently selected text layers as PNG overrides");
-    selectedTextAsImage.value = false;
-
-    var autoRouteNonSourceHanFonts = optionPanel.add("checkbox", undefined, "Auto-export non-Source-Han fonts as PNG");
-    autoRouteNonSourceHanFonts.value = true;
-
-    var note = optionPanel.add("statictext", undefined, "Select text layers in Photoshop before export to bake only those as PNG. Layout JSON can stay beside the PNG output folder.");
-    note.characters = 82;
-
     var buttons = dialog.add("group");
     buttons.orientation = "row";
     buttons.alignment = "right";
-    var cancelButton = buttons.add("button", undefined, "Cancel", { name: "cancel" });
-    var exportButton = buttons.add("button", undefined, "Export UI Package", { name: "ok" });
+    var cancelButton = buttons.add("button", undefined, "取消", { name: "cancel" });
+    var exportButton = buttons.add("button", undefined, "匯出 UI Package", { name: "ok" });
 
     cancelButton.onClick = function () {
         dialog.close(0);
@@ -310,12 +321,12 @@ function showExportDialog(doc) {
         var layoutJsonValue = ensureJsonExtension(trim(layoutText.text));
 
         if (!imageFolderValue) {
-            alert("Choose a PNG output folder.");
+            alert("請選擇 PNG 輸出資料夾。");
             return;
         }
 
         if (!layoutJsonValue) {
-            alert("Choose a Layout JSON file.");
+            alert("請選擇 Layout JSON 檔案。");
             return;
         }
 
@@ -327,7 +338,7 @@ function showExportDialog(doc) {
         var layoutJsonFile = new File(layoutJsonValue);
 
         if (isPathInsideFolder(layoutJsonFile, imageFolder) && !isSameFolder(layoutJsonFile.parent, imageFolder)) {
-            alert("Layout JSON file must not be inside an image subfolder.");
+            alert("Layout JSON 檔案不能放在圖片子資料夾內。");
             return;
         }
 
@@ -337,7 +348,8 @@ function showExportDialog(doc) {
             ignoreHiddenLayers: ignoreHidden.value,
             skipReferenceLayers: skipReference.value,
             useExportCache: useExportCache.value,
-            useFastLayerDuplicate: useFastLayerDuplicate.value,
+            // U11：fast duplicate 不再給 UI 選項，固定 true（內部已會自動 fallback 到 merged-copy）
+            useFastLayerDuplicate: true,
             useUnityAtlasStructure: useUnityAtlas.value,
             atlasLanguage: languageList.selection ? languageList.selection.text : "Base",
             textLayerOutput: textOutputList.selection && textOutputList.selection.index === 1 ? "image" : "tmp",
@@ -349,6 +361,36 @@ function showExportDialog(doc) {
 
     var accepted = dialog.show();
     return accepted === 1 ? dialog.result : null;
+}
+
+// U12 輔助：在開對話框前先掃一次目前選取的文字圖層
+function summarizeSelectedTextLayers(doc) {
+    var result = { count: 0, names: [] };
+    try {
+        var idMap = readSelectedLayerIdMap(doc);
+        // idMap 是 {id: true}，把圖層走一遍對名稱
+        walk(doc.layers);
+        function walk(layers) {
+            for (var i = 0; i < layers.length; i++) {
+                var layer = layers[i];
+                if (layer.typename === "LayerSet") {
+                    walk(layer.layers);
+                    continue;
+                }
+                if (layer.typename !== "ArtLayer") continue;
+                if (!isTextLayer(layer)) continue;
+                if (idMap[layer.id]) {
+                    result.count++;
+                    if (result.names.length < 5) {
+                        result.names.push(layer.name);
+                    } else if (result.names.length === 5) {
+                        result.names.push("…");
+                    }
+                }
+            }
+        }
+    } catch (e) {}
+    return result;
 }
 
 function exportUiPackage(sourceDoc, options) {
@@ -417,13 +459,19 @@ function exportUiPackage(sourceDoc, options) {
         var nodes = collectNodes(sourceDoc, true, context, pendingImages, canvasBounds);
 
         exportAllImages(pendingImages, context);
+        // Phase 3：先做像素雜湊去重，再寫 cache + buildLayoutJson，這樣 cache 與 JSON 都會反映去重後的最終狀態
+        var dedupStats = dedupPngsByHash(pendingImages, imageFolder, context);
         writeExportCacheIfDirty(context);
         refreshGroupBounds(nodes, context.doc);
 
         var layout = buildLayoutJson(sourceDoc, nodes);
         writeTextFile(layoutJsonFile, layout);
 
-        return {
+        // Phase 3：產生 export_report.txt 取代原本一閃即逝的 alert
+        var textStats = countTextStats(nodes);
+        var pngStats = scanPngFolderStats(imageFolder);
+        var reportFile = exportReportFile(imageFolder);
+        var resultObj = {
             imageFolder: imageFolder,
             layoutJsonFile: layoutJsonFile,
             imageCount: context.imageCount,
@@ -434,8 +482,15 @@ function exportUiPackage(sourceDoc, options) {
             skipHidden: context.skipHidden,
             skipIgnoreRef: context.skipIgnoreRef,
             skipAdjustment: context.skipAdjustment,
-            skipClipping: context.skipClipping
+            skipClipping: context.skipClipping,
+            outlineTextCount: textStats.outlineTextCount,
+            gradientTextCount: textStats.gradientTextCount,
+            dedupStats: dedupStats,
+            pngStats: pngStats,
+            reportFile: reportFile
         };
+        writeExportReport(reportFile, resultObj, dedupStats, pngStats);
+        return resultObj;
     } finally {
         // Direction 4: restore original visibility instead of closing a workDoc copy
         if (savedVisibility) {
@@ -1368,6 +1423,9 @@ function createTextNode(layer, context, parentBounds) {
         outlineColor: textStyle.outlineColor,
         outlineWidth: textStyle.outlineWidth,
         outlineOpacity: textStyle.outlineOpacity,
+        gradientStartColor: textStyle.gradientStartColor || "",
+        gradientEndColor: textStyle.gradientEndColor || "",
+        gradientAngle: textStyle.gradientAngle || 0,
         alignment: readTextAlignment(layer),
         children: []
     };
@@ -1386,7 +1444,7 @@ function createTextNode(layer, context, parentBounds) {
 function buildLayoutJson(doc, nodes) {
     var lines = [];
     lines.push("{");
-    lines.push('  "schemaVersion": "2.4",');
+    lines.push('  "schemaVersion": "2.8",');
     lines.push('  "canvas": {');
     lines.push('    "width": ' + jsonNumber(px(doc.width)) + ",");
     lines.push('    "height": ' + jsonNumber(px(doc.height)));
@@ -1442,6 +1500,12 @@ function nodeToJson(node, indent) {
         lines.push(childIndent + '"outlineWidth": ' + jsonNumber(node.outlineWidth || 0) + ",");
         lines.push(childIndent + '"outlineOpacity": ' + jsonNumber(node.outlineOpacity || 1) + ",");
         lines.push(childIndent + '"alignment": ' + quoteJson(node.alignment) + ",");
+        // Phase 3：漸層只在有資料時寫出，無漸層的文字維持原 JSON 大小
+        if (node.gradientStartColor) {
+            lines.push(childIndent + '"gradientStartColor": ' + quoteJson(node.gradientStartColor) + ",");
+            lines.push(childIndent + '"gradientEndColor": ' + quoteJson(node.gradientEndColor || "") + ",");
+            lines.push(childIndent + '"gradientAngle": ' + jsonNumber(node.gradientAngle || 0) + ",");
+        }
         if (node.fakeThicknessOffsetY) {
             lines.push(childIndent + '"fakeThicknessOffsetY": ' + jsonNumber(node.fakeThicknessOffsetY) + ",");
         }
@@ -1908,6 +1972,217 @@ function exportCacheFile(imageFolder) {
     return new File(imageFolder.fsName + "/.ps_to_unity_export_cache.tsv");
 }
 
+// Phase 3 像素雜湊去重：對匯出後的 PNG 做 FNV-1a 32-bit hash，同 hash 視為內容相同。
+// ES3 / ExtendScript 無 crypto，FNV-1a 雖然不是安全雜湊，但對 UI Package 的小檔案
+// 數量級（通常 < 200 張）內容完全相同才會撞值的機率極低，足以作為「同內容偵測」。
+function computeFileHash(file) {
+    try {
+        file.encoding = "BINARY";
+        if (!file.open("r")) {
+            return null;
+        }
+        var content = file.read();
+        file.close();
+    } catch (e) {
+        try { file.close(); } catch (e2) {}
+        return null;
+    }
+
+    var hash = 0x811C9DC5; // FNV-1a 32-bit offset basis
+    var len = content.length;
+    for (var i = 0; i < len; i++) {
+        hash = hash ^ content.charCodeAt(i);
+        // FNV prime 0x01000193；| 0 強制 32-bit signed，下面 >>> 0 轉 unsigned
+        hash = Math.imul ? Math.imul(hash, 0x01000193) : (hash * 0x01000193) | 0;
+    }
+    return ((hash >>> 0).toString(16)) + "_" + len; // 串上長度進一步降低碰撞
+}
+
+// Phase 3 dedup：呼叫前 PNG 已寫到 imageFolder。回傳 { dedupedCount, savedBytes }。
+// - 同 hash 群組：保留第一個遇到的 imagePath 為 canonical，其餘檔案刪除、節點 imagePath 重指到 canonical
+// - 同步清理 export cache 中對應「已刪除路徑」的紀錄，避免下次 run 認為檔案還在而誤跳過匯出
+function dedupPngsByHash(pendingImages, imageFolder, context) {
+    var stats = { dedupedCount: 0, savedBytes: 0, uniqueCount: 0, originalCount: 0 };
+    if (!pendingImages || pendingImages.length === 0) {
+        return stats;
+    }
+
+    var hashMap = {}; // hash -> canonical imagePath
+    var deletedPaths = {}; // deletedPath -> canonicalPath
+
+    for (var i = 0; i < pendingImages.length; i++) {
+        var p = pendingImages[i];
+        if (!p || !p.node || !p.node.imagePath) {
+            continue;
+        }
+        stats.originalCount++;
+
+        // 若該 node 的 imagePath 已被重指過（多個 node 共用同檔），跳過實體掃描
+        if (deletedPaths.hasOwnProperty(p.node.imagePath)) {
+            p.node.imagePath = deletedPaths[p.node.imagePath];
+            stats.dedupedCount++;
+            continue;
+        }
+
+        var file = new File(imageFolder.fsName + "/" + p.node.imagePath);
+        if (!file.exists) {
+            continue;
+        }
+        var hash = computeFileHash(file);
+        if (!hash) {
+            continue;
+        }
+
+        if (hashMap.hasOwnProperty(hash)) {
+            var canonical = hashMap[hash];
+            stats.savedBytes += file.length;
+            var oldPath = p.node.imagePath;
+            try { file.remove(); } catch (e) {}
+            deletedPaths[oldPath] = canonical;
+            p.node.imagePath = canonical;
+            stats.dedupedCount++;
+
+            // 清掉 cache 內被刪除路徑的條目
+            if (context.exportCache) {
+                var keysToDelete = [];
+                for (var k in context.exportCache) {
+                    if (context.exportCache.hasOwnProperty(k) &&
+                        context.exportCache[k].imagePath === oldPath) {
+                        keysToDelete.push(k);
+                    }
+                }
+                for (var j = 0; j < keysToDelete.length; j++) {
+                    delete context.exportCache[keysToDelete[j]];
+                    context.exportCacheDirty = true;
+                }
+            }
+        } else {
+            hashMap[hash] = p.node.imagePath;
+            stats.uniqueCount++;
+        }
+    }
+
+    return stats;
+}
+
+// Phase 3 / U13：取代原本的 alert，輸出可回看的 export_report.txt
+function writeExportReport(reportFile, result, dedupStats, pngStats) {
+    var lines = [];
+    var now = new Date();
+    var pad = function (n) { return n < 10 ? "0" + n : "" + n; };
+    var stamp = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate())
+              + " " + pad(now.getHours()) + ":" + pad(now.getMinutes()) + ":" + pad(now.getSeconds());
+
+    lines.push("PS_To_Unity_v2 匯出報告");
+    lines.push("版本：v" + SCRIPT_VERSION);
+    lines.push("時間：" + stamp);
+    lines.push("==========================================");
+    lines.push("");
+    lines.push("[統計]");
+    lines.push("匯出圖層：" + result.imageCount);
+    lines.push("文字節點：" + result.textCount + "（含描邊：" + result.outlineTextCount + "，含漸層：" + result.gradientTextCount + "）");
+    lines.push("群組：" + result.groupCount);
+    lines.push("");
+    lines.push("[跳過]");
+    lines.push("空白/不支援：" + result.skippedCount);
+    lines.push("隱藏圖層：" + result.skipHidden);
+    lines.push("IGNORE/REF：" + result.skipIgnoreRef);
+    lines.push("調整圖層：" + result.skipAdjustment);
+    lines.push("裁切圖層：" + result.skipClipping);
+    lines.push("快取未變更：" + result.unchangedCount);
+    lines.push("");
+    lines.push("[像素雜湊去重]");
+    if (dedupStats && dedupStats.originalCount > 0) {
+        lines.push("原始 PNG：" + dedupStats.originalCount);
+        lines.push("合併重複：" + dedupStats.dedupedCount + " → 唯一檔案 " + dedupStats.uniqueCount);
+        lines.push("省下：" + formatBytes(dedupStats.savedBytes));
+    } else {
+        lines.push("（無）");
+    }
+    lines.push("");
+    lines.push("[檔案]");
+    lines.push("PNG 資料夾：" + result.imageFolder.fsName);
+    if (pngStats) {
+        lines.push("PNG 總數：" + pngStats.fileCount);
+        lines.push("PNG 總大小：" + formatBytes(pngStats.totalBytes));
+        if (pngStats.largestName) {
+            lines.push("最大單檔：" + pngStats.largestName + "（" + formatBytes(pngStats.largestBytes) + "）");
+        }
+        if (pngStats.oversized && pngStats.oversized.length > 0) {
+            lines.push("⚠ 超大警告（>500KB，共 " + pngStats.oversized.length + " 筆）：");
+            for (var i = 0; i < pngStats.oversized.length && i < 20; i++) {
+                lines.push("  - " + pngStats.oversized[i].name + "（" + formatBytes(pngStats.oversized[i].size) + "）");
+            }
+            if (pngStats.oversized.length > 20) {
+                lines.push("  …（其餘 " + (pngStats.oversized.length - 20) + " 筆省略）");
+            }
+        } else {
+            lines.push("超大警告（>500KB）：0 筆");
+        }
+    }
+    lines.push("");
+    lines.push("[Layout JSON]");
+    lines.push(result.layoutJsonFile.fsName);
+
+    try {
+        writeTextFile(reportFile, lines.join("\n"));
+    } catch (e) {
+        // 報告寫不出來不影響匯出本身
+    }
+}
+
+function scanPngFolderStats(imageFolder) {
+    var stats = { fileCount: 0, totalBytes: 0, largestName: "", largestBytes: 0, oversized: [] };
+    try {
+        var files = imageFolder.getFiles("*.png");
+        for (var i = 0; i < files.length; i++) {
+            var f = files[i];
+            if (!(f instanceof File)) continue;
+            var len = f.length;
+            stats.fileCount++;
+            stats.totalBytes += len;
+            if (len > stats.largestBytes) {
+                stats.largestBytes = len;
+                stats.largestName = f.name;
+            }
+            if (len > 500 * 1024) {
+                stats.oversized.push({ name: f.name, size: len });
+            }
+        }
+    } catch (e) {}
+    return stats;
+}
+
+function formatBytes(bytes) {
+    if (!bytes) return "0 B";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(2) + " MB";
+}
+
+function exportReportFile(imageFolder) {
+    return new File(imageFolder.fsName + "/export_report.txt");
+}
+
+// 掃 layout tree 計算「含描邊文字 / 含漸層文字」筆數，給報告用
+function countTextStats(nodes) {
+    var stats = { outlineTextCount: 0, gradientTextCount: 0 };
+    walk(nodes);
+    return stats;
+    function walk(arr) {
+        if (!arr) return;
+        for (var i = 0; i < arr.length; i++) {
+            var n = arr[i];
+            if (!n) continue;
+            if (n.type === "text") {
+                if (n.outlineWidth && n.outlineWidth > 0) stats.outlineTextCount++;
+                if (n.gradientStartColor) stats.gradientTextCount++;
+            }
+            if (n.children && n.children.length) walk(n.children);
+        }
+    }
+}
+
 function encodeCacheValue(value) {
     try {
         return encodeURIComponent(String(value));
@@ -2310,7 +2585,11 @@ function readTextLayerStyle(layer) {
         fillColor: "",
         outlineColor: "",
         outlineWidth: 0,
-        outlineOpacity: 1
+        outlineOpacity: 1,
+        // Phase 3 漸層文字
+        gradientStartColor: "",
+        gradientEndColor: "",
+        gradientAngle: 0
     };
 
     try {
@@ -2336,6 +2615,26 @@ function readTextLayerStyle(layer) {
                 style.outlineColor = descriptorColorToHex(strokeColor);
                 style.outlineWidth = round2(strokeWidth);
                 style.outlineOpacity = round2(getDescriptorUnitDouble(stroke, ["opacity"], ["Opct"], 100) / 100);
+            }
+        }
+
+        // Phase 3 Gradient Overlay：取第一個與最後一個 color stop + 角度，寫進 JSON
+        var gradFill = getDescriptorObject(effects, ["gradientFill"], ["GrFl"]);
+        if (gradFill && getDescriptorBoolean(gradFill, ["enabled"], ["enab"], true)) {
+            var gradient = getDescriptorObject(gradFill, ["gradient"], ["Grdn"]);
+            if (gradient) {
+                var stops = getDescriptorList(gradient, ["colors"], ["Clrs"]);
+                if (stops && stops.count >= 2) {
+                    var firstStop = getDescriptorListItemAt(stops, 0);
+                    var lastStop = getDescriptorListItemAt(stops, stops.count - 1);
+                    var firstColor = firstStop ? getDescriptorObject(firstStop, ["color"], ["Clr "]) : null;
+                    var lastColor = lastStop ? getDescriptorObject(lastStop, ["color"], ["Clr "]) : null;
+                    if (firstColor && lastColor) {
+                        style.gradientStartColor = descriptorColorToHex(firstColor);
+                        style.gradientEndColor = descriptorColorToHex(lastColor);
+                        style.gradientAngle = round2(getDescriptorUnitDouble(gradFill, ["angle"], ["Angl"], 90));
+                    }
+                }
             }
         }
     } catch (e) {
@@ -2429,6 +2728,31 @@ function getDescriptorObject(descriptor, stringKeys, charKeys) {
 
     try {
         return descriptor.getObjectValue(id);
+    } catch (e) {
+        return null;
+    }
+}
+
+function getDescriptorList(descriptor, stringKeys, charKeys) {
+    var id = findDescriptorKey(descriptor, stringKeys, charKeys);
+    if (!id) {
+        return null;
+    }
+
+    try {
+        return descriptor.getList(id);
+    } catch (e) {
+        return null;
+    }
+}
+
+function getDescriptorListItemAt(list, index) {
+    if (!list || index < 0 || index >= list.count) {
+        return null;
+    }
+
+    try {
+        return list.getObjectValue(index);
     } catch (e) {
         return null;
     }

@@ -50,6 +50,34 @@ namespace PhotoshopToUnity.EditorImporter
             target.characterSpacing = node.characterSpacing;
             target.lineSpacing = node.lineSpacing;
             target.color = ParseColor(node.color, Color.white);
+
+            // Phase 3 漸層文字：有 PS Gradient Overlay 時設 TMP enableVertexGradient + colorGradient。
+            // PS 預設 angle=90（視覺上→下），first stop=上 / last stop=下；角度落在 (135, 315) 視為反向，交換。
+            if (!string.IsNullOrWhiteSpace(node.gradientStartColor)
+                && !string.IsNullOrWhiteSpace(node.gradientEndColor))
+            {
+                var startColor = ParseColor(node.gradientStartColor, target.color);
+                var endColor = ParseColor(node.gradientEndColor, target.color);
+                var normalizedAngle = ((node.gradientAngle % 360f) + 360f) % 360f;
+                Color topColor, bottomColor;
+                if (normalizedAngle > 135f && normalizedAngle < 315f)
+                {
+                    topColor = endColor;
+                    bottomColor = startColor;
+                }
+                else
+                {
+                    topColor = startColor;
+                    bottomColor = endColor;
+                }
+                target.enableVertexGradient = true;
+                target.colorGradient = new VertexGradient(topColor, topColor, bottomColor, bottomColor);
+            }
+            else
+            {
+                target.enableVertexGradient = false;
+            }
+
             // v2.7.2：PS Point Text 圖層 bbox 通常比實際字形寬，且 PS 視覺上字形是「居中」於 bbox。
             // 原 fallback = Left 會讓沒帶 alignment 欄位的短文字（按鈕標題等）貼在 bbox 左邊緣，
             // 與旁邊獨立的 icon 圖層合起來會像「文字 + 空隙 + icon」造成順序顛倒的錯覺。

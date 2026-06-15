@@ -46,6 +46,12 @@ namespace PhotoshopToUnity.EditorImporter
         public float outlineWidth;
         public float outlineOpacity = 1f;
         public string alignment;
+        // Phase 3 漸層文字（PS Gradient Overlay）：兩端色 + 角度
+        // PS Gradient Overlay 預設 angle = 90 = 視覺上「上→下」漸層；first stop = 上、last stop = 下
+        // 不填則 TmpMapper 不套用漸層（保留原 color 單色行為）。
+        public string gradientStartColor;
+        public string gradientEndColor;
+        public float gradientAngle;
         public float fakeThicknessOffsetX;
         public float fakeThicknessOffsetY;
         public string layoutType;           // "horizontal" | "vertical" | ""
