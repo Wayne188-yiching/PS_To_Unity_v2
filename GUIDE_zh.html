@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.8.0</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.8.1</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -902,6 +902,13 @@ TXT_score_[THICK:2]</code></pre>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
+
+  <h3>v2.8.1（2026-06-16）— Phase 3 hotfix：補上 Unity 端 pixel-content 去重</h3>
+  <ul>
+    <li><strong>問題</strong>：v2.8.0 在 JSX 端對 PNG bytes 算 FNV hash 做去重，但 PS <code>ExportOptionsSaveForWeb</code> 對相同像素內容產生的 PNG bytes 並不穩定（內嵌資訊與壓縮策略差異），導致視覺一模一樣的圖（例如清單列表 4 列共用同一張底圖）hash 完全不同，dedup 沒抓到，atlas 內出現多份重複 PNG。實測一張 lobby UI Package：43 張 PNG 內 7 個視覺重複群組共 12 張可去重。</li>
+    <li><strong>修正</strong>：把第二道去重搬到 Unity 端 ImageImportService。所有 PNG 匯入後新增 pass：用 <code>Texture2D.LoadImage(bytes)</code> 解碼到 in-memory texture，對 <code>GetRawTextureData()</code> 算 MD5（含維度作為 key），同 hash 視為視覺相同 → 保留第一張、刪除重複的 <code>.png</code> 與 <code>.meta</code>、<code>sprites</code> 字典所有 mapping 改指 canonical sprite。</li>
+    <li><strong>狀態</strong>：JSX 端 v2.8.0 的 FNV byte-hash dedup 保留作為第一道（零成本捕捉真正 byte-identical 的情況）；Unity 端 pixel-hash 是第二道，捕捉 byte 差但 pixel 同。Generate 完成後 HelpBox 顯示「像素去重合併：N 張（省 X KB）」。</li>
+  </ul>
 
   <h3>v2.8.0（2026-06-15）— 優化計畫 Phase 3：PS 端打磨 + 還原度</h3>
   <ul>

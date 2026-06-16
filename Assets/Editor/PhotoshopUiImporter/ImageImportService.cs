@@ -12,6 +12,9 @@ namespace PhotoshopToUnity.EditorImporter
         public readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();
         public readonly List<string> errors = new List<string>();
         public readonly List<string> missingSourceImages = new List<string>();
+        // v2.8.1 像素內容去重統計（解碼後 raw RGBA 相同的 PNG 合併到同一個 sprite）
+        public int dedupedSpriteCount;
+        public long dedupedSpriteBytes;
 
         public bool IsValid => errors.Count == 0;
     }
@@ -60,7 +63,162 @@ namespace PhotoshopToUnity.EditorImporter
             }
 
             AssetDatabase.Refresh();
+
+            // v2.8.1：在所有 PNG 匯入完成後，對 raw RGBA 算 MD5 去重。
+            // 補強 v2.8.0 JSX 端 FNV PNG-bytes hash 的盲點——PS ExportOptionsSaveForWeb
+            // 對相同像素產生的 PNG bytes 並不穩定（內嵌資訊與壓縮策略），bytes hash 抓不到，
+            // 必須解碼成 raw RGBA 再 hash 才能識別「視覺相同」。
+            DedupSpritesByPixelContent(result);
+
             return result;
+        }
+
+        private static void DedupSpritesByPixelContent(ImageImportResult result)
+        {
+            if (result.sprites.Count == 0)
+            {
+                return;
+            }
+
+            // 第一輪：對 sprites 字典裡每一個唯一 asset 算 pixel hash
+            var hashToCanonical = new Dictionary<string, string>(StringComparer.Ordinal);
+            var pathToCanonical = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var processedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var sprite in result.sprites.Values)
+            {
+                if (sprite == null)
+                {
+                    continue;
+                }
+
+                var assetPath = AssetDatabase.GetAssetPath(sprite);
+                if (string.IsNullOrEmpty(assetPath) || !processedPaths.Add(assetPath))
+                {
+                    continue;
+                }
+
+                var pixelHash = ComputePixelHash(assetPath);
+                if (pixelHash == null)
+                {
+                    continue;
+                }
+
+                if (hashToCanonical.TryGetValue(pixelHash, out var canonical))
+                {
+                    pathToCanonical[assetPath] = canonical;
+                }
+                else
+                {
+                    hashToCanonical[pixelHash] = assetPath;
+                }
+            }
+
+            if (pathToCanonical.Count == 0)
+            {
+                return;
+            }
+
+            // 第二輪：把 sprites 字典內所有指到重複 asset 的 entry 重指到 canonical sprite，
+            // 然後實體刪除重複的 PNG asset。
+            var deletedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var canonicalSpriteCache = new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
+            var spriteKeys = new List<string>(result.sprites.Keys);
+
+            foreach (var key in spriteKeys)
+            {
+                var sprite = result.sprites[key];
+                if (sprite == null)
+                {
+                    continue;
+                }
+
+                var assetPath = AssetDatabase.GetAssetPath(sprite);
+                if (!pathToCanonical.TryGetValue(assetPath, out var canonicalPath))
+                {
+                    continue;
+                }
+
+                if (!canonicalSpriteCache.TryGetValue(canonicalPath, out var canonicalSprite))
+                {
+                    canonicalSprite = AssetDatabase.LoadAssetAtPath<Sprite>(canonicalPath);
+                    canonicalSpriteCache[canonicalPath] = canonicalSprite;
+                }
+
+                if (canonicalSprite == null)
+                {
+                    continue;
+                }
+
+                result.sprites[key] = canonicalSprite;
+
+                if (deletedPaths.Add(assetPath))
+                {
+                    var absPath = PathUtility.ToAbsolutePath(assetPath);
+                    try
+                    {
+                        var fileLength = File.Exists(absPath) ? new FileInfo(absPath).Length : 0L;
+                        if (AssetDatabase.DeleteAsset(assetPath))
+                        {
+                            result.dedupedSpriteCount++;
+                            result.dedupedSpriteBytes += fileLength;
+                        }
+                    }
+                    catch
+                    {
+                        // 刪不掉就跳過，sprite 已經重指，留檔在 Atlas 內最多佔點空間，不影響行為
+                    }
+                }
+            }
+
+            if (result.dedupedSpriteCount > 0)
+            {
+                AssetDatabase.Refresh();
+            }
+        }
+
+        private static string ComputePixelHash(string assetPath)
+        {
+            Texture2D tex = null;
+            try
+            {
+                var absPath = PathUtility.ToAbsolutePath(assetPath);
+                if (!File.Exists(absPath))
+                {
+                    return null;
+                }
+
+                var bytes = File.ReadAllBytes(absPath);
+                tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                if (!tex.LoadImage(bytes, markNonReadable: false))
+                {
+                    return null;
+                }
+
+                var raw = tex.GetRawTextureData();
+                if (raw == null || raw.Length == 0)
+                {
+                    return null;
+                }
+
+                using (var md5 = System.Security.Cryptography.MD5.Create())
+                {
+                    var hash = md5.ComputeHash(raw);
+                    // 維度納入 hash key，避免相同 byte 長度但不同維度誤判
+                    return tex.width.ToString() + "x" + tex.height.ToString() + "_" + BitConverter.ToString(hash).Replace("-", string.Empty);
+                }
+            }
+            catch
+            {
+                return null;
+            }
+            finally
+            {
+                if (tex != null)
+                {
+                    UnityEngine.Object.DestroyImmediate(tex);
+                }
+            }
         }
 
         private static void CollectImagePaths(List<PhotoshopUiNode> nodes, HashSet<string> imagePaths)

@@ -1,7 +1,7 @@
 {
-    "version":  "2.8.0",
+    "version":  "2.8.1",
     "phase":  "Phase 1 — Font precision + version infra",
-    "updated":  "2026-06-15",
+    "updated":  "2026-06-16",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [
                      {

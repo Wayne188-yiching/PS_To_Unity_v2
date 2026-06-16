@@ -45,7 +45,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.8.0";
+        private const string ToolVersion = "2.8.1";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -798,21 +798,34 @@ namespace PhotoshopToUnity.EditorImporter
             Selection.activeObject = prefab;
             EditorGUIUtility.PingObject(prefab);
 
+            // v2.8.1 像素去重統計（解碼後 raw RGBA 相同 → 合併到同一個 sprite，PNG 實體被刪）
+            var dedupHint = importResult.dedupedSpriteCount > 0
+                ? $"　像素去重合併：{importResult.dedupedSpriteCount} 張（省 {FormatByteSize(importResult.dedupedSpriteBytes)}）"
+                : string.Empty;
+
             // F3：把描邊超限警告聚合後一次顯示，並輸出至 Console 方便回查節點名稱。
             if (tmpMapper.OutlineOverflowWarnings.Count > 0)
             {
                 foreach (var w in tmpMapper.OutlineOverflowWarnings)
                     Debug.LogWarning($"[OutlineOverflow] {w}");
 
-                var summary = $"Prefab 生成完成（{AssetDatabase.GetAssetPath(prefab)}），" +
-                              $"但有 {tmpMapper.OutlineOverflowWarnings.Count} 個文字描邊超出 SDF 物理上限被截斷，" +
+                var summary = $"Prefab 生成完成（{AssetDatabase.GetAssetPath(prefab)}）。{dedupHint}\n" +
+                              $"⚠ 有 {tmpMapper.OutlineOverflowWarnings.Count} 個文字描邊超出 SDF 物理上限被截斷，" +
                               "詳見 Console 警告。建議按建議值重建對應 TMP Font Asset 的 atlasPadding 後重跑。";
                 SetStatus(summary, MessageType.Warning);
             }
             else
             {
-                SetStatus($"Prefab 生成完成：{AssetDatabase.GetAssetPath(prefab)}", MessageType.Info);
+                SetStatus($"Prefab 生成完成：{AssetDatabase.GetAssetPath(prefab)}{dedupHint}", MessageType.Info);
             }
+        }
+
+        private static string FormatByteSize(long bytes)
+        {
+            if (bytes <= 0) return "0 B";
+            if (bytes < 1024) return $"{bytes} B";
+            if (bytes < 1024 * 1024) return $"{bytes / 1024.0:0.0} KB";
+            return $"{bytes / (1024.0 * 1024.0):0.00} MB";
         }
 
 
