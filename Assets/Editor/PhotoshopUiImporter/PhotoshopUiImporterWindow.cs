@@ -45,7 +45,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.8.1";
+        private const string ToolVersion = "2.9.0";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -661,6 +661,7 @@ namespace PhotoshopToUnity.EditorImporter
                 SetStatus(BuildErrorMessage("Layout 檢查失敗", result.errors), MessageType.Error);
                 return;
             }
+            LogLayoutWarnings(result);
 
             ApplyReferenceResolutionFromLayout(layout, false);
             packageHasTextNode = ContainsTextNode(layout?.nodes);
@@ -698,6 +699,7 @@ namespace PhotoshopToUnity.EditorImporter
                 SetStatus(BuildErrorMessage("Layout 驗證失敗", result.errors), MessageType.Error);
                 return;
             }
+            LogLayoutWarnings(result);
 
             ApplyReferenceResolutionFromLayout(layout, false);
             packageHasTextNode = ContainsTextNode(layout?.nodes);
@@ -744,6 +746,7 @@ namespace PhotoshopToUnity.EditorImporter
                 SetStatus(BuildErrorMessage("Layout 驗證失敗", readResult.errors), MessageType.Error);
                 return;
             }
+            LogLayoutWarnings(readResult);
             ApplyReferenceResolutionFromLayout(layout, false);
 
             EnsureSourceImageFolderFromLayout();
@@ -1465,6 +1468,23 @@ namespace PhotoshopToUnity.EditorImporter
             }
 
             return builder.ToString();
+        }
+
+        // PHASE4_PLAN.md Q10-a：LayoutReadResult.warnings 統一 dump 到 Unity Console。
+        // 來源：(1) JSX 端 detect 邏輯（GRID_DEGRADED / GRID_OUTLIER 等，Step 3 起注入），
+        //      (2) LayoutReader.Validate 加的 UNITY_TOOL_OUTDATED（Q9-c）。
+        private static void LogLayoutWarnings(LayoutReadResult result)
+        {
+            if (result == null || result.warnings == null || result.warnings.Count == 0)
+            {
+                return;
+            }
+            foreach (var w in result.warnings)
+            {
+                if (w == null) continue;
+                var where = string.IsNullOrWhiteSpace(w.node) ? "" : $" @ {w.node}";
+                Debug.LogWarning($"[PhotoshopUiImporter] {w.code}{where} — {w.message}");
+            }
         }
     }
 }

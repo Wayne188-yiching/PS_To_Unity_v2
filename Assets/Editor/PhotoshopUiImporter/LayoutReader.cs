@@ -7,6 +7,10 @@ namespace PhotoshopToUnity.EditorImporter
 {
     public static class LayoutReader
     {
+        // 這個 Unity backend 認得的 JSON schema 最高版本。
+        // 讀到 major.minor 比這個大的 JSON → 加 warning 提示更新 Unity 工具（PHASE4_PLAN.md Q9-c）。
+        private const string HighestSupportedSchemaVersion = "2.9";
+
         private static readonly HashSet<string> SupportedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "group",
@@ -43,6 +47,10 @@ namespace PhotoshopToUnity.EditorImporter
             }
 
             Validate(layout, result);
+            if (layout?.warnings != null)
+            {
+                result.warnings.AddRange(layout.warnings);
+            }
             return result.IsValid;
         }
 
@@ -58,10 +66,38 @@ namespace PhotoshopToUnity.EditorImporter
             {
                 schemaVersion = GetString(root, "schemaVersion"),
                 canvas = ParseCanvas(GetObject(root, "canvas")),
-                nodes = ParseNodes(GetArray(root, "nodes"))
+                nodes = ParseNodes(GetArray(root, "nodes")),
+                warnings = ParseWarnings(GetArray(root, "warnings"))
             };
 
             return layout;
+        }
+
+        private static List<PhotoshopUiWarning> ParseWarnings(List<object> raw)
+        {
+            var result = new List<PhotoshopUiWarning>();
+            if (raw == null)
+            {
+                return result;
+            }
+
+            foreach (var item in raw)
+            {
+                var source = item as Dictionary<string, object>;
+                if (source == null)
+                {
+                    continue;
+                }
+
+                result.Add(new PhotoshopUiWarning
+                {
+                    node = GetString(source, "node"),
+                    code = GetString(source, "code"),
+                    message = GetString(source, "message")
+                });
+            }
+
+            return result;
         }
 
         private static PhotoshopUiCanvas ParseCanvas(Dictionary<string, object> source)
@@ -138,6 +174,13 @@ namespace PhotoshopToUnity.EditorImporter
                 layoutPaddingTop = GetFloat(source, "layoutPaddingTop"),
                 layoutPaddingBottom = GetFloat(source, "layoutPaddingBottom"),
                 contentSizeFitter = GetBool(source, "contentSizeFitter", false),
+                hasCanvasGroup = GetBool(source, "hasCanvasGroup", false),
+                gridConstraintCount = (int)GetFloat(source, "gridConstraintCount"),
+                gridStartAxis = GetString(source, "gridStartAxis"),
+                gridCellSizeX = GetFloat(source, "gridCellSizeX"),
+                gridCellSizeY = GetFloat(source, "gridCellSizeY"),
+                gridSpacingX = GetFloat(source, "gridSpacingX"),
+                gridSpacingY = GetFloat(source, "gridSpacingY"),
                 children = ParseNodes(GetArray(source, "children"))
             };
         }
@@ -238,6 +281,18 @@ namespace PhotoshopToUnity.EditorImporter
             if (string.IsNullOrWhiteSpace(layout.schemaVersion))
             {
                 result.errors.Add("schemaVersion 為必填。");
+            }
+            else if (IsSchemaVersionNewerThanSupported(layout.schemaVersion))
+            {
+                // PHASE4_PLAN.md Q9-c：JSON 比 Unity backend 認得的還新，提示更新工具。
+                result.warnings.Add(new PhotoshopUiWarning
+                {
+                    node = "",
+                    code = "UNITY_TOOL_OUTDATED",
+                    message = $"layout.json schemaVersion 為 {layout.schemaVersion}，" +
+                              $"高於此 Unity 工具支援的最高版本 {HighestSupportedSchemaVersion}。" +
+                              "請更新 PhotoshopUiImporter 到最新版，否則部分新欄位將被忽略。"
+                });
             }
 
             if (layout.canvas == null)
@@ -355,6 +410,46 @@ namespace PhotoshopToUnity.EditorImporter
             {
                 result.errors.Add($"{path} 必須在 0 到 1 之間。");
             }
+        }
+
+        // 比對 major.minor（例："2.10" > "2.9" > "2.8"）。無法 parse 的字串當成同版，不阻擋 import。
+        private static bool IsSchemaVersionNewerThanSupported(string jsonSchemaVersion)
+        {
+            if (!TryParseMajorMinor(jsonSchemaVersion, out var jsonMajor, out var jsonMinor))
+            {
+                return false;
+            }
+            if (!TryParseMajorMinor(HighestSupportedSchemaVersion, out var supportedMajor, out var supportedMinor))
+            {
+                return false;
+            }
+
+            if (jsonMajor != supportedMajor)
+            {
+                return jsonMajor > supportedMajor;
+            }
+            return jsonMinor > supportedMinor;
+        }
+
+        private static bool TryParseMajorMinor(string version, out int major, out int minor)
+        {
+            major = 0;
+            minor = 0;
+            if (string.IsNullOrWhiteSpace(version))
+            {
+                return false;
+            }
+
+            var parts = version.Split('.');
+            if (parts.Length < 1 || !int.TryParse(parts[0], out major))
+            {
+                return false;
+            }
+            if (parts.Length >= 2 && !int.TryParse(parts[1], out minor))
+            {
+                minor = 0;
+            }
+            return true;
         }
     }
 }

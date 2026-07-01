@@ -32,7 +32,8 @@ namespace PhotoshopToUnity.EditorImporter
             AssetDatabase.Refresh();
 
             var rootName = string.IsNullOrWhiteSpace(context.prefabName) ? "PhotoshopUiPrefab" : context.prefabName;
-            var root = new GameObject(rootName, typeof(RectTransform));
+            // PHASE4_PLAN.md Q6：prefab root 一律掛 CanvasGroup（整頁 fade/loading disable 是最常見需求；不需要 JSX 標籤觸發）。
+            var root = new GameObject(rootName, typeof(RectTransform), typeof(CanvasGroup));
 
             try
             {
@@ -116,6 +117,8 @@ namespace PhotoshopToUnity.EditorImporter
                 case "group":
                     if (isLayoutGroup)
                         ApplyLayoutGroup(gameObject, node);
+                    if (node.hasCanvasGroup)
+                        ApplyCanvasGroup(gameObject);
                     break;
             }
 
@@ -237,6 +240,33 @@ namespace PhotoshopToUnity.EditorImporter
             image.preserveAspect = false;
         }
 
+        // PHASE4_PLAN.md Q5 / Q12-d：GridLayoutGroup 掛載。
+        // startCorner 與 childAlignment 由 Unity 端固定為 UpperLeft（不進 JSON）。
+        // constraint 固定為 FixedColumnCount，constraintCount 由 JSX 端計算後寫入 gridConstraintCount。
+        // padding 沿用 layoutPadding*（H/V/Grid 三種 layoutType 共用）。
+        private static void ApplyGridLayoutGroup(GameObject gameObject, PhotoshopUiNode node, RectOffset padding)
+        {
+            var grid = gameObject.AddComponent<GridLayoutGroup>();
+            grid.padding = padding;
+            grid.cellSize = new Vector2(node.gridCellSizeX, node.gridCellSizeY);
+            grid.spacing = new Vector2(node.gridSpacingX, node.gridSpacingY);
+            grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+            grid.startAxis = string.Equals(node.gridStartAxis, "vertical", StringComparison.OrdinalIgnoreCase)
+                ? GridLayoutGroup.Axis.Vertical
+                : GridLayoutGroup.Axis.Horizontal;
+            grid.childAlignment = TextAnchor.UpperLeft;
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = Mathf.Max(1, node.gridConstraintCount);
+        }
+
+        // PHASE4_PLAN.md Q6 / Q6.1：JSX 偵測 [CG] / [CANVASGROUP] → hasCanvasGroup=true → 掛 CanvasGroup。
+        // 欄位全用 Unity 預設（alpha=1、interactable=true、blocksRaycasts=true、ignoreParentGroups=false）——
+        // 不從 PS group opacity 推導（scope；且會打到 runtime fade 動畫）。
+        private static void ApplyCanvasGroup(GameObject gameObject)
+        {
+            gameObject.AddComponent<CanvasGroup>();
+        }
+
         private static void ApplyLayoutGroup(GameObject gameObject, PhotoshopUiNode node)
         {
             var padding = new RectOffset(
@@ -244,6 +274,13 @@ namespace PhotoshopToUnity.EditorImporter
                 Mathf.RoundToInt(node.layoutPaddingRight),
                 Mathf.RoundToInt(node.layoutPaddingTop),
                 Mathf.RoundToInt(node.layoutPaddingBottom));
+
+            // PHASE4_PLAN.md Q4/Q5/Q12-c：JSX 偵測 [GRID]/[GLAYOUT] → layoutType="grid"，走 GridLayoutGroup 分支。
+            if (string.Equals(node.layoutType, "grid", StringComparison.OrdinalIgnoreCase))
+            {
+                ApplyGridLayoutGroup(gameObject, node, padding);
+                return;
+            }
 
             var isHorizontal = string.Equals(node.layoutType, "horizontal", StringComparison.OrdinalIgnoreCase);
 

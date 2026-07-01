@@ -6,6 +6,15 @@ using UnityEngine.UI;
 
 namespace PhotoshopToUnity.EditorImporter
 {
+    // ── reskin flow 不可碰清單（PHASE4_PLAN.md Q3）────────────────────────────
+    // 以下由 full import（UGuiTmpPrefabBackend）視為 source of truth，reskin 完全不觸碰：
+    //   * CanvasGroup（含 root 自動掛的那個）
+    //   * GridLayoutGroup（layoutType == "grid" 的節點）
+    //   * HorizontalLayoutGroup / VerticalLayoutGroup 的參數（含 padding / spacing / childControl 等）
+    //   * ContentSizeFitter
+    // reskin 只做：同名圖檔覆蓋、Prefab 內 Sprite 參照替換。設計師如果手動改上述 component，
+    // reskin 不會吃掉他的手調 —— 但下次 full import 一定會覆蓋（因為 PS 是 source of truth）。
+    // ─────────────────────────────────────────────────────────────────────────
     public static class PsUiSkinApplier
     {
         public struct Result

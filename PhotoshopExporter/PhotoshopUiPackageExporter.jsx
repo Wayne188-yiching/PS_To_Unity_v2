@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.8.1";
+var SCRIPT_VERSION = "2.9.0";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 (function () {
@@ -437,6 +437,7 @@ function exportUiPackage(sourceDoc, options) {
             exportCache: null,
             exportCacheDirty: false,
             counters: {},
+            warnings: [],
             imageCount: 0,
             textCount: 0,
             groupCount: 0,
@@ -462,9 +463,9 @@ function exportUiPackage(sourceDoc, options) {
         // Phase 3：先做像素雜湊去重，再寫 cache + buildLayoutJson，這樣 cache 與 JSON 都會反映去重後的最終狀態
         var dedupStats = dedupPngsByHash(pendingImages, imageFolder, context);
         writeExportCacheIfDirty(context);
-        refreshGroupBounds(nodes, context.doc);
+        refreshGroupBounds(nodes, context);
 
-        var layout = buildLayoutJson(sourceDoc, nodes);
+        var layout = buildLayoutJson(sourceDoc, nodes, context.warnings);
         writeTextFile(layoutJsonFile, layout);
 
         // Phase 3：產生 export_report.txt 取代原本一閃即逝的 alert
@@ -605,8 +606,11 @@ function createGroupNode(layerSet, children, context, parentBounds, bounds) {
         return null;
     }
 
+    // PHASE4_PLAN.md Q8：group node 名字統一 strip 掉方括號 tag，避免 prefab 節點名裡出現 [H]/[CG]/[GRID] 等殘留。
+    var displayName = stripCanvasGroupTags(stripGridLayoutTags(stripLayoutGroupTags(layerSet.name)));
+
     var node = {
-        name: uniqueNodeName(layoutType ? stripLayoutGroupTags(layerSet.name) : layerSet.name, context.counters),
+        name: uniqueNodeName(displayName, context.counters),
         type: "group",
         x: bounds.left,
         y: bounds.top,
@@ -617,20 +621,22 @@ function createGroupNode(layerSet, children, context, parentBounds, bounds) {
     };
 
     applyLayoutMetadata(node, bounds, parentBounds, layerSet.name);
-    applyLayoutGroupMetadata(node, layerSet, children, bounds);
+    applyLayoutGroupMetadata(node, layerSet, children, bounds, context);
+    applyCanvasGroupMetadata(node, layerSet);
     node._parentBounds = parentBounds;
     node._rawName = layerSet.name;
     return node;
 }
 
-function refreshGroupBounds(nodes, doc) {
+function refreshGroupBounds(nodes, context) {
+    var doc = context && context.doc ? context.doc : context; // 保留舊呼叫端傳 doc 的相容
     for (var i = 0; i < nodes.length; i++) {
         var node = nodes[i];
         if (!node || node.type !== "group") {
             continue;
         }
 
-        refreshGroupBounds(node.children || [], doc);
+        refreshGroupBounds(node.children || [], context);
         var bounds = boundsFromChildren(node.children || [], doc);
         if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
             continue;
@@ -641,7 +647,7 @@ function refreshGroupBounds(nodes, doc) {
         node.width = bounds.width;
         node.height = bounds.height;
         applyLayoutMetadata(node, bounds, node._parentBounds, node._rawName);
-        applyLayoutGroupMetadata(node, node._rawName, node.children || [], bounds);
+        applyLayoutGroupMetadata(node, node._rawName, node.children || [], bounds, context && context.doc ? context : null);
     }
 }
 
@@ -1013,9 +1019,46 @@ function applyLayoutMetadata(node, bounds, parentBounds, rawName) {
     node.pivot = layout.pivot;
 }
 
-function applyLayoutGroupMetadata(node, group, children, bounds) {
+// PHASE4_PLAN.md Q6 / Q8：group 名稱中偵測到 [CG] / [CANVASGROUP] → hasCanvasGroup = true。
+// 「root 自動掛 CanvasGroup」由 Unity 端硬性掛在 prefab root GameObject，JSX 端不必處理 nesting level。
+function applyCanvasGroupMetadata(node, group) {
+    var rawName = typeof group === "string" ? group : (group && group.name);
+    var name = String(rawName || "");
+    if (/\[(?:CG|CANVASGROUP)\]/i.test(name)) {
+        node.hasCanvasGroup = true;
+    }
+}
+
+function applyLayoutGroupMetadata(node, group, children, bounds, context) {
     var layoutType = detectLayoutGroupType(group, children);
     if (!layoutType) {
+        return;
+    }
+
+    var rawName = typeof group === "string" ? group : (group && group.name);
+    var displayName = node && node.name ? node.name : String(rawName || "");
+
+    if (layoutType === "grid") {
+        // PHASE4_PLAN.md Q5：計算 grid 參數；若子節點寬高差 > 20% → 降級成普通 group（GRID_DEGRADED）。
+        var gridParams = calcGridParams(children, context, displayName);
+        if (!gridParams) {
+            return; // 降級：node.layoutType 維持空字串，走普通 group 路徑
+        }
+        var gridPadding = calcLayoutPadding(bounds, children);
+        node.layoutType = "grid";
+        node.layoutSpacing = 0; // grid 用 gridSpacingX/Y，layoutSpacing 保留 0
+        node.layoutPaddingLeft = gridPadding.padLeft;
+        node.layoutPaddingRight = gridPadding.padRight;
+        node.layoutPaddingTop = gridPadding.padTop;
+        node.layoutPaddingBottom = gridPadding.padBottom;
+        node.contentSizeFitter = false; // grid 靠 constraint + cellSize 決定尺寸，不用 ContentSizeFitter
+        node.gridConstraintCount = gridParams.constraintCount;
+        node.gridStartAxis = gridParams.startAxis;
+        node.gridCellSizeX = gridParams.cellSizeX;
+        node.gridCellSizeY = gridParams.cellSizeY;
+        node.gridSpacingX = gridParams.spacingX;
+        node.gridSpacingY = gridParams.spacingY;
+        node.children = children;
         return;
     }
 
@@ -1031,10 +1074,142 @@ function applyLayoutGroupMetadata(node, group, children, bounds) {
     node.children = children;
 }
 
+// PHASE4_PLAN.md Q5：Grid 參數推導。
+// - cellSize = 子節點寬高的 (中位數, 中位數)
+// - 寬高差 > 20% → 回 null（呼叫端降級成普通 group）+ pushWarning(GRID_DEGRADED)
+// - 寬高差 ≤ 20% 但非完全等大 → 仍回參數 + pushWarning(GRID_OUTLIER)
+// - spacing.x = 同 Y 相鄰節點水平 gap 中位數；spacing.y = 同 X 相鄰節點垂直 gap 中位數
+// - startAxis：第一行同 Y 節點數 > 第一列同 X 節點數 → horizontal，否則 vertical
+// - constraintCount：主軸第一 line 節點數（配 FixedColumnCount，Unity 端固定）
+function calcGridParams(children, context, nodeName) {
+    var items = layoutVisibleChildren(children);
+    if (items.length < 2) {
+        return null;
+    }
+
+    var widths = [];
+    var heights = [];
+    for (var i = 0; i < items.length; i++) {
+        widths.push(items[i].width);
+        heights.push(items[i].height);
+    }
+    var cellWidth = medianOfNumbers(widths);
+    var cellHeight = medianOfNumbers(heights);
+
+    // Outlier 偵測（相對於中位數的最大偏差比例）
+    var maxWDev = 0;
+    var maxHDev = 0;
+    for (var j = 0; j < items.length; j++) {
+        if (cellWidth > 0) {
+            maxWDev = Math.max(maxWDev, Math.abs(items[j].width - cellWidth) / cellWidth);
+        }
+        if (cellHeight > 0) {
+            maxHDev = Math.max(maxHDev, Math.abs(items[j].height - cellHeight) / cellHeight);
+        }
+    }
+    var maxDev = Math.max(maxWDev, maxHDev);
+
+    if (maxDev > 0.20) {
+        pushWarning(context, nodeName || "",
+            "GRID_DEGRADED",
+            "子節點寬高差異超過 20%（最大偏差 " + Math.round(maxDev * 100) +
+            "%），無法安排為 GridLayoutGroup；已降級為普通 group。");
+        return null;
+    }
+    if (maxDev > 0) {
+        pushWarning(context, nodeName || "",
+            "GRID_OUTLIER",
+            "子節點寬高存在 " + Math.round(maxDev * 100) +
+            "% 的偏差；仍掛 GridLayoutGroup 但實際排列可能與 PS 有微幅差異。");
+    }
+
+    // startAxis：以第一行同 Y 節點數 vs 第一列同 X 節點數比較（3 px 容差跟 detectLayoutGroupType 一致）
+    var baseY = items[0].y;
+    var baseX = items[0].x;
+    var firstRowCount = 0;
+    var firstColCount = 0;
+    for (var k = 0; k < items.length; k++) {
+        if (Math.abs(items[k].y - baseY) <= 3) firstRowCount++;
+        if (Math.abs(items[k].x - baseX) <= 3) firstColCount++;
+    }
+    var horizontal = firstRowCount >= firstColCount;
+    var startAxis = horizontal ? "horizontal" : "vertical";
+    var constraintCount = horizontal ? firstRowCount : firstColCount;
+
+    // spacing.x：對每一 row（同 y）內排序 by x，收集所有相鄰水平 gap，取整體中位數
+    var xGaps = collectGridGaps(items, true);
+    var yGaps = collectGridGaps(items, false);
+    var spacingX = xGaps.length ? medianOfNumbers(xGaps) : 0;
+    var spacingY = yGaps.length ? medianOfNumbers(yGaps) : 0;
+
+    return {
+        cellSizeX: round2(cellWidth),
+        cellSizeY: round2(cellHeight),
+        spacingX: Math.max(0, round2(spacingX)),
+        spacingY: Math.max(0, round2(spacingY)),
+        startAxis: startAxis,
+        constraintCount: Math.max(1, constraintCount)
+    };
+}
+
+// 收集 grid 內「同 row」或「同 column」的相鄰 gap（3 px 容差分組）。
+// horizontal=true → 分 row（同 y），算水平 gap；horizontal=false → 分 column（同 x），算垂直 gap。
+function collectGridGaps(items, horizontal) {
+    var gaps = [];
+    if (!items || items.length < 2) return gaps;
+
+    // 依主軸 sort
+    var sorted = items.slice().sort(function (a, b) {
+        return horizontal ? (a.y - b.y || a.x - b.x) : (a.x - b.x || a.y - b.y);
+    });
+
+    var lines = [];
+    var currentLine = [sorted[0]];
+    for (var i = 1; i < sorted.length; i++) {
+        var prev = currentLine[currentLine.length - 1];
+        var curr = sorted[i];
+        var sameLine = horizontal ? Math.abs(curr.y - prev.y) <= 3 : Math.abs(curr.x - prev.x) <= 3;
+        if (sameLine) {
+            currentLine.push(curr);
+        } else {
+            lines.push(currentLine);
+            currentLine = [curr];
+        }
+    }
+    lines.push(currentLine);
+
+    for (var li = 0; li < lines.length; li++) {
+        var line = lines[li];
+        if (line.length < 2) continue;
+        line.sort(function (a, b) {
+            return horizontal ? a.x - b.x : a.y - b.y;
+        });
+        for (var m = 0; m < line.length - 1; m++) {
+            var cur = line[m];
+            var nxt = line[m + 1];
+            var gap = horizontal ? nxt.x - (cur.x + cur.width) : nxt.y - (cur.y + cur.height);
+            if (gap >= 0) gaps.push(gap);
+        }
+    }
+    return gaps;
+}
+
+function medianOfNumbers(values) {
+    if (!values || values.length === 0) return 0;
+    var sorted = values.slice().sort(function (a, b) { return a - b; });
+    var mid = Math.floor(sorted.length / 2);
+    if (sorted.length % 2 === 1) return sorted[mid];
+    return (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 function detectLayoutGroupType(group, children) {
     var rawName = typeof group === "string" ? group : (group && group.name);
     var name = String(rawName || "");
 
+    // PHASE4_PLAN.md Q4：Grid 只認顯式標籤，不做啟發式偵測（誤判成本不對稱）。
+    if (/\[(?:GRID|GLAYOUT)\]/i.test(name)) {
+        return "grid";
+    }
     if (/\[(?:H|HLAYOUT)\]/i.test(name)) {
         return "horizontal";
     }
@@ -1441,10 +1616,10 @@ function createTextNode(layer, context, parentBounds) {
     return node;
 }
 
-function buildLayoutJson(doc, nodes) {
+function buildLayoutJson(doc, nodes, warnings) {
     var lines = [];
     lines.push("{");
-    lines.push('  "schemaVersion": "2.8",');
+    lines.push('  "schemaVersion": "2.9",');
     lines.push('  "canvas": {');
     lines.push('    "width": ' + jsonNumber(px(doc.width)) + ",");
     lines.push('    "height": ' + jsonNumber(px(doc.height)));
@@ -1455,9 +1630,39 @@ function buildLayoutJson(doc, nodes) {
         lines.push(nodeToJson(nodes[i], "    ") + (i < nodes.length - 1 ? "," : ""));
     }
 
-    lines.push("  ]");
+    lines.push("  ],");
+    // PHASE4_PLAN.md Q10-a/b：root-level warnings 陣列。空陣列亦寫出，讓 Unity backend 統一走同一段解析。
+    var warningList = warnings || [];
+    if (warningList.length === 0) {
+        lines.push('  "warnings": []');
+    } else {
+        lines.push('  "warnings": [');
+        for (var w = 0; w < warningList.length; w++) {
+            var item = warningList[w];
+            var trailing = w < warningList.length - 1 ? "," : "";
+            lines.push("    {");
+            lines.push('      "node": ' + quoteJson(item.node || "") + ",");
+            lines.push('      "code": ' + quoteJson(item.code || "") + ",");
+            lines.push('      "message": ' + quoteJson(item.message || ""));
+            lines.push("    }" + trailing);
+        }
+        lines.push("  ]");
+    }
     lines.push("}");
     return lines.join("\n");
+}
+
+// PHASE4_PLAN.md Q10：把一則 warning 塞進 context.warnings，後面會 flush 到 layout.json 的 root-level warnings 陣列。
+// codes 用 SCREAMING_SNAKE 常數（例：GRID_OUTLIER / GRID_DEGRADED / UNITY_TOOL_OUTDATED）。
+function pushWarning(context, nodeName, code, message) {
+    if (!context || !context.warnings) {
+        return;
+    }
+    context.warnings.push({
+        node: nodeName || "",
+        code: code || "",
+        message: message || ""
+    });
 }
 
 function nodeToJson(node, indent) {
@@ -1484,6 +1689,18 @@ function nodeToJson(node, indent) {
         lines.push(childIndent + '"layoutPaddingTop": ' + jsonNumber(node.layoutPaddingTop || 0) + ",");
         lines.push(childIndent + '"layoutPaddingBottom": ' + jsonNumber(node.layoutPaddingBottom || 0) + ",");
         lines.push(childIndent + '"contentSizeFitter": ' + (node.contentSizeFitter ? "true" : "false") + ",");
+        // PHASE4_PLAN.md Q12-c：grid 專屬欄位只在 layoutType==="grid" 時寫出
+        if (node.layoutType === "grid") {
+            lines.push(childIndent + '"gridConstraintCount": ' + jsonNumber(node.gridConstraintCount || 1) + ",");
+            lines.push(childIndent + '"gridStartAxis": ' + quoteJson(node.gridStartAxis || "horizontal") + ",");
+            lines.push(childIndent + '"gridCellSizeX": ' + jsonNumber(node.gridCellSizeX || 0) + ",");
+            lines.push(childIndent + '"gridCellSizeY": ' + jsonNumber(node.gridCellSizeY || 0) + ",");
+            lines.push(childIndent + '"gridSpacingX": ' + jsonNumber(node.gridSpacingX || 0) + ",");
+            lines.push(childIndent + '"gridSpacingY": ' + jsonNumber(node.gridSpacingY || 0) + ",");
+        }
+    }
+    if (node.hasCanvasGroup) {
+        lines.push(childIndent + '"hasCanvasGroup": true,');
     }
 
     if (node.type === "image") {
@@ -2361,7 +2578,7 @@ function normalizeFileSystemPath(path) {
 }
 
 function uniqueFileName(name, counters) {
-    var base = normalizeAsciiSlug(stripFakeThicknessTags(stripLayoutGroupTags(stripLayoutTokens(stripControlPrefix(name)))));
+    var base = normalizeAsciiSlug(stripFakeThicknessTags(stripCanvasGroupTags(stripGridLayoutTags(stripLayoutGroupTags(stripLayoutTokens(stripControlPrefix(name)))))));
     if (!base) {
         base = "layer";
     }
@@ -2381,6 +2598,16 @@ function uniqueNodeName(name, counters) {
 
 function stripLayoutGroupTags(name) {
     return String(name || "").replace(/\[(?:H|HLAYOUT|V|VLAYOUT)\]/ig, "");
+}
+
+// PHASE4_PLAN.md Q8：CanvasGroup 標籤別名 [CG] / [CANVASGROUP]。
+function stripCanvasGroupTags(name) {
+    return String(name || "").replace(/\[(?:CG|CANVASGROUP)\]/ig, "");
+}
+
+// PHASE4_PLAN.md Q8：Grid 標籤別名 [GRID] / [GLAYOUT]。
+function stripGridLayoutTags(name) {
+    return String(name || "").replace(/\[(?:GRID|GLAYOUT)\]/ig, "");
 }
 
 function stripFakeThicknessTags(name) {
