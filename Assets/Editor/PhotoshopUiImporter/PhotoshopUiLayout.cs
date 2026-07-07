@@ -72,7 +72,7 @@ namespace PhotoshopToUnity.EditorImporter
         public bool contentSizeFitter;
         // Phase 4：JSX 偵測 [CG] / [CANVASGROUP] 標籤時填 true（root GameObject 由 Unity 端 hardcode 掛 CanvasGroup，不看此欄）。
         public bool hasCanvasGroup;
-        // Phase 4 Grid：僅在 layoutType == "grid" 時有效。startCorner / childAlignment 由 Unity 端固定為 UpperLeft，不進 JSON（PHASE4_PLAN.md Q12-d）。
+        // Phase 4 Grid：僅在 layoutType == "grid" 時有效。startCorner / childAlignment 由 Unity 端固定為 UpperLeft，不進 JSON（OPTIMIZATION_PLAN_zh.html#phase4-decisions Q12-d）。
         public int gridConstraintCount;
         public string gridStartAxis;    // "horizontal" | "vertical"
         public float gridCellSizeX;

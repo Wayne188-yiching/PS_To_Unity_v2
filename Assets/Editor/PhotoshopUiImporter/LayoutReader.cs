@@ -8,7 +8,7 @@ namespace PhotoshopToUnity.EditorImporter
     public static class LayoutReader
     {
         // 這個 Unity backend 認得的 JSON schema 最高版本。
-        // 讀到 major.minor 比這個大的 JSON → 加 warning 提示更新 Unity 工具（PHASE4_PLAN.md Q9-c）。
+        // 讀到 major.minor 比這個大的 JSON → 加 warning 提示更新 Unity 工具（OPTIMIZATION_PLAN_zh.html#phase4-decisions Q9-c）。
         private const string HighestSupportedSchemaVersion = "2.9";
 
         private static readonly HashSet<string> SupportedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -284,7 +284,7 @@ namespace PhotoshopToUnity.EditorImporter
             }
             else if (IsSchemaVersionNewerThanSupported(layout.schemaVersion))
             {
-                // PHASE4_PLAN.md Q9-c：JSON 比 Unity backend 認得的還新，提示更新工具。
+                // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q9-c：JSON 比 Unity backend 認得的還新，提示更新工具。
                 result.warnings.Add(new PhotoshopUiWarning
                 {
                     node = "",

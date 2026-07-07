@@ -2,7 +2,7 @@
 
 > **狀態**：PSD 檔請依下方指引由 Photoshop 手動建立並存到此資料夾。
 > commit 這些 PSD 後、Phase 4.5 之後任何回歸測試都能重跑同一組樣本。
-> 用途對應 [`docs/PHASE4_PLAN.md`](../../docs/PHASE4_PLAN.md) Step 4 / Q13-d。
+> 用途對應 [`OPTIMIZATION_PLAN_zh.html#phase4-decisions`](../../OPTIMIZATION_PLAN_zh.html#phase4-decisions) Step 4 / Q13-d。
 
 ---
 

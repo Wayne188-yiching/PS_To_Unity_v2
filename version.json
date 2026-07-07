@@ -1,7 +1,7 @@
 {
     "version":  "2.9.0",
     "phase":  "Phase 4 — Adaptive layout components (Grid + CanvasGroup)",
-    "updated":  "2026-07-01",
+    "updated":  "2026-07-07",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [
                      {
@@ -39,6 +39,11 @@
                          "file":  "GUIDE_zh.html",
                          "pattern":  "\u003cspan class=\"badge\"\u003ev\\d+\\.\\d+\\.\\d+\u003c/span\u003e",
                          "replacement":  "\u003cspan class=\"badge\"\u003ev{version}\u003c/span\u003e"
+                     },
+                     {
+                         "file":  "GUIDE_zh.html",
+                         "pattern":  "PS → Unity UI Tool \u0026nbsp;·\u0026nbsp; v\\d+\\.\\d+\\.\\d+ \u0026nbsp;·\u0026nbsp;",
+                         "replacement":  "PS → Unity UI Tool \u0026nbsp;·\u0026nbsp; v{version} \u0026nbsp;·\u0026nbsp;"
                      }
                  ]
 }

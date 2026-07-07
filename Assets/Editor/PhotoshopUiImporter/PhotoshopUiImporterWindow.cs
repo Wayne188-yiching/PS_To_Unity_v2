@@ -1470,7 +1470,7 @@ namespace PhotoshopToUnity.EditorImporter
             return builder.ToString();
         }
 
-        // PHASE4_PLAN.md Q10-a：LayoutReadResult.warnings 統一 dump 到 Unity Console。
+        // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q10-a：LayoutReadResult.warnings 統一 dump 到 Unity Console。
         // 來源：(1) JSX 端 detect 邏輯（GRID_DEGRADED / GRID_OUTLIER 等，Step 3 起注入），
         //      (2) LayoutReader.Validate 加的 UNITY_TOOL_OUTDATED（Q9-c）。
         private static void LogLayoutWarnings(LayoutReadResult result)

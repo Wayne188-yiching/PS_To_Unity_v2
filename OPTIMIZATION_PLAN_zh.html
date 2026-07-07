@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PS → Unity UI 工具 — 優化計畫（基準 v2.4.2）</title>
+  <title>PS → Unity UI 工具 — 優化計畫（已推進至 v2.9.0）</title>
   <style>
     :root {
       --bg: #0a0e1a;
@@ -140,6 +140,7 @@
     .tag-ok { color: var(--ok); border-color: var(--ok); background: var(--ok-soft); }
     .tag-cyan { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
     .tag-magenta { color: var(--magenta); border-color: var(--magenta); background: var(--magenta-soft); }
+    .tag-done { color: var(--muted); border-color: var(--muted); background: rgba(107,122,153,0.10); }
 
     .phase {
       border: 1px solid var(--line);
@@ -150,8 +151,51 @@
       margin: 18px 0;
     }
     .phase.urgent { border-left-color: var(--red); }
+    .phase.done { border-left-color: var(--muted); opacity: 0.86; }
+    .phase.stub { border-left-color: var(--magenta); border-left-style: dashed; }
     .phase h3 { margin-top: 0; }
     .phase .meta { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+    .phase h4 { margin: 18px 0 6px; font-size: 14px; color: var(--accent); }
+    .phase h4.q { color: var(--magenta); margin-top: 22px; }
+    .phase .qbody { border-left: 2px solid var(--line); padding-left: 12px; margin: 4px 0 12px; }
+
+    .handoff {
+      margin: 14px 0 4px;
+      border: 1px dashed var(--magenta);
+      border-radius: 8px;
+      background: var(--magenta-soft);
+      padding: 12px 14px;
+    }
+    .handoff summary {
+      cursor: pointer;
+      color: var(--magenta);
+      font-weight: 600;
+      font-size: 13.5px;
+      list-style: none;
+    }
+    .handoff summary::before {
+      content: "▶ ";
+      display: inline-block;
+      transition: transform 0.15s;
+    }
+    .handoff[open] summary::before { content: "▼ "; }
+    .handoff pre {
+      margin: 10px 0 0;
+      background: var(--code-bg);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      font-family: "Share Tech Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12.5px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .handoff .hint {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 8px;
+    }
 
     ul, ol { padding-left: 22px; }
     li { margin: 5px 0; }
@@ -178,9 +222,9 @@
 <main>
 
   <header>
-    <h1>優化計畫 <span class="badge">基準版本 v2.4.2</span></h1>
+    <h1>優化計畫 <span class="badge">已推進至 v2.9.0</span></h1>
     <p class="lead">Photoshop → Unity UI 工具（PS_To_Unity_v2）優化方向、問題診斷與階段排程。<br>
-    文件日期：2026-06-11　·　配合文件：GUIDE_zh.html、README_zh.md</p>
+    文件起始：2026-06-11（基準 v2.4.2）　·　最後更新：2026-07-07　·　配合文件：GUIDE_zh.html、README_zh.md</p>
   </header>
 
   <nav>
@@ -188,8 +232,9 @@
     <a href="#font">字型精度診斷</a>
     <a href="#uiux">UI/UX 問題清單</a>
     <a href="#phases">階段排程</a>
+    <a href="#phase4">Phase 4 決議 Q1–Q13</a>
+    <a href="#phase5">Phase 5 規劃</a>
     <a href="#backlog">後續待辦池</a>
-    <a href="#open">待確認事項</a>
     <a href="#howto">執行方式</a>
   </nav>
 
@@ -197,17 +242,11 @@
   <h2 id="rules">流程規範（每次優化必做）</h2>
   <div class="panel">
     <ol>
-      <li><strong>版本號</strong>：每完成一個階段即 bump 版本號。行為變更或 JSON 格式新增欄位 → 升 <strong>minor</strong>（如 2.5.0）；純修正 → 升 <strong>patch</strong>（如 2.4.3）。</li>
-      <li><strong>需同步更新版本號的位置</strong>（Phase 1 完成版本號單一來源之前，以下全部手動同步）：
-        <ul>
-          <li><code>PhotoshopUiPackageExporter.jsx</code> 的 <code>SCRIPT_VERSION</code></li>
-          <li><code>PhotoshopUiImporterWindow.cs</code> 的 <code>ToolVersion</code></li>
-          <li><code>GUIDE_zh.html</code>：header 標題徽章、頁尾版本</li>
-          <li><code>README.md</code> 與 <code>README_zh.md</code> 的「目前版本」</li>
-        </ul>
-      </li>
-      <li><strong>HTML 文件</strong>：每階段完成後在 GUIDE_zh.html 更新對應段落與 FAQ，並記錄 changelog。</li>
+      <li><strong>版本號</strong>：每完成一個階段即 bump 版本號。行為變更或 JSON 格式新增欄位 → 升 <strong>minor</strong>（如 2.9.0）；純修正 → 升 <strong>patch</strong>（如 2.9.1）。Phase 1 起版本已改由 <code>version.json</code> + <code>bump-version.ps1</code> 單一來源同步全部位置（<code>.\bump-version.ps1 -NewVersion X.Y.Z</code>；加 <code>-Check</code> 僅檢查不修改）。</li>
+      <li><strong>HTML 文件</strong>：每階段完成後在 GUIDE_zh.html 更新對應段落與 FAQ，並記錄 changelog。任何未來優化的 Phase 一律新增章節寫入本檔（OPTIMIZATION_PLAN_zh.html），不再另建獨立 markdown 規劃檔。</li>
       <li><strong>驗收</strong>：每階段附「驗收標準」，由使用者在 Photoshop / Unity 實機驗證通過後才進入下一階段。</li>
+      <li><strong>版本控管</strong>：每階段結束一律 <code>git commit</code> + <code>git push</code>（跨機器工作流程；Phase 0 起已連上 <code>origin/main</code>）。</li>
+      <li><strong>Phase 交接提示詞（必附）</strong>：每個 Phase 章節末尾都必須放一段可直接複製的「交接提示詞」（&lt;details class="handoff"&gt; 區塊），讓使用者能在任何新 Claude 對話中複製貼上、無需重新解釋背景就能接手該 Phase 的規劃或實作。提示詞至少包含：任務目標、關鍵入口檔案路徑、參考的既有決議段落錨點（如 <code>OPTIMIZATION_PLAN_zh.html#phase4-q3</code>）、以及本次要交接的具體步驟。<strong>未附提示詞的 Phase 章節視為未完成規劃。</strong></li>
     </ol>
   </div>
 
@@ -327,90 +366,480 @@
   <h2 id="phases">階段排程</h2>
 
   <div class="callout warn">
-    <strong>版號修正（2026-06-11 Phase 0 執行時發現）</strong>：本計畫原以 v2.4.2 為基準，但倉庫實際狀態為 JSX = 2.4.2、Unity 端 = 2.5.0（SkinTheme 等 v2.5 功能已存在）、README = 2.2.0，版本已漂移。為避免 Unity 端版號倒退，Phase 0 改出 <strong>v2.5.1</strong>（統一全部位置），後續 Phase 版號順延：Phase 1 → v2.6.0、Phase 2 → v2.7.0、Phase 3 → v2.8.0。
+    <strong>版號修正（2026-06-11 Phase 0 執行時發現）</strong>：本計畫原以 v2.4.2 為基準，但倉庫實際狀態為 JSX = 2.4.2、Unity 端 = 2.5.0（SkinTheme 等 v2.5 功能已存在）、README = 2.2.0，版本已漂移。為避免 Unity 端版號倒退，Phase 0 改出 <strong>v2.5.1</strong>（統一全部位置），後續 Phase 版號順延：Phase 1 → v2.6.0、Phase 2 → v2.7.0、Phase 3 → v2.8.0、Phase 4 → v2.9.0。
   </div>
 
-  <div class="phase urgent">
-    <h3><span class="tag tag-red">Phase 0</span>緊急安全修正 → v2.5.1（原訂 v2.4.3）<span class="tag tag-ok">已實作，待驗收</span></h3>
-    <p class="meta">範圍小（各約十數行）、風險低、但問題會造成實際損失，不等大版本。</p>
+  <!-- ────────────── Phase 0 ────────────── -->
+  <div class="phase done" id="phase0">
+    <h3><span class="tag tag-red">Phase 0</span>緊急安全修正 → v2.5.1（原訂 v2.4.3）<span class="tag tag-done">已完成</span></h3>
+    <p class="meta">範圍小（各約十數行）、風險低、但問題會造成實際損失，不等大版本。commit = 82b6953。</p>
     <ul>
       <li>U1：換皮改為「掃描預覽 → 確認 → 覆蓋」兩段式</li>
       <li>U2：Check for Updates 不再關閉匯出對話框 / 保留欄位值</li>
     </ul>
-    <p><strong>驗收標準</strong>：換皮在覆蓋前必出現確認清單；PS 端點更新檢查後返回對話框、原設定仍在。</p>
+    <details class="handoff">
+      <summary>Phase 0 交接提示詞（複製給新對話用）</summary>
+<pre>你正在協助 PS_To_Unity_v2 專案的 Phase 0 hotfix 追加。倉庫在
+E:\Wayne\Claude\PS_To_Unity_v2-main（Windows/PowerShell 環境，git 已連 origin/main）。
+Phase 0 目標已完成（v2.5.1），如需追加 hotfix：
+
+背景參考：
+- OPTIMIZATION_PLAN_zh.html#phase0
+- 關鍵入口：PhotoshopExporter/PhotoshopUiPackageExporter.jsx（Check for Updates 段）、
+  Assets/Editor/PhotoshopUiImporter/PsUiSkinApplier.cs（兩段式 reskin flow）
+
+任務：{{ 請描述具體 hotfix 內容 }}
+
+規範：改完先跑 .\bump-version.ps1 -NewVersion 2.5.X 同步版號、更新 GUIDE_zh.html
+changelog、確認實機驗證後 commit + push。</pre>
+      <span class="hint">用途：Phase 0 若日後需要追加 hotfix，把 {{ }} 部分改成任務描述再貼進新對話即可。</span>
+    </details>
   </div>
 
-  <div class="phase">
-    <h3><span class="tag tag-cyan">Phase 1</span>字型精度 + 版本基建 → v2.6.0（原訂 v2.5.0）</h3>
-    <p class="meta">針對核心痛點「文字大小與描邊對不準」，並讓之後每次迭代的版本同步成本下降。</p>
+  <!-- ────────────── Phase 1 ────────────── -->
+  <div class="phase done" id="phase1">
+    <h3><span class="tag tag-cyan">Phase 1</span>字型精度 + 版本基建 → v2.6.0（原訂 v2.5.0）<span class="tag tag-done">已完成</span></h3>
+    <p class="meta">核心痛點「文字大小與描邊對不準」修正 + 建立 <code>version.json</code> 單一版本來源。commit = 41f6d9c；含後續 v2.6.1~2.6.4 微調（PS 選單整合、描邊補償係數、anchor 推測關閉、Check for Updates 用 semver 比較）。</p>
     <ol>
-      <li><strong>F2</strong>：描邊換算分母從 <code>atlasPadding</code> 改為 <code>atlasPadding + 1</code>（= gradientScale），修正系統性偏厚 20% 的問題。建議同步改為從 Font Asset 動態讀取，避免未來換字型時又出現同樣問題</li>
-      <li><strong>F3</strong>：換算結果超過 1.0 時不再無聲 clamp，於 Validate / Generate 報告明確警告並附建議 padding 值（以目前字型為例：36pt 文字描邊上限約 8.6px）</li>
-      <li><strong>F4</strong>：JSX 補讀 stroke position；Unity 端以 <code>_FaceDilate</code> 補償居中描邊（實驗項，需實測）</li>
-      <li><strong>基建</strong>：建立 <code>version.json</code> 單一版本來源 + bump script（改一處自動同步 JSX / CS / GUIDE / README）</li>
-      <li><strong>校準 PSD</strong>：建立固定字級 × 描邊組合的測試檔，作為回歸基準</li>
+      <li>F2：描邊換算分母 <code>atlasPadding</code> → <code>atlasPadding + 1</code>（= gradientScale），修正系統性偏厚 20%；改為從 Font Asset 動態讀取</li>
+      <li>F3：換算超過 1.0 不再無聲 clamp，Console 明確警告並附建議 padding 值</li>
+      <li>F4：JSX 補讀 stroke position；Unity 端用 <code>_FaceDilate</code> 補償居中描邊</li>
+      <li>基建：<code>version.json</code> + <code>bump-version.ps1</code></li>
+      <li>校準 PSD：Calibration 建立面板收在 PS Hub 面板</li>
     </ol>
-    <p><strong>驗收標準</strong>：用校準 PSD 匯出，於 Unity 疊半透明 PS 截圖比對，72 與 144 DPI 文件的文字大小皆一致；常用描邊寬度視覺誤差肉眼不可辨；超限描邊出現明確警告。</p>
+    <details class="handoff">
+      <summary>Phase 1 交接提示詞（追加 hotfix / 校準用）</summary>
+<pre>你正在協助 PS_To_Unity_v2 專案的 Phase 1（字型精度）後續調整。倉庫在
+E:\Wayne\Claude\PS_To_Unity_v2-main。
+
+背景參考：
+- OPTIMIZATION_PLAN_zh.html#phase1、#font（F1–F5 診斷）
+- 關鍵入口：Assets/Editor/PhotoshopUiImporter/TmpMapper.cs（ConvertPhotoshopStrokeWidth、
+  Apply、FindLibraryMaterial）、PhotoshopExporter/PhotoshopUiPackageExporter.jsx 的
+  frameFX / gradient 讀取段
+- 校準工具：PS 端 Hub 面板「Create Calibration PSD」，產出的 PSD 走一次 export → import
+  流程做視覺對照
+- 描邊補償係數：GUIDE_zh.html「文字與材質球」章節有校正流程
+
+任務：{{ 請描述具體調整內容，例如「調整補償係數預設值」或「加新的 stroke position 補償」}}
+
+規範：改完後跑校準 PSD 回歸、bump 版號、更新 GUIDE changelog、commit + push。</pre>
+    </details>
   </div>
 
-  <div class="phase">
-    <h3><span class="tag tag-cyan">Phase 2</span>Unity 端 UX 重整 → v2.7.0（原訂 v2.6.0）</h3>
+  <!-- ────────────── Phase 2 ────────────── -->
+  <div class="phase done" id="phase2">
+    <h3><span class="tag tag-cyan">Phase 2</span>Unity 端 UX 重整 → v2.7.0（原訂 v2.6.0）<span class="tag tag-done">已完成</span></h3>
+    <p class="meta">commit = bfec4cc；含 v2.7.1 hotfix（換皮 Foldout assertion）與 v2.7.2 hotfix（TMP alignment fallback Left → Center）。</p>
     <ul>
-      <li>U3：路徑按鈕收斂，以<strong>「建立專案資料夾」為主流程</strong>（最常用）；「套用標準輸出路徑」與「圖片位置跟隨來源」降為進階折疊選項</li>
-      <li>U4 / U5：步驟完成狀態、按鈕 disable 引導、必填即時標紅</li>
-      <li>U6：Validate 與預覽合併，Generate 做主視覺按鈕</li>
-      <li>U7 / U8：換皮移位、參考解析度控制項簡化</li>
-      <li>F5：收緊材質庫比對容差（依 Phase 1 修正後實測決定數值）</li>
+      <li>U3：路徑按鈕以「建立專案資料夾」為主流程，其他兩顆併進進階折疊區</li>
+      <li>U4 / U5：Generate 按鈕依前置條件 disable + HelpBox 條列缺項、TMP Font Asset 缺項即時標紅</li>
+      <li>U6：Validate / Dry-run / Generate 三鈕合併為「檢查」+ 主視覺「Generate Prefab」</li>
+      <li>U7 / U8：換皮工具整段搬到主流程之後並收進 Foldout；參考解析度控制項簡化</li>
+      <li>F5：材質庫 <code>widthDiff</code> 容差由「永遠選最接近」改為「超過 10% 直接淘汰」</li>
     </ul>
-    <p><strong>驗收標準</strong>：新使用者不看文件可完成「套用 Package → Generate」完整流程；每個錯誤狀態都有明確下一步指引。</p>
+    <details class="handoff">
+      <summary>Phase 2 交接提示詞（Unity UX 追加調整用）</summary>
+<pre>你正在協助 PS_To_Unity_v2 專案的 Phase 2（Unity Importer UX）後續調整。倉庫在
+E:\Wayne\Claude\PS_To_Unity_v2-main。
+
+背景參考：
+- OPTIMIZATION_PLAN_zh.html#phase2、#uiux（U1–U13）
+- 關鍵入口：Assets/Editor/PhotoshopUiImporter/PhotoshopUiImporterWindow.cs
+  （IMGUI 主視窗，Unity 6 Foldout 要包在 EditorGUILayout.VerticalScope(EditorStyles.helpBox)
+  裡才不會噴 assertion，見 v2.7.1 hotfix）
+
+任務：{{ 請描述具體 UX 調整 }}
+
+規範：Unity Editor 端 IMGUI 修改後請提供 Unity 版本（本專案主要跑 6000.0.67f1），
+本倉庫非完整 Unity 專案，語法檢查用 Roslyn 指令即可（見 CLAUDE.md 說明）。</pre>
+    </details>
   </div>
 
-  <div class="phase">
-    <h3><span class="tag tag-cyan">Phase 3</span>PS 端打磨 + 還原度 → v2.8.0（原訂 v2.7.0）</h3>
+  <!-- ────────────── Phase 3 ────────────── -->
+  <div class="phase done" id="phase3">
+    <h3><span class="tag tag-cyan">Phase 3</span>PS 端打磨 + 還原度 → v2.8.0（原訂 v2.7.0）<span class="tag tag-done">已完成</span></h3>
+    <p class="meta">commit = ca48666；含 v2.8.1 hotfix（Unity 端 pixel-content 去重補強）。</p>
     <ul>
-      <li>U9 ~ U12：PS 對話框中文化、選項收納進階區、選取狀態顯示</li>
-      <li>U13 + 匯出報告：總圖量、總大小、超大單圖警告、skipped 清單，輸出可回看的報告檔</li>
-      <li>像素雜湊去重：以匯出後 PNG 像素雜湊比對，正確撿回 v2.4.2 停用的去重功能（不誤殺同寬不同字的文字圖）</li>
-      <li>漸層文字：讀取 PS Gradient Overlay 上下色 → TMP <code>colorGradient</code> 四角頂點色</li>
+      <li>U9 ~ U12：PS 對話框中文化、Layout JSON 路徑收進階區、選取文字圖層即時顯示</li>
+      <li>U13 + 匯出報告：<code>export_report.txt</code> 檔生成（統計 / 超大警告 / dedup 結果）</li>
+      <li>像素雜湊去重：JSX 端 FNV byte-hash（第一道）+ Unity 端 pixel-hash（第二道，v2.8.1 補上）</li>
+      <li>漸層文字：讀 PS Gradient Overlay 首末 color stop + angle → TMP <code>colorGradient</code></li>
     </ul>
-    <p><strong>驗收標準</strong>：重複底圖正確共用、文字圖不被誤合併；漸層標題文字還原上下色；匯出後產生報告檔。</p>
+    <details class="handoff">
+      <summary>Phase 3 交接提示詞（PS-side 追加調整用）</summary>
+<pre>你正在協助 PS_To_Unity_v2 專案的 Phase 3（PS 端還原度）後續調整。倉庫在
+E:\Wayne\Claude\PS_To_Unity_v2-main。
+
+背景參考：
+- OPTIMIZATION_PLAN_zh.html#phase3
+- 關鍵入口：PhotoshopExporter/PhotoshopUiPackageExporter.jsx（近 3000 行單檔，ExtendScript
+  ES3 語法，勿用 let/const/arrow function/template literal），主要區塊：export 主流程 /
+  frameFX / gradient / dedup / export_report
+- 匯出報告：export_report.txt 產出點在 exporter 主流程末段
+
+任務：{{ 請描述具體調整 }}
+
+規範：JSX 修改後跑 node 語法檢查（見 CLAUDE.md）；schemaVersion 有變動要同步 Unity
+端 LayoutReader.cs 的最低支援版本。</pre>
+    </details>
+  </div>
+
+  <!-- ────────────── Phase 4 ────────────── -->
+  <div class="phase done" id="phase4">
+    <h3><span class="tag tag-cyan">Phase 4</span>自適應布局 Component 自動掛載 → v2.9.0<span class="tag tag-done">已完成</span></h3>
+    <p class="meta">commit = f4ebb13。PSD → Unity Prefab 產出後自動掛 <code>GridLayoutGroup</code> 與 <code>CanvasGroup</code>（Layout child opts / ScrollRect 不在本階段範圍，見 Q1 / Q7）。完整 grill-me 決議見下方 <a href="#phase4-q1">Phase 4 決議 Q1–Q13</a>。</p>
+
+    <h4>實作範圍</h4>
+    <ul>
+      <li><strong>Schema 升版 2.8 → 2.9</strong>：<code>PhotoshopUiLayout.cs</code> 加 <code>PhotoshopUiWarning</code> class、<code>hasCanvasGroup</code> bool、grid 6 欄位（<code>gridConstraintCount</code> / <code>gridStartAxis</code> / <code>gridCellSizeX,Y</code> / <code>gridSpacingX,Y</code>）；Unity 端遇到 schemaVersion 比自己認得的還新 → 加 <code>UNITY_TOOL_OUTDATED</code> warning</li>
+      <li><strong>CanvasGroup</strong>：prefab root 一律掛（見 Q6）；中間層需標 <code>[CG]</code> / <code>[CANVASGROUP]</code>；alpha=1 / interactable=true / blocksRaycasts=true 為 Unity 預設，不讀 PS group opacity（Q6.1）</li>
+      <li><strong>GridLayoutGroup</strong>：靠顯式命名觸發 <code>[GRID]</code> / <code>[GLAYOUT]</code>（Q4）；cellSize 取子節點中位數，spacing 取同 Y / 同 X 相鄰間距中位數；<code>constraint=FixedColumnCount</code>、<code>constraintCount</code>=第一行同 Y 節點數；startAxis 依實際排列自動判；startCorner / childAlignment 固定 UpperLeft 不進 JSON（Q12-d）</li>
+      <li><strong>降級與警告</strong>：子寬高差 &gt; 20% → JSX 送 <code>GRID_DEGRADED</code> warning 且降級成普通 group；差 ≤ 20% 但有 outlier → 送 <code>GRID_OUTLIER</code> 仍掛 grid（Q5.2 / Q5.3）</li>
+      <li><strong>Reskin guard</strong>：<code>PsUiSkinApplier.cs</code> 加註解「不可碰清單：CanvasGroup、GridLayoutGroup、layoutType=grid 的 group 之 layout 欄位」（Q3）</li>
+      <li><strong>Warning channel</strong>：JSON root-level <code>warnings: [{node, code, message}, ...]</code>；Unity 端 <code>LogLayoutWarnings</code> 於 CheckLayout / ValidateLayout / GeneratePrefab 三入口都會 dump 到 Console（Q10）</li>
+    </ul>
+
+    <h4>Phase 4 收尾狀態（截至 2026-07-07）</h4>
+    <div class="callout warn">
+      <strong>兩件事尚未收尾：</strong>
+      <ol style="margin:6px 0 0 18px;">
+        <li>有 3 個 post-commit fix 未提交（<code>PhotoshopUiPackageExporter.jsx</code> +37/-2）：
+          <ul>
+            <li><code>constraintCount</code> 邏輯反了：<code>horizontal ? firstRowCount : firstColCount</code> 會讓 rows&gt;cols 的 grid 在 Unity 端 90° 翻轉。<code>FixedColumnCount</code> 語意始終是欄數、跟 startAxis 無關，改成固定 <code>firstRowCount</code>。</li>
+            <li>新增 <code>sortGridChildren</code>：Unity GridLayoutGroup 按 sibling index 依序填格，PS 端要先把 children 依 startAxis 排好（Horizontal→row-major、Vertical→column-major），視覺才對得上。</li>
+            <li><code>pushWarning</code> dedup：<code>applyLayoutGroupMetadata</code> 會在 <code>createGroupNode</code> 與 <code>refreshGroupBounds</code> 各執行一次，同一個 grid 的 <code>GRID_OUTLIER</code> / <code>GRID_DEGRADED</code> 會被送兩次；加 <code>(node, code)</code> key dedup。</li>
+          </ul>
+        </li>
+        <li><code>Samples/Phase4/</code> 目錄仍只有 <code>README.md</code>，規劃的 4 個 PSD 樣本（<code>grid_basic</code> / <code>canvasgroup_basic</code> / <code>grid_canvasgroup_combo</code> / <code>grid_degrade</code>）需要使用者用 Photoshop 手動建立並 commit。README 內驗收 checklist（含 reskin guard 手動驗證 + Phase 3 樣本回歸測試）也還沒逐項跑過。</li>
+      </ol>
+    </div>
+
+    <details class="handoff">
+      <summary>Phase 4 交接提示詞（收尾 / 後續 fix 用）</summary>
+<pre>你正在協助 PS_To_Unity_v2 專案的 Phase 4（Grid + CanvasGroup 自動掛載）收尾。倉庫在
+E:\Wayne\Claude\PS_To_Unity_v2-main。Phase 4 主功能已 commit 為 v2.9.0，還有兩件事沒完：
+
+1. Uncommitted post-commit fix（PhotoshopUiPackageExporter.jsx 已有 +37/-2 未提交 diff）：
+   - constraintCount 邏輯反了 → 已修為固定 firstRowCount
+   - 新增 sortGridChildren（讓 Unity sibling 填格順序對得上 PS 視覺）
+   - pushWarning dedup（避免同一個 grid 送兩次警告）
+   請幫我決定該 amend 進 v2.9.0 還是出 v2.9.1 hotfix（依 OPTIMIZATION_PLAN_zh.html#phase4-q11
+   規則）；決定後執行 commit + push。
+
+2. Samples/Phase4/ 只有 README.md，需要 4 個 PSD 樣本，但這是要我自己用 Photoshop 手動建的。
+   請把 Samples/Phase4/README.md 的建立步驟摘給我，我建完後你來驗收 checklist。
+
+背景參考：
+- OPTIMIZATION_PLAN_zh.html#phase4（本階段章節）
+- OPTIMIZATION_PLAN_zh.html#phase4-q1 ~ #phase4-q13（grill-me 完整決議）
+- Samples/Phase4/README.md（驗收 checklist）
+- 關鍵入口：
+  PhotoshopExporter/PhotoshopUiPackageExporter.jsx（detectLayoutGroupType / calcGridParams /
+    applyCanvasGroupMetadata / stripGridLayoutTags / stripCanvasGroupTags / pushWarning / sortGridChildren）
+  Assets/Editor/PhotoshopUiImporter/UGuiTmpPrefabBackend.cs（ApplyLayoutGroup /
+    ApplyGridLayoutGroup / ApplyCanvasGroup）
+  Assets/Editor/PhotoshopUiImporter/PhotoshopUiLayout.cs（PhotoshopUiWarning + 新欄位）
+  Assets/Editor/PhotoshopUiImporter/LayoutReader.cs（schemaVersion 比對 + warnings 反序列化）
+  Assets/Editor/PhotoshopUiImporter/PsUiSkinApplier.cs（reskin 不可碰清單註解）</pre>
+    </details>
+  </div>
+
+  <!-- ────────────── Phase 4.5 stub ────────────── -->
+  <div class="phase stub" id="phase4-5">
+    <h3><span class="tag tag-magenta">Phase 4.5</span>ScrollRect 完整套件（stub，Phase 4 結束後再開規劃）</h3>
+    <p class="meta">Phase 4 grill-me 時決定分階段：ScrollRect 需要重組 prefab 階層（PS 是一層 group，Unity 要拆成 ScrollView &gt; Viewport &gt; Content 三層），跟 Grid + CanvasGroup 風險不同等級，獨立做較乾淨（見 Q1 / Q11-c）。</p>
+    <h4>預期範圍</h4>
+    <ul>
+      <li><code>[SCROLL_V]</code> / <code>[SCROLL_H]</code> 命名觸發（跟 <code>[GRID]</code> / <code>[CG]</code> 顯式標籤風格對齊）</li>
+      <li>Prefab 階層自動拆為 ScrollView &gt; Viewport（掛 <code>RectMask2D</code> / <code>Mask</code>）&gt; Content</li>
+      <li><code>Scrollbar</code> 自動掛（垂直或水平）</li>
+      <li>版號延後決定（可能 v2.10.0）</li>
+    </ul>
+    <details class="handoff">
+      <summary>Phase 4.5 交接提示詞（開規劃用 — grill-me 前置）</summary>
+<pre>你正在協助 PS_To_Unity_v2 專案規劃 Phase 4.5（ScrollRect 完整套件）。倉庫在
+E:\Wayne\Claude\PS_To_Unity_v2-main。Phase 4（v2.9.0，Grid + CanvasGroup）已完成，
+Phase 4.5 要延續同一套「PS 端顯式命名標籤 → Unity 端自動掛 component」的模式。
+
+請幫我用 grill-me 模式規劃 Phase 4.5，需要決議的問題包括但不限於：
+
+1. Prefab 階層重組：PS 一層 group 要拆成 ScrollView > Viewport > Content 三層，該怎麼
+   對應圖層命名？是否讓 [SCROLL_V] group 內第一層 child 自動成為 Content，還是需要
+   額外的 [CONTENT] 命名標籤？
+2. Viewport Mask 選擇：RectMask2D（無 draw call、無圓角）還是 Mask（可用 Image alpha、
+   多一次 draw call）？是否讓使用者用命名標籤選擇？
+3. Scrollbar：是否自動生成？位置（右側 / 底部）？跟 PS 圖層對應規則？
+4. Content 尺寸：ContentSizeFitter 何時掛？水平/垂直獨立控制還是綁定 SCROLL 方向？
+5. 與 Phase 4 Grid 的組合：[SCROLL_V][GRID] 同時標記時，Content 節點掛 Grid、外層掛
+   ScrollRect 的預期行為？
+6. reskin guard：ScrollRect / Viewport Mask / Scrollbar 都納入 PsUiSkinApplier 不可碰清單？
+7. 版號決策：出 v2.10.0（minor bump，因為 JSON schema 會加新欄位）還是留在 v2.9.x？
+
+背景參考：
+- OPTIMIZATION_PLAN_zh.html#phase4-5（本階段 stub）
+- OPTIMIZATION_PLAN_zh.html#phase4（Phase 4 完整決議，作為風格參照）
+- OPTIMIZATION_PLAN_zh.html#rules 第 5 條（規劃結束後要在此文件補 Phase 4.5 完整章節與交接提示詞）
+
+規範：全部決議後把結果寫進 OPTIMIZATION_PLAN_zh.html 的 #phase4-5 章節（把 stub 換掉），
+並在 OPTIMIZATION_PLAN_zh.html 內加對應的 Q1–Q?? 錨點供程式碼註解引用（見 #phase4-q1
+的模式）。</pre>
+    </details>
   </div>
 
   <!-- ══════════════════════════════════════════════════════ -->
-  <h2 id="backlog">後續待辦池（Phase 4+，依屆時痛點排序）</h2>
+  <h2 id="phase4-decisions">Phase 4 決議 Q1–Q13（grill-me 摘要）</h2>
+  <p class="muted">整併自原 <code>docs/PHASE4_PLAN.md</code>（2026-06-24 規劃結束）。程式碼註解引用格式為 <code>OPTIMIZATION_PLAN_zh.html#phase4-q?</code>。</p>
+
+  <div class="phase" id="phase4-q-container">
+    <h4 class="q" id="phase4-q1">Q1 — 路線分階段</h4>
+    <div class="qbody">
+      <table>
+        <tr><th>階段</th><th>範圍</th><th>版號</th><th>狀態</th></tr>
+        <tr><td>Phase 4 (A)</td><td><code>GridLayoutGroup</code> + <code>CanvasGroup</code>（Layout child opts 沿用現狀不動，見 Q7）</td><td>v2.9.0</td><td>已完成</td></tr>
+        <tr><td>Phase 4.5 (B)</td><td><code>ScrollRect</code> 完整套件（含 Viewport/Content 階層重組、<code>RectMask2D</code>/<code>Mask</code>、<code>Scrollbar</code>、<code>[SCROLL_V]</code>/<code>[SCROLL_H]</code> 命名觸發）</td><td>延後決定</td><td>Phase 4 完成後再開規劃</td></tr>
+      </table>
+      <p><strong>Why 分階段：</strong>ScrollRect 需要重組 prefab 階層，跟 A 風險不同等級，獨立做較乾淨。</p>
+    </div>
+
+    <h4 class="q" id="phase4-q2">Q2 — 訊號源：PS 端是 source of truth</h4>
+    <div class="qbody">
+      <p>JSX 偵測並寫進 JSON → Unity 端只負責照 JSON 掛 component。任何新欄位先加在 <code>PhotoshopUiNode</code>，JSX 寫入，Unity backend 只讀。</p>
+      <p><strong>Why：</strong>跟現行 <code>layoutType / layoutSpacing / contentSizeFitter</code> 同模式；除錯時看 JSON 就能對得上 prefab。</p>
+    </div>
+
+    <h4 class="q" id="phase4-q3">Q3 — 覆蓋語意：每次 full import 完全照 JSON 蓋過</h4>
+    <div class="qbody">
+      <p>Full import 完全覆蓋 Grid / CanvasGroup（與既有 <code>ApplyLayoutGroup</code> 行為一致）；<strong>reskin flow 完全不觸碰新 component</strong>（保留設計師手調空間）。</p>
+      <p><strong>Why：</strong>一致性 &gt; 彈性；source of truth 是 PS。Phase 2 立下的鐵律延續。</p>
+    </div>
+
+    <h4 class="q" id="phase4-q4">Q4 — Grid 觸發：顯式 <code>[GRID]</code> / <code>[GLAYOUT]</code> 命名標籤</h4>
+    <div class="qbody">
+      <p>不做啟發式偵測。</p>
+      <p><strong>Why：</strong>Grid 誤判成本不對稱（強塞 cell size 會視覺整個錯位）；設計師打標籤成本低、行為可預期。也跟 Phase 4.5 <code>[SCROLL_V]</code> 顯式風格對齊。</p>
+    </div>
+
+    <h4 class="q" id="phase4-q5">Q5 — Grid 參數推導規則</h4>
+    <div class="qbody">
+      <table>
+        <tr><th>欄位</th><th>規則</th></tr>
+        <tr><td><code>cellSize</code></td><td>子節點寬高的 <strong>(中位數寬, 中位數高)</strong>。避 outlier；同寬同高時等價於 first。</td></tr>
+        <tr><td><code>spacing.x</code></td><td>同 Y 相鄰節點水平 gap 中位數（沿用 <code>calcLayoutSpacing</code>，只在同 Y 對之間算）。</td></tr>
+        <tr><td><code>spacing.y</code></td><td>同 X 相鄰節點垂直 gap 中位數（只在同 X 對之間算）。</td></tr>
+        <tr><td><code>padding</code></td><td>沿用既有 <code>calcLayoutPadding</code>（group bounds vs children bounding-box 差）。</td></tr>
+        <tr><td><code>startCorner</code></td><td>固定 <code>UpperLeft</code>（hardcode、不進 JSON，見 Q12-d）。</td></tr>
+        <tr><td><code>startAxis</code></td><td>依實際排列自動判：第一行同 Y 節點數 &gt; 第一列同 X 節點數 → <code>Horizontal</code>，反之 <code>Vertical</code>。</td></tr>
+        <tr><td><code>constraint</code></td><td><code>FixedColumnCount</code>，<code>constraintCount</code> = 第一行同 Y 節點數。</td></tr>
+        <tr><td><code>childAlignment</code></td><td>固定 <code>UpperLeft</code>（hardcode、不進 JSON）。</td></tr>
+      </table>
+      <p><strong>邊界條件：</strong></p>
+      <table>
+        <tr><th>子題</th><th>決議</th><th>Why</th></tr>
+        <tr><td>Q5.1 <code>constraint</code></td><td><strong>FixedColumnCount</strong></td><td>Flexible 在 runtime 因 viewport 寬度自動換行，跟 PS 看到的版面對不上</td></tr>
+        <tr><td>Q5.2 子寬高差異 &gt; 20%</td><td>JSX 報 warning + 降級成普通 group（不掛 GridLayoutGroup）</td><td>GridLayoutGroup 強制等大 cell；硬塞會視覺爆掉；降級至少不破壞排版</td></tr>
+        <tr><td>Q5.3 cellSize outlier 差距 ≤ 20%</td><td>仍掛 GridLayoutGroup，但報 warning</td><td>20% 內視為設計意圖等大、PS 圖層只是 anti-alias 飄幾 px；warning 幫設計師抓「以為是 grid 但對齊跑掉」的情境</td></tr>
+      </table>
+    </div>
+
+    <h4 class="q" id="phase4-q6">Q6 — CanvasGroup 觸發：root 自動掛 + 中間層 <code>[CG]</code> / <code>[CANVASGROUP]</code> 顯式</h4>
+    <div class="qbody">
+      <p>JSON root node 一定掛 CanvasGroup（不需要標籤）；中間層 group 想掛要打標籤。<strong>單一標籤，不分動詞</strong>（不收 <code>[FADE]</code> / <code>[TOGGLE]</code>，因為 CanvasGroup 是同一個 component，動詞是 runtime 的事）。</p>
+      <p><strong>Why：</strong>99% 場景是「整頁淡入淡出 / loading 遮罩 disable 互動」，root 自動掛省標籤；中間層顯式跟 <code>[GRID]</code> 對齊。</p>
+      <h5 id="phase4-q6-1" style="margin:10px 0 4px; color:var(--accent); font-size:13.5px;">Q6.1 — CanvasGroup 初始值：全部 Unity 預設</h5>
+      <p><code>alpha=1</code> / <code>interactable=true</code> / <code>blocksRaycasts=true</code> / <code>ignoreParentGroups=false</code>。不讀 PS group opacity。</p>
+      <p><strong>Why：</strong>Phase 4 範圍 = 掛 component，不做「PS opacity → CanvasGroup.alpha」翻譯（scope creep + 語意衝突：bake 進初始 alpha 會打到 runtime fade 動畫）。</p>
+    </div>
+
+    <h4 class="q" id="phase4-q7">Q7 — Layout child opts：沿用現狀，Phase 4 不動</h4>
+    <div class="qbody">
+      <ul>
+        <li>Q7-a 四個 bool（<code>childControlWidth/Height</code>、<code>childForceExpandWidth/Height</code>）→ 全部 <code>false</code>（沿用）</li>
+        <li>Q7-b <code>childAlignment</code> → 沿用三種不一致（H=MiddleLeft、V=UpperCenter、Grid=UpperLeft）</li>
+      </ul>
+      <p><strong>Why：</strong>Phase 1–3 寫死跑了三個 phase 零抱怨；統一成 UpperLeft 是 breaking change 又收益低，YAGNI。Phase 4 對既有 H/V Layout 完全不碰。</p>
+    </div>
+
+    <h4 class="q" id="phase4-q8">Q8 — 命名標籤定義</h4>
+    <div class="qbody">
+      <table>
+        <tr><th>觸發目標</th><th>標籤別名集</th></tr>
+        <tr><td>Grid</td><td><code>[GRID]</code> / <code>[GLAYOUT]</code></td></tr>
+        <tr><td>CanvasGroup</td><td><code>[CG]</code> / <code>[CANVASGROUP]</code></td></tr>
+        <tr><td>（參照）H Layout</td><td><code>[H]</code> / <code>[HLAYOUT]</code>（既有）</td></tr>
+        <tr><td>（參照）V Layout</td><td><code>[V]</code> / <code>[VLAYOUT]</code>（既有）</td></tr>
+        <tr><td>（參照）Fake thickness</td><td><code>[THICK:offsetY:offsetX]</code>（既有）</td></tr>
+      </table>
+      <p><strong>通則（跟既有 convention 鎖死）：</strong></p>
+      <ul>
+        <li>大小寫不敏感（regex <code>i</code> flag）</li>
+        <li>位置任意（regex 全域 replace）</li>
+        <li>多標籤可組合：<code>[GRID][CG] Cards</code> 兩個同時生效（Grid 跟 CanvasGroup 正交）</li>
+        <li>未知 token（如 typo <code>[GIRD]</code>）→ <strong>靜默放行</strong>（見 Q10-d）</li>
+        <li>架構：先沿用「各自寫 <code>stripXxxTags</code>」，第四個 tag（Phase 4.5 <code>[SCROLL_V]</code>）進來時再 refactor 成統一 parser</li>
+      </ul>
+    </div>
+
+    <h4 class="q" id="phase4-q9">Q9 — Schema 升版策略</h4>
+    <div class="qbody">
+      <table>
+        <tr><th>子題</th><th>決議</th><th>Why</th></tr>
+        <tr><td>Q9-a bump schemaVersion</td><td><code>"2.8"</code> → <code>"2.9"</code>（記號用途，不加 enforce）</td><td>跟 ToolVersion minor 對齊；debug 友善</td></tr>
+        <tr><td>Q9-b 向下相容（老 JSON 缺新欄位）</td><td>missing = default（不掛 component），跟 Phase 3 行為一致</td><td>老 JSON 重新 import 不破，新功能本來就是 opt-in</td></tr>
+        <tr><td>Q9-c 向上相容（JSX 比 Unity 新）</td><td>Unity 端比對 schemaVersion，過新就 warning「請更新 Unity 工具」</td><td>防「設計師標了 <code>[GRID]</code> 但沒生效」的悶燒 bug</td></tr>
+      </table>
+    </div>
+
+    <h4 class="q" id="phase4-q10">Q10 — Warning / Error 策略</h4>
+    <div class="qbody">
+      <table>
+        <tr><th>子題</th><th>決議</th><th>Why</th></tr>
+        <tr><td>Q10-a 出口</td><td>寫進 JSON <code>warnings</code> 陣列 → Unity backend import 時 dump 到 Unity Console</td><td>統一 source of truth；設計師在 Unity 端看到問題才回查</td></tr>
+        <tr><td>Q10-b 結構</td><td>Root-level array：<code>layout.warnings = [{node, code, message}, ...]</code>，code 用 SCREAMING_SNAKE 常數</td><td>一次 foreach 印完，掃描容易</td></tr>
+        <tr><td>Q10-c 嚴重程度</td><td>warning / error 兩級（沿用既有 <code>LayoutReadResult.errors</code> 為 error 級，新增 warnings 平行擴充）</td><td>Phase 4 沒新 error 場景但結構支援；info 太瑣碎沒人看</td></tr>
+        <tr><td>Q10-d 未知方括號 token</td><td>靜默放行（沿用現狀）</td><td>PS 圖層用 <code>[Hover]</code>/<code>[Disabled]</code> 描述 state 是普遍命名習慣，全報會大量誤報；typo 漏報是個別偶發</td></tr>
+      </table>
+    </div>
+
+    <h4 class="q" id="phase4-q11">Q11 — 版號規劃</h4>
+    <div class="qbody">
+      <table>
+        <tr><th>子題</th><th>決議</th></tr>
+        <tr><td>Q11-a Phase 4 主版號</td><td>v2.9.0</td></tr>
+        <tr><td>Q11-b hotfix 策略</td><td>開發中 commit 不 bump；整個 Phase 4 合到 main 時打 v2.9.0 tag；之後 regression 才 v2.9.1</td></tr>
+        <tr><td>Q11-c Phase 4.5 版號</td><td>延後決定（Phase 4.5 開規劃時再 grill）</td></tr>
+      </table>
+    </div>
+
+    <h4 class="q" id="phase4-q12">Q12 — JSON Schema 形狀</h4>
+    <div class="qbody">
+      <table>
+        <tr><th>子題</th><th>決議</th></tr>
+        <tr><td>Q12-a 整體風格</td><td>flat（沿用 100% 既有 convention，無 nested object）</td></tr>
+        <tr><td>Q12-b CanvasGroup 旗標</td><td><code>bool hasCanvasGroup</code>（跟 <code>contentSizeFitter</code>、<code>visible</code> 同風格）</td></tr>
+        <tr><td>Q12-c Grid 欄位</td><td>複用 <code>layoutType</code> 加 <code>"grid"</code> 值 + 加 flat sibling 欄位：<code>gridConstraintCount</code> (int)、<code>gridStartAxis</code> (string <code>"horizontal"</code>/<code>"vertical"</code>)、<code>gridCellSizeX/Y</code> (float)、<code>gridSpacingX/Y</code> (float)；padding 複用既有 <code>layoutPaddingLeft/Right/Top/Bottom</code></td></tr>
+        <tr><td>Q12-d hardcode 值（startCorner / childAlignment 都 UpperLeft）</td><td>不寫進 JSON，Unity 端 hardcode（跟 <code>childControlWidth/Height = false</code> 寫死同模式）</td></tr>
+      </table>
+    </div>
+
+    <h4 class="q" id="phase4-q13">Q13 — 實作切分與驗證</h4>
+    <div class="qbody">
+      <table>
+        <tr><th>子題</th><th>決議</th></tr>
+        <tr><td>Q13-a Commit 切分</td><td>1 PR 多 commit：開發過程切 4 個 commit（基礎建設 / CanvasGroup / Grid / reskin guard），最終 squash 進 main 成單一 feat（跟 Phase 1–3 慣例對齊）</td></tr>
+        <tr><td>Q13-b 實作順序</td><td>1 基礎 → 2 CanvasGroup → 3 Grid → 4 reskin guard</td></tr>
+        <tr><td>Q13-c reskin guard 驗證</td><td>註解 + 手動 PSD 驗證：在 <code>PsUiSkinApplier.cs</code> 加「不可碰清單」註解 + 跑樣本「手動改 CanvasGroup.alpha → 跑 reskin → 確認沒被吃」</td></tr>
+        <tr><td>Q13-d 測試策略</td><td>手動 PSD 樣本 + commit 進 repo（<code>Samples/Phase4/*.psd</code>），包含純 <code>[GRID]</code>、純 <code>[CG]</code>、組合、降級 case；不引入 Unity Test Framework</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <h2 id="phase5">Phase 5 規劃：Prefab 字體材質批次替換工具（stub）</h2>
+
+  <div class="phase stub" id="phase5-stub">
+    <h3><span class="tag tag-magenta">Phase 5</span>既有 Prefab 字體 / 材質分析 + 一鍵批次替換<span class="tag tag-magenta">規劃 stub</span></h3>
+    <p class="meta">建立於 2026-07-07，尚未 grill。範圍描述用來讓下一輪 grill-me 有起點；不代表已定案。</p>
+
+    <h4>使用者提出的原始需求</h4>
+    <blockquote style="border-left:3px solid var(--magenta); padding:6px 12px; margin:6px 0; color:var(--ink); background:var(--magenta-soft); border-radius:4px;">
+      「目前的工具希望能夠有此功能，帶入已有的 Prefab，然後能夠知道上面掛了幾個 TMP，用到了多少個材質球，能夠一鍵替換不同字體的材質球，在不變動該 Prefab 內的排版的狀態下，只將裡面的字體做更換。」
+    </blockquote>
+
+    <h4>預期範圍（草案，待 grill 定案）</h4>
+    <ul>
+      <li><strong>分析頁</strong>：帶入 Prefab（或多個 Prefab、資料夾）→ 顯示：
+        <ul>
+          <li>TMP 節點總數（<code>TextMeshProUGUI</code> + <code>TextMeshPro</code>）</li>
+          <li>使用到的 <code>fontMaterial</code> 清單（含每個材質球用了幾次、依賴的 Font Asset）</li>
+          <li>使用到的 Font Asset 清單</li>
+          <li>可選：分佈直方圖（哪些節點使用哪個材質）</li>
+        </ul>
+      </li>
+      <li><strong>替換頁</strong>：從分析結果選要替換的來源材質 / Font Asset → 指定目標 Font Asset → 產生對應材質映射（考慮既有 TmpMapper 材質庫比對邏輯，見 <a href="#phase1">Phase 1</a> F5）→ 一鍵套用</li>
+      <li><strong>非目標（明確排除）</strong>：不動 <code>RectTransform</code>、<code>fontSize</code>、<code>alignment</code>、<code>outline width</code>、任何排版屬性；不動 Prefab 節點結構</li>
+      <li><strong>安全機制</strong>：預設 dry-run 模式（列印將更動什麼但不寫入）；Prefab overrides 保留策略（Prefab Variant 有 override 過材質的節點怎麼處理）；Undo 支援</li>
+    </ul>
+
+    <h4>已知需要 grill 的問題（先給 grill-me 起點）</h4>
+    <ul>
+      <li>Q1：入口位置——放在既有 <code>PhotoshopUiImporterWindow</code> 內作為新分頁 / Foldout，還是獨立 Editor Window？</li>
+      <li>Q2：範圍——單 Prefab、多 Prefab、還是整個資料夾遞迴？是否支援 Prefab Variant？</li>
+      <li>Q3：材質配對邏輯——當目標 Font Asset 沒有現成對應材質時，是走 Phase 1 F5 材質庫比對（<code>widthDiff</code> 容差 10%）自動找、還是要求使用者手動指定？</li>
+      <li>Q4：Prefab overrides——Prefab Variant / Instance 有手動 override 過材質的節點該不該覆寫？以什麼為預設？</li>
+      <li>Q5：跟現有 SkinTheme 換皮流程的關係——這功能算是 SkinTheme 的延伸還是獨立工具？是否共用 UI？</li>
+      <li>Q6：schemaVersion 影響——這功能純 Unity 端，不動 JSX / JSON，是否需要 bump schema？（初判：不需要，只 bump ToolVersion）</li>
+      <li>Q7：版號——minor bump 到 v2.10.0（新功能）還是 v2.9.x（不動 schema 也算功能加）？</li>
+      <li>Q8：測試樣本——需要 <code>Samples/Phase5/</code> 建幾個手工 prefab 走 checklist 嗎？</li>
+    </ul>
+
+    <details class="handoff">
+      <summary>Phase 5 交接提示詞（開規劃用 — grill-me 前置）</summary>
+<pre>你正在協助 PS_To_Unity_v2 專案規劃 Phase 5（既有 Prefab 字體 / 材質分析 + 一鍵批次替換）。
+倉庫在 E:\Wayne\Claude\PS_To_Unity_v2-main。
+
+原始需求：
+「帶入已有的 Prefab → 分析上面掛了幾個 TMP、用到多少個材質球 → 一鍵替換不同字體的材質
+球，在不變動 Prefab 內排版的狀態下只更換字體。」
+
+請用 grill-me 模式跟我逐題確認以下（可依討論再加）：
+
+Q1 入口位置：放在 PhotoshopUiImporterWindow 內新分頁 / Foldout，還是獨立 Editor Window？
+Q2 範圍：單 Prefab / 多 Prefab / 資料夾遞迴？是否支援 Prefab Variant？
+Q3 材質配對：目標 Font Asset 沒有現成對應材質時，走 TmpMapper.FindLibraryMaterial（Phase 1 F5
+   的 widthDiff 10% 容差），還是要求使用者手動指定 mapping？
+Q4 Prefab overrides：Variant / Instance 有 override 過材質的節點該不該覆寫？預設策略？
+Q5 跟 SkinTheme 換皮流程的關係：延伸還是獨立工具？共用 UI？
+Q6 schemaVersion：這功能純 Unity 端不動 JSX/JSON，是否需要 bump schema？（初判否）
+Q7 版號：v2.10.0（minor，新功能）還是 v2.9.x？
+Q8 測試樣本：需要在 Samples/Phase5/ 建手工 prefab checklist 嗎？
+
+背景參考：
+- OPTIMIZATION_PLAN_zh.html#phase5（本 stub）
+- OPTIMIZATION_PLAN_zh.html#phase1（F5 材質庫比對邏輯，會共用）
+- OPTIMIZATION_PLAN_zh.html#phase2（Unity Importer UX 慣例）
+- 關鍵入口候選：Assets/Editor/PhotoshopUiImporter/PhotoshopUiImporterWindow.cs、
+  Assets/Editor/PhotoshopUiImporter/TmpMapper.cs（FindLibraryMaterial）、
+  Assets/Editor/PhotoshopUiImporter/PsUiSkinApplier.cs（SkinTheme 換皮流程參考）
+- 環境事實：本倉庫非完整 Unity 專案，語法檢查用 Roslyn 指令；實機驗收由使用者把
+  Assets/Editor/PhotoshopUiImporter/ 複製到遊戲專案內測試
+
+規範（來自 OPTIMIZATION_PLAN_zh.html#rules）：
+1. grill 完後，把決議寫進 OPTIMIZATION_PLAN_zh.html 的 #phase5 章節（把 stub 換掉），
+   加 Q1–Q?? 錨點供程式碼引用
+2. 實作結束跑 .\bump-version.ps1 -NewVersion 2.10.0（或依 Q7 決議）
+3. 更新 GUIDE_zh.html 補 changelog + 「Prefab 字體批次替換」使用說明章節
+4. commit + push（每 Phase 結束必做）</pre>
+    </details>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <h2 id="backlog">後續待辦池（未排入 Phase）</h2>
   <table>
     <tr><th>項目</th><th>說明</th></tr>
     <tr><td>9-slice 支援</td><td>命名標記記錄 border，Unity 端設 Sprite border + Image type = Sliced，大幅縮小圖集</td></tr>
     <tr><td>Drop Shadow → TMP Underlay</td><td>補齊常見字效對應</td></tr>
-    <tr><td>Btn 自動掛元件</td><td><code>Btn_</code> 前綴自動加 Button（含 transition），延伸 Toggle / ScrollView 標記</td></tr>
-    <tr><td>一鍵 Generate</td><td>套用 Package → 建資料夾 → 填路徑 → 檢查 → Generate 收成一鍵（Phase 2 完成後評估必要性）</td></tr>
-    <tr><td>JSX 模組化</td><td>開發時拆檔、發佈時 build 合併單檔，維持現有單檔更新機制；主檔已 2,668 行</td></tr>
+    <tr><td>Btn 自動掛元件</td><td><code>Btn_</code> 前綴自動加 Button（含 transition），延伸 Toggle 標記（ScrollView 已改由 Phase 4.5 統一處理）</td></tr>
+    <tr><td>一鍵 Generate</td><td>套用 Package → 建資料夾 → 填路徑 → 檢查 → Generate 收成一鍵（Phase 2 後評估必要性）</td></tr>
+    <tr><td>JSX 模組化</td><td>開發時拆檔、發佈時 build 合併單檔，維持現有單檔更新機制；主檔已 3000+ 行</td></tr>
   </table>
-
-  <!-- ══════════════════════════════════════════════════════ -->
-  <h2 id="open">待確認事項</h2>
-  <div class="callout ok">
-    Q1（PSD DPI）、Q3（路徑按鈕習慣）、Q4（Font Asset 設定）已全部確認。
-  </div>
-  <div class="callout warn">
-    <strong>Q2 仍待確認</strong>：提供一組實際對照數據「PS 裡某文字的字級與描邊 px ↔ 目前 Unity 產出後的視覺結果」，用來驗證 F2 偏厚 20% 的方向是否與實際體感一致，並作為 Phase 1 完成後的驗收基準。
-  </div>
 
   <!-- ══════════════════════════════════════════════════════ -->
   <h2 id="howto">執行方式</h2>
   <div class="panel">
-    <p><strong>分工模式</strong>：規劃討論於 Claude Project；程式實作於 <strong>Claude Code（桌面版）</strong>，指向本機 PS_To_Unity_v2 倉庫；Photoshop / Unity 實機驗收由使用者執行。</p>
+    <p><strong>分工模式</strong>：規劃討論於 Claude Project 或 Claude Code；程式實作於 <strong>Claude Code（桌面版）</strong>，指向本機 PS_To_Unity_v2 倉庫；Photoshop / Unity 實機驗收由使用者執行。</p>
     <ul>
       <li>本文件放入倉庫根目錄，作為 Claude Code 的執行依據。</li>
-      <li><strong>一個 Phase 一個對話</strong>：依序執行，勿一次跨多階段。</li>
+      <li><strong>一個 Phase 一個對話</strong>：依序執行，勿一次跨多階段。要開新對話接手 Phase 時，複製該 Phase 章節末端的「交接提示詞」貼進新對話即可。</li>
       <li>每個 Phase 開始前，先請 Claude Code 說明「打算改哪些檔案與原因」再放行。</li>
-      <li>每個 Phase 結束：bump 版本 → 更新 GUIDE_zh.html 與 README → git commit → 使用者實機驗收 → 通過後進入下一階段。</li>
+      <li>每個 Phase 結束：<code>.\bump-version.ps1 -NewVersion X.Y.Z</code> → 更新 GUIDE_zh.html changelog → <code>git commit</code> → <code>git push</code>（跨機器工作流程）→ 使用者實機驗收 → 通過後進入下一階段。</li>
+      <li>本倉庫非完整 Unity 專案（無 <code>ProjectSettings</code>），C# 修改的語法檢查用 Unity 內附 Roslyn：<code>& "C:\Program Files\Unity\Hub\Editor\6000.0.67f1\Editor\Data\NetCoreRuntime\dotnet.exe" "C:\Program Files\Unity\Hub\Editor\6000.0.67f1\Editor\Data\DotNetSdkRoslyn\csc.dll" /nologo /t:library &lt;file.cs&gt;</code>（缺參考組件屬預期，只看有無 CS1xxx 語法錯誤）；JSX 用 node <code>new Function()</code> 做基本語法檢查（注意 ExtendScript 是 ES3）。</li>
     </ul>
   </div>
 
   <footer>
-    PS → Unity UI Tool 優化計畫 · 基準 v2.4.2 · 2026-06-11<br>
-    配合文件：GUIDE_zh.html · <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" style="color:var(--accent)">GitHub</a>
+    PS → Unity UI Tool 優化計畫 · 起始基準 v2.4.2（2026-06-11）· 目前已推進至 v2.9.0（Phase 4 完成）<br>
+    最後更新：2026-07-07 · 配合文件：GUIDE_zh.html、README_zh.md · <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" style="color:var(--accent)">GitHub</a>
   </footer>
 
 </main>

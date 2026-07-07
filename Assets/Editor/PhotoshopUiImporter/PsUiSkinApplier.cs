@@ -6,7 +6,7 @@ using UnityEngine.UI;
 
 namespace PhotoshopToUnity.EditorImporter
 {
-    // ── reskin flow 不可碰清單（PHASE4_PLAN.md Q3）────────────────────────────
+    // ── reskin flow 不可碰清單（OPTIMIZATION_PLAN_zh.html#phase4-decisions Q3）────────────────────────────
     // 以下由 full import（UGuiTmpPrefabBackend）視為 source of truth，reskin 完全不觸碰：
     //   * CanvasGroup（含 root 自動掛的那個）
     //   * GridLayoutGroup（layoutType == "grid" 的節點）

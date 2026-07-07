@@ -606,7 +606,7 @@ function createGroupNode(layerSet, children, context, parentBounds, bounds) {
         return null;
     }
 
-    // PHASE4_PLAN.md Q8：group node 名字統一 strip 掉方括號 tag，避免 prefab 節點名裡出現 [H]/[CG]/[GRID] 等殘留。
+    // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q8：group node 名字統一 strip 掉方括號 tag，避免 prefab 節點名裡出現 [H]/[CG]/[GRID] 等殘留。
     var displayName = stripCanvasGroupTags(stripGridLayoutTags(stripLayoutGroupTags(layerSet.name)));
 
     var node = {
@@ -1019,7 +1019,7 @@ function applyLayoutMetadata(node, bounds, parentBounds, rawName) {
     node.pivot = layout.pivot;
 }
 
-// PHASE4_PLAN.md Q6 / Q8：group 名稱中偵測到 [CG] / [CANVASGROUP] → hasCanvasGroup = true。
+// OPTIMIZATION_PLAN_zh.html#phase4-decisions Q6 / Q8：group 名稱中偵測到 [CG] / [CANVASGROUP] → hasCanvasGroup = true。
 // 「root 自動掛 CanvasGroup」由 Unity 端硬性掛在 prefab root GameObject，JSX 端不必處理 nesting level。
 function applyCanvasGroupMetadata(node, group) {
     var rawName = typeof group === "string" ? group : (group && group.name);
@@ -1039,7 +1039,7 @@ function applyLayoutGroupMetadata(node, group, children, bounds, context) {
     var displayName = node && node.name ? node.name : String(rawName || "");
 
     if (layoutType === "grid") {
-        // PHASE4_PLAN.md Q5：計算 grid 參數；若子節點寬高差 > 20% → 降級成普通 group（GRID_DEGRADED）。
+        // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q5：計算 grid 參數；若子節點寬高差 > 20% → 降級成普通 group（GRID_DEGRADED）。
         var gridParams = calcGridParams(children, context, displayName);
         if (!gridParams) {
             return; // 降級：node.layoutType 維持空字串，走普通 group 路徑
@@ -1074,7 +1074,7 @@ function applyLayoutGroupMetadata(node, group, children, bounds, context) {
     node.children = children;
 }
 
-// PHASE4_PLAN.md Q5：Grid 參數推導。
+// OPTIMIZATION_PLAN_zh.html#phase4-decisions Q5：Grid 參數推導。
 // - cellSize = 子節點寬高的 (中位數, 中位數)
 // - 寬高差 > 20% → 回 null（呼叫端降級成普通 group）+ pushWarning(GRID_DEGRADED)
 // - 寬高差 ≤ 20% 但非完全等大 → 仍回參數 + pushWarning(GRID_OUTLIER)
@@ -1206,7 +1206,7 @@ function detectLayoutGroupType(group, children) {
     var rawName = typeof group === "string" ? group : (group && group.name);
     var name = String(rawName || "");
 
-    // PHASE4_PLAN.md Q4：Grid 只認顯式標籤，不做啟發式偵測（誤判成本不對稱）。
+    // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q4：Grid 只認顯式標籤，不做啟發式偵測（誤判成本不對稱）。
     if (/\[(?:GRID|GLAYOUT)\]/i.test(name)) {
         return "grid";
     }
@@ -1631,7 +1631,7 @@ function buildLayoutJson(doc, nodes, warnings) {
     }
 
     lines.push("  ],");
-    // PHASE4_PLAN.md Q10-a/b：root-level warnings 陣列。空陣列亦寫出，讓 Unity backend 統一走同一段解析。
+    // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q10-a/b：root-level warnings 陣列。空陣列亦寫出，讓 Unity backend 統一走同一段解析。
     var warningList = warnings || [];
     if (warningList.length === 0) {
         lines.push('  "warnings": []');
@@ -1652,7 +1652,7 @@ function buildLayoutJson(doc, nodes, warnings) {
     return lines.join("\n");
 }
 
-// PHASE4_PLAN.md Q10：把一則 warning 塞進 context.warnings，後面會 flush 到 layout.json 的 root-level warnings 陣列。
+// OPTIMIZATION_PLAN_zh.html#phase4-decisions Q10：把一則 warning 塞進 context.warnings，後面會 flush 到 layout.json 的 root-level warnings 陣列。
 // codes 用 SCREAMING_SNAKE 常數（例：GRID_OUTLIER / GRID_DEGRADED / UNITY_TOOL_OUTDATED）。
 function pushWarning(context, nodeName, code, message) {
     if (!context || !context.warnings) {
@@ -1689,7 +1689,7 @@ function nodeToJson(node, indent) {
         lines.push(childIndent + '"layoutPaddingTop": ' + jsonNumber(node.layoutPaddingTop || 0) + ",");
         lines.push(childIndent + '"layoutPaddingBottom": ' + jsonNumber(node.layoutPaddingBottom || 0) + ",");
         lines.push(childIndent + '"contentSizeFitter": ' + (node.contentSizeFitter ? "true" : "false") + ",");
-        // PHASE4_PLAN.md Q12-c：grid 專屬欄位只在 layoutType==="grid" 時寫出
+        // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q12-c：grid 專屬欄位只在 layoutType==="grid" 時寫出
         if (node.layoutType === "grid") {
             lines.push(childIndent + '"gridConstraintCount": ' + jsonNumber(node.gridConstraintCount || 1) + ",");
             lines.push(childIndent + '"gridStartAxis": ' + quoteJson(node.gridStartAxis || "horizontal") + ",");
@@ -2600,12 +2600,12 @@ function stripLayoutGroupTags(name) {
     return String(name || "").replace(/\[(?:H|HLAYOUT|V|VLAYOUT)\]/ig, "");
 }
 
-// PHASE4_PLAN.md Q8：CanvasGroup 標籤別名 [CG] / [CANVASGROUP]。
+// OPTIMIZATION_PLAN_zh.html#phase4-decisions Q8：CanvasGroup 標籤別名 [CG] / [CANVASGROUP]。
 function stripCanvasGroupTags(name) {
     return String(name || "").replace(/\[(?:CG|CANVASGROUP)\]/ig, "");
 }
 
-// PHASE4_PLAN.md Q8：Grid 標籤別名 [GRID] / [GLAYOUT]。
+// OPTIMIZATION_PLAN_zh.html#phase4-decisions Q8：Grid 標籤別名 [GRID] / [GLAYOUT]。
 function stripGridLayoutTags(name) {
     return String(name || "").replace(/\[(?:GRID|GLAYOUT)\]/ig, "");
 }

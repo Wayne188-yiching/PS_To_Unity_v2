@@ -903,6 +903,17 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
 
+  <h3>v2.9.0（2026-07-01）— 優化計畫 Phase 4：自適應布局 Component 自動掛載</h3>
+  <ul>
+    <li><strong>GridLayoutGroup 自動掛載</strong>：PS 端 group 名稱含 <code>[GRID]</code> 或 <code>[GLAYOUT]</code> 標籤時，Unity 端 prefab 自動掛 <code>GridLayoutGroup</code>。cellSize 取子節點寬高中位數、spacing 取同 Y / 同 X 相鄰間距中位數、<code>constraint=FixedColumnCount</code>、constraintCount = 第一行同 Y 節點數、startAxis 依實際排列自動判、<code>startCorner</code> / <code>childAlignment</code> 固定 <code>UpperLeft</code>。子節點寬高差 &gt; 20% 會走 <code>GRID_DEGRADED</code> warning 降級成普通 group（避免 Grid 強制等大 cell 弄爛設計稿排版）；差 ≤ 20% 但有 outlier 則走 <code>GRID_OUTLIER</code> warning 仍掛 Grid。</li>
+    <li><strong>CanvasGroup 自動掛載</strong>：prefab root 一律掛 <code>CanvasGroup</code>（99% 場景需要「整頁淡入淡出 / loading 遮罩 disable 互動」，省一個標籤）；中間層 group 想掛要標 <code>[CG]</code> 或 <code>[CANVASGROUP]</code>。初始值全走 Unity 預設（alpha=1、interactable=true、blocksRaycasts=true、不讀 PS group opacity）。</li>
+    <li><strong>多標籤可組合</strong>：<code>[GRID][CG] Cards</code> 兩個同時生效（Grid 跟 CanvasGroup 正交）；大小寫不敏感、位置任意；未知 token 靜默放行（PS 圖層命名習慣不強加規則）。</li>
+    <li><strong>Warnings 統一 channel</strong>：JSX 端把警告寫進 <code>layout.json</code> root-level <code>warnings: [{node, code, message}, ...]</code>，Unity 端 <code>LogLayoutWarnings</code> 於「檢查 Layout」/「Validate」/「Generate」三個入口都會 dump 到 Console。code 用 SCREAMING_SNAKE 常數（<code>GRID_DEGRADED</code> / <code>GRID_OUTLIER</code> / <code>UNITY_TOOL_OUTDATED</code>）。</li>
+    <li><strong>Schema 2.8 → 2.9</strong>：Unity 端遇到 schemaVersion 比自己認得的還新 → 加 <code>UNITY_TOOL_OUTDATED</code> warning 提示更新工具，防「設計師標了 <code>[GRID]</code> 但沒生效」的悶燒 bug。老 JSON 缺新欄位 → 走預設（不掛 component）。</li>
+    <li><strong>Reskin guard</strong>：<code>PsUiSkinApplier.cs</code> 開頭加註解「reskin flow 不可碰 CanvasGroup、GridLayoutGroup、layoutType=grid 的 group 之 layout 欄位」——這些是 full import 的 source of truth，reskin 只換材質與 sprite。</li>
+    <li><strong>規劃決議整併</strong>：Phase 4 grill-me Q1–Q13 完整決議搬進 <a href="OPTIMIZATION_PLAN_zh.html#phase4-decisions">OPTIMIZATION_PLAN_zh.html#phase4-decisions</a>，原 <code>docs/PHASE4_PLAN.md</code> 廢除；程式碼註解引用一併換成 HTML 錨點。</li>
+  </ul>
+
   <h3>v2.8.1（2026-06-16）— Phase 3 hotfix：補上 Unity 端 pixel-content 去重</h3>
   <ul>
     <li><strong>問題</strong>：v2.8.0 在 JSX 端對 PNG bytes 算 FNV hash 做去重，但 PS <code>ExportOptionsSaveForWeb</code> 對相同像素內容產生的 PNG bytes 並不穩定（內嵌資訊與壓縮策略差異），導致視覺一模一樣的圖（例如清單列表 4 列共用同一張底圖）hash 完全不同，dedup 沒抓到，atlas 內出現多份重複 PNG。實測一張 lobby UI Package：43 張 PNG 內 7 個視覺重複群組共 12 張可去重。</li>
@@ -994,7 +1005,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.7.2 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.9.0 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

@@ -32,7 +32,7 @@ namespace PhotoshopToUnity.EditorImporter
             AssetDatabase.Refresh();
 
             var rootName = string.IsNullOrWhiteSpace(context.prefabName) ? "PhotoshopUiPrefab" : context.prefabName;
-            // PHASE4_PLAN.md Q6：prefab root 一律掛 CanvasGroup（整頁 fade/loading disable 是最常見需求；不需要 JSX 標籤觸發）。
+            // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q6：prefab root 一律掛 CanvasGroup（整頁 fade/loading disable 是最常見需求；不需要 JSX 標籤觸發）。
             var root = new GameObject(rootName, typeof(RectTransform), typeof(CanvasGroup));
 
             try
@@ -240,7 +240,7 @@ namespace PhotoshopToUnity.EditorImporter
             image.preserveAspect = false;
         }
 
-        // PHASE4_PLAN.md Q5 / Q12-d：GridLayoutGroup 掛載。
+        // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q5 / Q12-d：GridLayoutGroup 掛載。
         // startCorner 與 childAlignment 由 Unity 端固定為 UpperLeft（不進 JSON）。
         // constraint 固定為 FixedColumnCount，constraintCount 由 JSX 端計算後寫入 gridConstraintCount。
         // padding 沿用 layoutPadding*（H/V/Grid 三種 layoutType 共用）。
@@ -259,7 +259,7 @@ namespace PhotoshopToUnity.EditorImporter
             grid.constraintCount = Mathf.Max(1, node.gridConstraintCount);
         }
 
-        // PHASE4_PLAN.md Q6 / Q6.1：JSX 偵測 [CG] / [CANVASGROUP] → hasCanvasGroup=true → 掛 CanvasGroup。
+        // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q6 / Q6.1：JSX 偵測 [CG] / [CANVASGROUP] → hasCanvasGroup=true → 掛 CanvasGroup。
         // 欄位全用 Unity 預設（alpha=1、interactable=true、blocksRaycasts=true、ignoreParentGroups=false）——
         // 不從 PS group opacity 推導（scope；且會打到 runtime fade 動畫）。
         private static void ApplyCanvasGroup(GameObject gameObject)
@@ -275,7 +275,7 @@ namespace PhotoshopToUnity.EditorImporter
                 Mathf.RoundToInt(node.layoutPaddingTop),
                 Mathf.RoundToInt(node.layoutPaddingBottom));
 
-            // PHASE4_PLAN.md Q4/Q5/Q12-c：JSX 偵測 [GRID]/[GLAYOUT] → layoutType="grid"，走 GridLayoutGroup 分支。
+            // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q4/Q5/Q12-c：JSX 偵測 [GRID]/[GLAYOUT] → layoutType="grid"，走 GridLayoutGroup 分支。
             if (string.Equals(node.layoutType, "grid", StringComparison.OrdinalIgnoreCase))
             {
                 ApplyGridLayoutGroup(gameObject, node, padding);
