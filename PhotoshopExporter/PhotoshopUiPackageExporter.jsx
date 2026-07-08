@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.9.0";
+var SCRIPT_VERSION = "2.9.1";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 (function () {
@@ -1058,7 +1058,9 @@ function applyLayoutGroupMetadata(node, group, children, bounds, context) {
         node.gridCellSizeY = gridParams.cellSizeY;
         node.gridSpacingX = gridParams.spacingX;
         node.gridSpacingY = gridParams.spacingY;
-        node.children = children;
+        // 依 startAxis 對應的 sibling 填充順序重排 children，讓 Unity GridLayoutGroup 按 sibling index
+        // 填入的位置對得上 PS 的視覺 (x, y)。（Angle C #2）
+        node.children = sortGridChildren(children, gridParams, bounds);
         return;
     }
 
@@ -1072,6 +1074,31 @@ function applyLayoutGroupMetadata(node, group, children, bounds, context) {
     node.contentSizeFitter = true;
     // Auto-dedup disabled in v2.4.2 to avoid wrongly merging same-size but different-content images.
     node.children = children;
+}
+
+// Sort a group's children into the sibling order that Unity's GridLayoutGroup will fill visually.
+// FixedColumnCount + Horizontal → row-major (row0 left→right, then row1, ...).
+// FixedColumnCount + Vertical → column-major (col0 top→bottom, then col1, ...).
+function sortGridChildren(children, gridParams, bounds) {
+    if (!children || children.length < 2 || !gridParams) return children;
+    var rowStride = (gridParams.cellSizeY || 0) + (gridParams.spacingY || 0);
+    var colStride = (gridParams.cellSizeX || 0) + (gridParams.spacingX || 0);
+    var originX = bounds ? bounds.left : 0;
+    var originY = bounds ? bounds.top : 0;
+    var sorted = children.slice();
+    sorted.sort(function (a, b) {
+        var aRow = rowStride > 0 ? Math.round((a.y - originY) / rowStride) : 0;
+        var bRow = rowStride > 0 ? Math.round((b.y - originY) / rowStride) : 0;
+        var aCol = colStride > 0 ? Math.round((a.x - originX) / colStride) : 0;
+        var bCol = colStride > 0 ? Math.round((b.x - originX) / colStride) : 0;
+        if (gridParams.startAxis === "vertical") {
+            if (aCol !== bCol) return aCol - bCol;
+            return aRow - bRow;
+        }
+        if (aRow !== bRow) return aRow - bRow;
+        return aCol - bCol;
+    });
+    return sorted;
 }
 
 // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q5：Grid 參數推導。
@@ -1134,7 +1161,9 @@ function calcGridParams(children, context, nodeName) {
     }
     var horizontal = firstRowCount >= firstColCount;
     var startAxis = horizontal ? "horizontal" : "vertical";
-    var constraintCount = horizontal ? firstRowCount : firstColCount;
+    // Unity Constraint.FixedColumnCount 語意始終是「欄數」，跟 startAxis 無關；startAxis 只控填充順序。
+    // 先前寫法 `horizontal ? firstRowCount : firstColCount` 會讓 rows>cols 的 grid 90° 翻轉（Angle A #1）。
+    var constraintCount = firstRowCount;
 
     // spacing.x：對每一 row（同 y）內排序 by x，收集所有相鄰水平 gap，取整體中位數
     var xGaps = collectGridGaps(items, true);
@@ -1658,6 +1687,12 @@ function pushWarning(context, nodeName, code, message) {
     if (!context || !context.warnings) {
         return;
     }
+    // Dedup by (node, code) — applyLayoutGroupMetadata 會在 createGroupNode 與 refreshGroupBounds
+    // 各執行一次，calcGridParams 若不 dedup 會讓每個 grid 的 GRID_OUTLIER/GRID_DEGRADED 出兩次。
+    var key = String(nodeName || "") + "|" + String(code || "");
+    if (!context._warningKeys) context._warningKeys = {};
+    if (context._warningKeys[key]) return;
+    context._warningKeys[key] = true;
     context.warnings.push({
         node: nodeName || "",
         code: code || "",

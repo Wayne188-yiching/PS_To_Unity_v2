@@ -500,40 +500,42 @@ E:\Wayne\Claude\PS_To_Unity_v2-main。
       <li><strong>Warning channel</strong>：JSON root-level <code>warnings: [{node, code, message}, ...]</code>；Unity 端 <code>LogLayoutWarnings</code> 於 CheckLayout / ValidateLayout / GeneratePrefab 三入口都會 dump 到 Console（Q10）</li>
     </ul>
 
-    <h4>Phase 4 收尾狀態（截至 2026-07-07）</h4>
+    <h4>Phase 4 收尾狀態（更新至 2026-07-07）</h4>
+    <div class="callout ok">
+      <strong>三個 post-commit fix 已透過 v2.9.1 hotfix 修復（見 <a href="GUIDE_zh.html#changelog">GUIDE_zh.html changelog v2.9.1</a>）：</strong>
+      <ul style="margin:6px 0 0 18px;">
+        <li>✅ <code>constraintCount</code> 邏輯反了 → 固定 <code>firstRowCount</code>（<code>FixedColumnCount</code> 語意是欄數、跟 <code>startAxis</code> 無關）</li>
+        <li>✅ 新增 <code>sortGridChildren</code>：Unity GridLayoutGroup sibling 填格順序對得上 PS 視覺（Horizontal→row-major、Vertical→column-major）</li>
+        <li>✅ <code>pushWarning</code> 加 <code>(node, code)</code> dedup：<code>applyLayoutGroupMetadata</code> 雙次執行不再送重複警告</li>
+      </ul>
+    </div>
     <div class="callout warn">
-      <strong>兩件事尚未收尾：</strong>
-      <ol style="margin:6px 0 0 18px;">
-        <li>有 3 個 post-commit fix 未提交（<code>PhotoshopUiPackageExporter.jsx</code> +37/-2）：
-          <ul>
-            <li><code>constraintCount</code> 邏輯反了：<code>horizontal ? firstRowCount : firstColCount</code> 會讓 rows&gt;cols 的 grid 在 Unity 端 90° 翻轉。<code>FixedColumnCount</code> 語意始終是欄數、跟 startAxis 無關，改成固定 <code>firstRowCount</code>。</li>
-            <li>新增 <code>sortGridChildren</code>：Unity GridLayoutGroup 按 sibling index 依序填格，PS 端要先把 children 依 startAxis 排好（Horizontal→row-major、Vertical→column-major），視覺才對得上。</li>
-            <li><code>pushWarning</code> dedup：<code>applyLayoutGroupMetadata</code> 會在 <code>createGroupNode</code> 與 <code>refreshGroupBounds</code> 各執行一次，同一個 grid 的 <code>GRID_OUTLIER</code> / <code>GRID_DEGRADED</code> 會被送兩次；加 <code>(node, code)</code> key dedup。</li>
-          </ul>
-        </li>
-        <li><code>Samples/Phase4/</code> 目錄仍只有 <code>README.md</code>，規劃的 4 個 PSD 樣本（<code>grid_basic</code> / <code>canvasgroup_basic</code> / <code>grid_canvasgroup_combo</code> / <code>grid_degrade</code>）需要使用者用 Photoshop 手動建立並 commit。README 內驗收 checklist（含 reskin guard 手動驗證 + Phase 3 樣本回歸測試）也還沒逐項跑過。</li>
-      </ol>
+      <strong>仍待使用者手動完成：</strong>
+      <p style="margin:6px 0 0;"><code>Samples/Phase4/</code> 目錄仍只有 <code>README.md</code>，規劃的 4 個 PSD 樣本（<code>grid_basic</code> / <code>canvasgroup_basic</code> / <code>grid_canvasgroup_combo</code> / <code>grid_degrade</code>）需要使用者用 Photoshop 手動建立並 commit。README 內驗收 checklist（含 reskin guard 手動驗證 + Phase 3 樣本回歸測試）也還沒逐項跑過。這是 Phase 4 剩下唯一未收尾項目。</p>
     </div>
 
     <details class="handoff">
-      <summary>Phase 4 交接提示詞（收尾 / 後續 fix 用）</summary>
+      <summary>Phase 4 交接提示詞（驗收樣本用）</summary>
 <pre>你正在協助 PS_To_Unity_v2 專案的 Phase 4（Grid + CanvasGroup 自動掛載）收尾。倉庫在
-E:\Wayne\Claude\PS_To_Unity_v2-main。Phase 4 主功能已 commit 為 v2.9.0，還有兩件事沒完：
+E:\Wayne\Claude\PS_To_Unity_v2-main。Phase 4 主功能已 commit 為 v2.9.0，v2.9.1 hotfix
+已修完三個 post-commit fix（constraintCount 90° 翻轉、sortGridChildren、pushWarning dedup），
+仍待完成的是驗收樣本：
 
-1. Uncommitted post-commit fix（PhotoshopUiPackageExporter.jsx 已有 +37/-2 未提交 diff）：
-   - constraintCount 邏輯反了 → 已修為固定 firstRowCount
-   - 新增 sortGridChildren（讓 Unity sibling 填格順序對得上 PS 視覺）
-   - pushWarning dedup（避免同一個 grid 送兩次警告）
-   請幫我決定該 amend 進 v2.9.0 還是出 v2.9.1 hotfix（依 OPTIMIZATION_PLAN_zh.html#phase4-q11
-   規則）；決定後執行 commit + push。
-
-2. Samples/Phase4/ 只有 README.md，需要 4 個 PSD 樣本，但這是要我自己用 Photoshop 手動建的。
-   請把 Samples/Phase4/README.md 的建立步驟摘給我，我建完後你來驗收 checklist。
+Samples/Phase4/ 目前只有 README.md，規劃的 4 個 PSD 樣本尚未建立：
+  - grid_basic.psd（純 [GRID]）
+  - canvasgroup_basic.psd（純 [CG]）
+  - grid_canvasgroup_combo.psd（[GRID][CG] 組合）
+  - grid_degrade.psd（子寬高差 > 20% 觸發降級）
+這是要用 Photoshop 手動建的，你的任務：
+1. 把 Samples/Phase4/README.md 的建立步驟拆解給我看，回答我建立過程的問題
+2. 我建完 push 後，你幫我逐項跑驗收 checklist（含 reskin guard 手動驗證 + Phase 3 樣本
+   回歸測試），確認 v2.9.1 沒把 Phase 3 產出弄壞
 
 背景參考：
 - OPTIMIZATION_PLAN_zh.html#phase4（本階段章節）
-- OPTIMIZATION_PLAN_zh.html#phase4-q1 ~ #phase4-q13（grill-me 完整決議）
+- OPTIMIZATION_PLAN_zh.html#phase4-decisions（grill-me Q1-Q13 完整決議）
 - Samples/Phase4/README.md（驗收 checklist）
+- GUIDE_zh.html#changelog v2.9.0 / v2.9.1 條目
 - 關鍵入口：
   PhotoshopExporter/PhotoshopUiPackageExporter.jsx（detectLayoutGroupType / calcGridParams /
     applyCanvasGroupMetadata / stripGridLayoutTags / stripCanvasGroupTags / pushWarning / sortGridChildren）
