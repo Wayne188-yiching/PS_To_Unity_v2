@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.10.0</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.10.1</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -611,20 +611,18 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="layout-group">Layout Group 自動排版 <span class="tag tag-new">v2.4</span></h2>
 
-  <p>圖層群組可自動轉為 Unity 的 <code>HorizontalLayoutGroup</code> 或 <code>VerticalLayoutGroup</code>，並自動套上 <code>ContentSizeFitter</code>。</p>
+  <p>圖層群組可透過明確命名標記轉為 Unity 的 <code>HorizontalLayoutGroup</code> 或 <code>VerticalLayoutGroup</code>，並自動套上 <code>ContentSizeFitter</code>。未標記的普通群組會完整保留 Photoshop 座標，不再猜測排版方向。</p>
   <div class="callout warn">
     <strong>v2.4.2 起停用自動去重</strong>：先前依「相同寬高」判斷重複圖會誤判（譬如同寬度但不同字的文字、同尺寸但不同 icon），故 v2.4.2 起每個圖層各自輸出獨立 PNG。若需要圖片共用，請在 PS 將圖層名稱統一。
   </div>
 
   <h3>偵測規則</h3>
-  <p>支援兩種方式，<strong>命名標記優先於自動偵測</strong>：</p>
+  <p><strong>v2.10.1 起只接受明確命名標記</strong>，避免一般群組因子層剛好同 X/Y 而被錯誤重排：</p>
   <table>
     <tr><th>方式</th><th>條件</th><th>結果</th></tr>
     <tr><td>命名標記</td><td>群組名稱含 <code>[H]</code> 或 <code>[HLAYOUT]</code>（不分大小寫）</td><td>強制水平 layout</td></tr>
     <tr><td>命名標記</td><td>群組名稱含 <code>[V]</code> 或 <code>[VLAYOUT]</code>（不分大小寫）</td><td>強制垂直 layout</td></tr>
-    <tr><td>自動偵測</td><td>群組有 2 個以上子層，且所有子層 Y 位置一致（±3px 容差）</td><td>水平 layout</td></tr>
-    <tr><td>自動偵測</td><td>群組有 2 個以上子層，且所有子層 X 位置一致（±3px 容差）</td><td>垂直 layout</td></tr>
-    <tr><td>無</td><td>不符合上述任一條件</td><td>普通群組，不加 Layout Component</td></tr>
+    <tr><td>無標記</td><td>任何一般群組</td><td>普通群組，不加 Layout Component，保留 PS 座標</td></tr>
   </table>
 
   <h3>實際 PSD 圖層命名範例</h3>
@@ -639,13 +637,7 @@ TXT_score_[THICK:2]</code></pre>
     ├── Menu_Help.png
     └── Menu_Quit.png</code></pre>
 
-  <p><strong>情境 B：自動偵測（不寫標記）</strong></p>
-  <pre><code>Toolbar/                     ← 子層 Y 全相同 → 自動水平
-├── Icon_1.png  (x=100, y=50)
-├── Icon_2.png  (x=150, y=50)
-└── Icon_3.png  (x=200, y=50)</code></pre>
-
-  <p><strong>情境 C：結合其他標記（多標記共存）</strong></p>
+  <p><strong>情境 B：結合其他標記（多標記共存）</strong></p>
   <pre><code>TopBar_[H][ANCHOR_TC]/       ← 水平 layout + 上方置中錨點
 ├── Coin.png
 ├── Diamond.png
@@ -893,15 +885,23 @@ TXT_score_[THICK:2]</code></pre>
   <p>v2.4.0 之前使用 <code>textItem.size</code>，這個 API 拿到的是「設計時原始字體」，不含 Free Transform 縮放。若文字圖層被自由變形縮放過，PS 字元面板顯示的是「縮放後的有效字體」（impliedFontSize），兩者會不同。<br>
   v2.4.1 起改用 ActionDescriptor 讀取 <code>impliedFontSize</code>，與 PS 字元面板顯示完全一致。</p>
 
-  <h3>明明設定 TMP，文字卻變成圖片？<span class="tag tag-new">v2.4</span></h3>
-  <p>v2.4 起新增「Auto-export non-Source-Han fonts as PNG」自動分流。若文字圖層使用非思源系列字型（思源黑體/宋體、源泉圓體、Noto CJK 之外的字型），會自動輸出為 PNG，避免 Unity 缺字型造成顯示異常。<br>
-  若要強制以 TMP 輸出，可在對話框取消勾選此選項，或在圖層名稱加入 <code>[TMP]</code> / <code>TXT_</code> 等手動標記。</p>
+  <h3>文字為什麼變成圖片？<span class="tag tag-new">v2.10.1</span></h3>
+  <p>所有字型預設都會輸出為 TMP。只有文字圖層名稱含 <code>[PNG]</code> / <code>TXTIMG_</code> 等圖片標記、被選為「目前選取的文字圖層為 PNG」，或使用者明確勾選「白名單外字型改為 PNG」時才會烘成圖片。多字型 PSD 請在 Unity 使用 <code>TmpFontMap</code> 將 <code>fontToken</code> 對應到正確的 TMP Font Asset。</p>
 
-  <h3>Layout Group 沒有自動偵測成功？<span class="tag tag-new">v2.4</span></h3>
-  <p>自動偵測需要群組內所有子層的 X（垂直 layout）或 Y（水平 layout）座標一致（±3px 容差）。若子層位置略有偏移超出容差，可在群組名稱加 <code>[H]</code> 或 <code>[V]</code> 強制指定方向。命名標記永遠優先於自動偵測。</p>
+  <h3>如何建立 Layout Group？<span class="tag tag-new">v2.10.1</span></h3>
+  <p>請在群組名稱加入 <code>[H]</code>、<code>[V]</code> 或 <code>[GRID]</code>。v2.10.1 起不再依子層 X/Y 自動猜測，避免 Unity 重排未標記的設計稿群組。</p>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
+
+  <h3>v2.10.1（2026-07-13）— TMP 預設輸出 + 版面誤判修復 + 更新器補檔</h3>
+  <ul>
+    <li><strong>所有字型預設保留 TMP</strong>：PS 匯出器不再預設把白名單外字型烘成 PNG；只有明確勾選「白名單外字型改為 PNG」、選取轉圖或使用 <code>[PNG]</code> 類標記時才輸出文字圖。</li>
+    <li><strong>停用未標記群組的 H/V 自動猜測</strong>：一般 PSD 群組若子層剛好同 X/Y，先前可能被誤掛 <code>VerticalLayoutGroup</code> / <code>HorizontalLayoutGroup</code>，造成 Unity 重排與拉伸。現在 H/V/Grid 全部只接受 <code>[H]</code> / <code>[V]</code> / <code>[GRID]</code> 明確標記。</li>
+    <li><strong>TMP 繼承父群組 Color Overlay</strong>：文字圖層位於帶有「顏色覆蓋」效果的群組時，匯出的 TMP 色值會使用群組最終覆蓋色，不再只讀文字層原始填色。</li>
+    <li><strong>Prefab 根節點裁切至 PSD Canvas</strong>：根節點新增 <code>RectMask2D</code>，使超出 Photoshop 文件畫布的圖層 bounds / effect 不會在 Unity Game View 額外露出。</li>
+    <li><strong>Unity 更新器補上 TmpFontMap.cs</strong>：修正 v2.10.0 從舊版更新後缺檔而產生 <code>CS0246</code> 的問題。</li>
+  </ul>
 
   <h3>v2.10.0（2026-07-13）— 命名規則說明 + 多字型 TMP 支援 + BTN_ Button 修復</h3>
   <ul>
@@ -1021,7 +1021,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.10.0 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.10.1 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 
