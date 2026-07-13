@@ -1,7 +1,7 @@
 {
-    "version":  "2.9.1",
-    "phase":  "Phase 4 — Adaptive layout components (Grid + CanvasGroup)",
-    "updated":  "2026-07-07",
+    "version":  "2.10.0",
+    "phase":  "v2.10 — Naming help + multi-font TMP whitelist/map + BTN_ fix",
+    "updated":  "2026-07-13",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [
                      {

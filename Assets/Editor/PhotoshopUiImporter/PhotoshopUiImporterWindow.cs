@@ -19,6 +19,8 @@ namespace PhotoshopToUnity.EditorImporter
         private SkinMap skinMap;
         private TMP_FontAsset defaultTmpFontAsset;
         private Material defaultTmpMaterialPreset;
+        // v2.10：fontToken → Font Asset 對應表（選填），多字型 PSD 用；null = 全部套預設字型（舊行為）。
+        private TmpFontMap tmpFontMap;
         private bool autoReferenceResolution = true;
         private Vector2 referenceResolution = new Vector2(1920f, 1080f);
         private bool useResponsiveAnchor;
@@ -45,7 +47,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.9.1";
+        private const string ToolVersion = "2.10.0";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -274,6 +276,21 @@ namespace PhotoshopToUnity.EditorImporter
                 }
 
                 defaultTmpMaterialPreset = (Material)EditorGUILayout.ObjectField("預設 TMP 材質球", defaultTmpMaterialPreset, typeof(Material), false);
+
+                // v2.10：多字型支援——依 layout.json 的 fontToken 比對關鍵字自動套字型。
+                tmpFontMap = (TmpFontMap)EditorGUILayout.ObjectField(
+                    new GUIContent(
+                        "字型對應表（選填）",
+                        "TmpFontMap：fontToken 關鍵字 → TMP Font Asset。\n" +
+                        "PS 端字型白名單保持 TMP 的文字，靠這張表套正確字型；\n" +
+                        "沒對到的 fontToken 用預設字型並在 Generate 後警告。\n" +
+                        "建立：Project 視窗右鍵 Create > Photoshop UI Importer > Tmp Font Map。"),
+                    tmpFontMap, typeof(TmpFontMap), false);
+                if (tmpFontMap != null && (tmpFontMap.entries == null || tmpFontMap.entries.Count == 0))
+                {
+                    EditorGUILayout.HelpBox("字型對應表是空的：請在該 TmpFontMap 資產內新增 keyword → Font Asset 項目。", MessageType.Warning);
+                }
+
                 DrawFolderPathField("TMP 材質球資料夾（選填）", ref materialLibraryFolder, true);
                 skinMap = (SkinMap)EditorGUILayout.ObjectField("Skin Map（選填）", skinMap, typeof(SkinMap), false);
 
@@ -781,7 +798,8 @@ namespace PhotoshopToUnity.EditorImporter
                 defaultTmpMaterialPreset,
                 generatedMaterialFolder,
                 string.IsNullOrWhiteSpace(materialLibraryFolder) ? null : materialLibraryFolder,
-                outlineThicknessMultiplier);
+                outlineThicknessMultiplier,
+                tmpFontMap);
             var backend = new UGuiTmpPrefabBackend();
             var prefabName = Path.GetFileNameWithoutExtension(layoutJsonPath);
 
@@ -806,15 +824,22 @@ namespace PhotoshopToUnity.EditorImporter
                 ? $"　像素去重合併：{importResult.dedupedSpriteCount} 張（省 {FormatByteSize(importResult.dedupedSpriteBytes)}）"
                 : string.Empty;
 
-            // F3：把描邊超限警告聚合後一次顯示，並輸出至 Console 方便回查節點名稱。
-            if (tmpMapper.OutlineOverflowWarnings.Count > 0)
+            // F3 + v2.10：把描邊超限與 fontToken 未對應警告聚合後一次顯示，並輸出至 Console 方便回查節點名稱。
+            foreach (var w in tmpMapper.OutlineOverflowWarnings)
+                Debug.LogWarning($"[OutlineOverflow] {w}");
+            foreach (var w in tmpMapper.FontTokenWarnings)
+                Debug.LogWarning($"[FontToken] {w}");
+
+            if (tmpMapper.OutlineOverflowWarnings.Count > 0 || tmpMapper.FontTokenWarnings.Count > 0)
             {
-                foreach (var w in tmpMapper.OutlineOverflowWarnings)
-                    Debug.LogWarning($"[OutlineOverflow] {w}");
+                var notes = new System.Collections.Generic.List<string>();
+                if (tmpMapper.OutlineOverflowWarnings.Count > 0)
+                    notes.Add($"{tmpMapper.OutlineOverflowWarnings.Count} 個文字描邊超出 SDF 物理上限被截斷（建議按 Console 建議值重建 Font Asset 的 atlasPadding）");
+                if (tmpMapper.FontTokenWarnings.Count > 0)
+                    notes.Add($"{tmpMapper.FontTokenWarnings.Count} 種字型沒對到字型對應表，已用預設字型");
 
                 var summary = $"Prefab 生成完成（{AssetDatabase.GetAssetPath(prefab)}）。{dedupHint}\n" +
-                              $"⚠ 有 {tmpMapper.OutlineOverflowWarnings.Count} 個文字描邊超出 SDF 物理上限被截斷，" +
-                              "詳見 Console 警告。建議按建議值重建對應 TMP Font Asset 的 atlasPadding 後重跑。";
+                              $"⚠ {string.Join("；", notes)}，詳見 Console 警告。";
                 SetStatus(summary, MessageType.Warning);
             }
             else

@@ -2,7 +2,7 @@
 
 將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。
 
-**目前版本：v2.9.1**
+**目前版本：v2.10.0**
 
 ---
 
@@ -25,8 +25,10 @@
 3. 在 Unity 開啟 `Tools > Photoshop UI Importer > Importer_v2`。
 4. 選擇 Package 資料夾，點「套用 Package」。
 5. 填寫「專案資料夾名稱」，點「套用標準輸出路徑」。
-6. 指定「預設 TMP Font Asset」（UI 含文字時必填）。
+6. 指定「預設 TMP Font Asset」（UI 含文字時必填）。多字型 PSD 可另指定「字型對應表 TmpFontMap」（fontToken 關鍵字 → Font Asset），搭配 PS 端「編輯字型白名單…」讓非思源字型也保持 TMP 不轉圖。
 7. 點「Validate」確認，再點「Generate Prefab」完成。
+
+> 圖層命名會觸發哪些 Unity 端行為（`[GRID]`、`[CG]`、`BTN_`…），見 PS 匯出對話框的「命名規則說明」按鈕。
 
 ---
 

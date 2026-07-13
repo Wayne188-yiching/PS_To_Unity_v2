@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Photoshop → Unity UI 工具 v2.9 — 完整使用說明</title>
+  <title>Photoshop → Unity UI 工具 v2.10 — 完整使用說明</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.9.1</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.10.0</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -903,6 +903,15 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
 
+  <h3>v2.10.0（2026-07-13）— 命名規則說明 + 多字型 TMP 支援 + BTN_ Button 修復</h3>
+  <ul>
+    <li><strong>PS 匯出對話框加「命名規則說明」按鈕</strong>：header 新增速查對話框，集中列出所有會觸發 Unity 端行為的圖層命名約定——群組標籤（<code>[H]</code>/<code>[V]</code>/<code>[GRID]</code>/<code>[CG]</code>/<code>[THICK]</code>）、前綴（<code>BTN_</code>/<code>IGNORE_</code>/<code>REF_</code>）、文字輸出覆寫（<code>[PNG]</code>/<code>[TMP]</code> 系列）、響應式錨點 token（<code>STRETCH_*</code>/<code>ANCHOR_*</code>/<code>PIVOT_*</code>）與通則。</li>
+    <li><strong>TMP 字型白名單（PS 端）</strong>：原「非思源系列字型自動匯出為 PNG」硬編碼白名單，改為「內建思源／源泉系列 + 使用者自訂關鍵字」。對話框新增「編輯字型白名單…」：自動偵測列出本文件所有文字圖層用到的字型（PostScript 名），雙擊或按鈕即可加入白名單；白名單存於 <code>使用者資料夾/PS_To_Unity_v2/tmp_font_whitelist.txt</code>（一行一關鍵字，slug 化後部分符合即生效），跨 PSD 共用。白名單內字型保持 TMP 節點、不再被轉成 PNG。</li>
+    <li><strong>字型對應表 TmpFontMap（Unity 端）</strong>：新增 ScriptableObject（Create &gt; Photoshop UI Importer &gt; Tmp Font Map），一筆 = fontToken 關鍵字 → TMP Font Asset（+ 選填材質球）。Importer「文字與材質」區新增「字型對應表（選填）」欄位；Generate 時每個 text 節點先依 <code>fontToken</code> 比對此表套字型，對不到才退回預設字型並於 Console 警告（同 token 只報一次）。未指定對應表時行為與舊版完全一致。描邊材質的 SDF 換算與材質庫比對同步改為以「該節點解析後的字型」為準，並新增 atlas 貼圖比對——不同字型的材質球不會被跨字型借用（借了會整段亂碼）。</li>
+    <li><strong>BTN_ 自動掛 Button 修復</strong>：此功能自加入以來從未實際生效——JSX 端 <code>stripControlPrefix</code> 會把 <code>BTN_</code> 從節點名去掉，Unity 端 <code>StartsWith("BTN_")</code> 永遠比不到；且 Image 一律 <code>raycastTarget=false</code>、<code>AddComponent&lt;Button&gt;</code> 不會自動指定 targetGraphic，就算掛上也點不到。修正：節點名保留 <code>BTN_</code> 前綴（PNG 檔名維持去前綴，匯出快取相容）；Unity 端掛 Button 時把該 Image <code>raycastTarget</code> 設回 <code>true</code> 並接上 <code>targetGraphic</code>，產出即為可點擊的 Button。</li>
+    <li><strong>schema 不變</strong>：本版沒有新增 layout.json 欄位，schemaVersion 維持 <code>2.9</code>，老 Unity 端讀新 JSON 不會誤報過舊。</li>
+  </ul>
+
   <h3>v2.9.1（2026-07-07）— Phase 4 hotfix：Grid 90° 翻轉 + sibling 填格順序 + 警告重複</h3>
   <ul>
     <li><strong>constraintCount 邏輯反了（Grid 90° 翻轉）</strong>：v2.9.0 的 <code>calcGridParams</code> 用 <code>horizontal ? firstRowCount : firstColCount</code> 計算 <code>constraintCount</code>。但 Unity <code>Constraint.FixedColumnCount</code> 的語意始終是「欄數」，跟 <code>startAxis</code> 無關；<code>startAxis</code> 只控 GridLayoutGroup 填格順序（Horizontal→row-major、Vertical→column-major），不改變欄數定義。原邏輯會讓 rows &gt; cols 的 grid（例如 1 欄 × N 列的縱向清單）被誤設 <code>constraintCount = N</code>（column 數），視覺整個 90° 翻轉。修正為固定 <code>constraintCount = firstRowCount</code>。</li>
@@ -1012,7 +1021,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.9.1 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.10.0 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

@@ -238,6 +238,15 @@ namespace PhotoshopToUnity.EditorImporter
             image.sprite = context.skinResolver?.Resolve(node);
             image.type = Image.Type.Simple;
             image.preserveAspect = false;
+
+            // v2.10：BTN_ 自動掛的 Button 要能點到，必須有接收 raycast 的 targetGraphic。
+            // （AddComponent 不會像 Inspector 那樣自動跑 Reset() 指定 targetGraphic，需手動接線。）
+            var button = gameObject.GetComponent<Button>();
+            if (button != null)
+            {
+                image.raycastTarget = true;
+                button.targetGraphic = image;
+            }
         }
 
         // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q5 / Q12-d：GridLayoutGroup 掛載。

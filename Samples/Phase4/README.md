@@ -8,7 +8,7 @@
 
 ## 需要的 4 個樣本
 
-以下四個 PSD 都以 **1080×1920** 畫布（或其他任意尺寸，只要一致）建立，內部一個 root group 命名為 `MainPage`。
+以下四個 PSD 都以 **1920×1080** 畫布建立（對齊 Unity 端預設參考解析度，避免 canvas ≠ reference resolution 時的置中裁切位移干擾驗收），內部一個 root group 命名為 `MainPage`。
 
 ### 1. `grid_basic.psd` — 純 Grid（不掛 CanvasGroup）
 - root `MainPage`

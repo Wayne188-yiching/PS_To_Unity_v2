@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.9.1";
+var SCRIPT_VERSION = "2.10.0";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 (function () {
@@ -158,6 +158,137 @@ function downloadUrlToFile(url, destPath) {
 
 // ---------------------------------------------------------------------------
 
+// v2.10：命名規則速查——集中列出所有會觸發 Unity 端行為的圖層命名約定。
+function showNamingHelpDialog() {
+    var text = ""
+        + "── 群組標籤（自動掛 Unity Component）──\n"
+        + "[H] / [HLAYOUT]         Horizontal Layout Group\n"
+        + "[V] / [VLAYOUT]         Vertical Layout Group\n"
+        + "[GRID] / [GLAYOUT]      Grid Layout Group（子圖層寬高差 >20% 自動降級成普通群組並警告）\n"
+        + "[CG] / [CANVASGROUP]    Canvas Group（Prefab 根節點免標籤、一律自動掛）\n"
+        + "[THICK:下偏移:右偏移]    假厚度文字（Unity 產出上下兩層 TMP）\n"
+        + "\n"
+        + "── 前綴 ──\n"
+        + "BTN_              此圖層在 Unity 自動掛 Button（可點擊）\n"
+        + "IGNORE_ / REF_    匯出時整層略過（需勾「略過 IGNORE_ 與 REF_ 圖層」）\n"
+        + "\n"
+        + "── 文字圖層輸出覆寫（優先於「預設文字圖層處理」下拉）──\n"
+        + "轉 PNG 圖片：[PNG] [IMAGE] [IMG]，或前綴 TXTIMG_ / TXT_IMG_ / TEXTIMG_ / TEXT_IMG_\n"
+        + "保持 TMP 文字：[TMP] [TEXT]，或前綴 TMP_ / TXT_\n"
+        + "\n"
+        + "── 錨點 token（需在 Unity Importer 勾「啟用響應式 anchor」）──\n"
+        + "STRETCH_FULL / STRETCH_X / STRETCH_Y\n"
+        + "ANCHOR_TL / ANCHOR_TR / ANCHOR_BL / ANCHOR_BR\n"
+        + "ANCHOR_TOP / ANCHOR_BOTTOM / ANCHOR_LEFT / ANCHOR_RIGHT / ANCHOR_CENTER\n"
+        + "PIVOT_TL / PIVOT_TR / PIVOT_BL / PIVOT_BR（覆寫預設 pivot）\n"
+        + "\n"
+        + "── 通則 ──\n"
+        + "・標籤不分大小寫、可寫在圖層名任意位置，可組合：Cards[GRID][CG]\n"
+        + "・標籤與前綴會自動從 Unity 節點名移除（BTN_ 會保留在節點名）\n"
+        + "・未知 [標籤] 一律放行不報錯（可自由用 [Hover] 等描述性標記）";
+
+    var dialog = new Window("dialog", "圖層命名規則速查　v" + SCRIPT_VERSION);
+    dialog.orientation = "column";
+    dialog.alignChildren = "fill";
+    var body = dialog.add("edittext", undefined, text, { multiline: true, scrolling: true, readonly: true });
+    body.preferredSize = [660, 400];
+    var closeButton = dialog.add("button", undefined, "關閉", { name: "ok" });
+    closeButton.alignment = "right";
+    closeButton.onClick = function () {
+        dialog.close(1);
+    };
+    dialog.show();
+}
+
+// v2.10：TMP 字型白名單編輯——白名單內字型保持 TMP，不會被「白名單外字型自動匯出為 PNG」轉成圖。
+function showFontWhitelistDialog(doc) {
+    var dialog = new Window("dialog", "TMP 字型白名單");
+    dialog.orientation = "column";
+    dialog.alignChildren = "fill";
+
+    var info = dialog.add("statictext", undefined,
+        "一行一個關鍵字，比對字型 PostScript 名稱（不分大小寫、部分符合即生效）。\n" +
+        "內建的思源／源泉／Noto CJK 系列不用列。範例：DFHei 可涵蓋華康黑體全系列。\n" +
+        "注意：保持 TMP 的字型，需在 Unity Importer 的「字型對應表 TmpFontMap」建立對應 Font Asset。",
+        { multiline: true });
+    info.characters = 76;
+
+    var detected = collectDocumentTextFonts(doc);
+    var detectPanel = dialog.add("panel", undefined, "本文件偵測到的字型（雙擊或按「加入」放進白名單）");
+    detectPanel.orientation = "column";
+    detectPanel.alignChildren = "fill";
+    var fontList = detectPanel.add("listbox", undefined, detected, { multiselect: true });
+    fontList.preferredSize.height = 110;
+    var addGroup = detectPanel.add("group");
+    addGroup.orientation = "row";
+    var addSelectedButton = addGroup.add("button", undefined, "加入選取字型");
+    var addAllButton = addGroup.add("button", undefined, "全部加入");
+
+    var listPanel = dialog.add("panel", undefined, "白名單關鍵字（一行一個）");
+    listPanel.orientation = "column";
+    listPanel.alignChildren = "fill";
+    var keywordText = listPanel.add("edittext", undefined, loadUserTmpFontKeywords().join("\n"),
+        { multiline: true, scrolling: true });
+    keywordText.preferredSize.height = 110;
+
+    function appendKeyword(value) {
+        var current = trim(keywordText.text);
+        var lines = current ? current.split(/\r?\n/) : [];
+        var slug = normalizeAsciiSlug(value);
+        for (var i = 0; i < lines.length; i++) {
+            if (normalizeAsciiSlug(lines[i]) === slug) {
+                return;
+            }
+        }
+        keywordText.text = current ? current + "\n" + value : value;
+    }
+
+    addSelectedButton.onClick = function () {
+        if (!fontList.selection) {
+            return;
+        }
+        for (var i = 0; i < fontList.selection.length; i++) {
+            appendKeyword(fontList.selection[i].text);
+        }
+    };
+    addAllButton.onClick = function () {
+        for (var i = 0; i < detected.length; i++) {
+            appendKeyword(detected[i]);
+        }
+    };
+    fontList.onDoubleClick = function () {
+        if (fontList.selection && fontList.selection.length) {
+            appendKeyword(fontList.selection[0].text);
+        }
+    };
+
+    var buttons = dialog.add("group");
+    buttons.orientation = "row";
+    buttons.alignment = "right";
+    var cancelButton = buttons.add("button", undefined, "取消", { name: "cancel" });
+    var saveButton = buttons.add("button", undefined, "儲存", { name: "ok" });
+    cancelButton.onClick = function () {
+        dialog.close(0);
+    };
+    saveButton.onClick = function () {
+        var lines = keywordText.text.split(/\r?\n/);
+        var cleaned = [];
+        for (var i = 0; i < lines.length; i++) {
+            var line = trim(lines[i]);
+            if (line) {
+                cleaned.push(line);
+            }
+        }
+        if (saveUserTmpFontKeywords(cleaned)) {
+            dialog.close(1);
+        } else {
+            alert("寫入白名單檔案失敗：" + userTmpFontWhitelistFile().fsName);
+        }
+    };
+
+    dialog.show();
+}
+
 function showExportDialog(doc) {
     var dialog = new Window("dialog", "Photoshop UI Package Exporter");
     dialog.orientation = "column";
@@ -170,6 +301,11 @@ function showExportDialog(doc) {
     headerGroup.alignChildren = ["fill", "center"];
     var versionLabel = headerGroup.add("statictext", undefined, "v" + SCRIPT_VERSION);
     versionLabel.justify = "left";
+    var helpButton = headerGroup.add("button", undefined, "命名規則說明");
+    helpButton.alignment = "right";
+    helpButton.onClick = function () {
+        showNamingHelpDialog();
+    };
     var updateButton = headerGroup.add("button", undefined, "檢查更新");
     updateButton.alignment = "right";
     updateButton.onClick = function () {
@@ -249,8 +385,16 @@ function showExportDialog(doc) {
     var selectedSummaryLabel = optionPanel.add("statictext", undefined, selectedSummaryText);
     selectedSummaryLabel.characters = 82;
 
-    var autoRouteNonSourceHanFonts = optionPanel.add("checkbox", undefined, "非思源系列字型自動匯出為 PNG");
+    // v2.10：白名單 = 內建思源／源泉系列 + 使用者自訂關鍵字（編輯對話框維護，存於使用者資料夾）。
+    var fontRouteGroup = optionPanel.add("group");
+    fontRouteGroup.orientation = "row";
+    fontRouteGroup.alignChildren = ["left", "center"];
+    var autoRouteNonSourceHanFonts = fontRouteGroup.add("checkbox", undefined, "白名單外字型自動匯出為 PNG（內建：思源／源泉系列）");
     autoRouteNonSourceHanFonts.value = true;
+    var editFontWhitelistButton = fontRouteGroup.add("button", undefined, "編輯字型白名單…");
+    editFontWhitelistButton.onClick = function () {
+        showFontWhitelistDialog(doc);
+    };
 
     var note = optionPanel.add("statictext", undefined, "勾選「目前選取的文字圖層為 PNG」前，請先在 Photoshop 圖層面板選好要轉的文字圖層。");
     note.characters = 82;
@@ -433,6 +577,8 @@ function exportUiPackage(sourceDoc, options) {
             textLayerOutput: options.textLayerOutput || "tmp",
             selectedTextLayerIds: options.selectedTextLayersAsImages ? readSelectedLayerIdMap(sourceDoc) : {},
             autoRouteNonSourceHanFonts: options.autoRouteNonSourceHanFonts !== false,
+            // v2.10：使用者自訂 TMP 字型白名單（一行一關鍵字，比對 normalizeAsciiSlug 後 indexOf）
+            tmpFontKeywords: loadUserTmpFontKeywords(),
             sourceModified: readDocumentModified(sourceDoc),
             exportCache: null,
             exportCacheDirty: false,
@@ -704,9 +850,11 @@ function createImageNode(layer, context, parentBounds) {
 
     var safeName = uniqueFileName(layer.name, context.counters);
     var fileName = safeName + ".png";
+    // v2.10：BTN_ 前綴保留在節點名（Unity 端據此自動掛 Button），PNG 檔名維持去前綴不變（匯出快取相容）。
+    var nodeName = startsWith(String(layer.name || "").toUpperCase(), "BTN_") ? "BTN_" + safeName : safeName;
 
     var node = {
-        name: safeName,
+        name: nodeName,
         type: "image",
         x: bounds.left,
         y: bounds.top,
@@ -2628,7 +2776,12 @@ function uniqueFileName(name, counters) {
 }
 
 function uniqueNodeName(name, counters) {
-    return uniqueFileName(name, counters);
+    // v2.10：BTN_ 前綴保留在節點名（Unity 端據此自動掛 Button）；PNG 檔名仍走 uniqueFileName 去前綴。
+    var base = uniqueFileName(name, counters);
+    if (startsWith(String(name || "").toUpperCase(), "BTN_")) {
+        return "BTN_" + base;
+    }
+    return base;
 }
 
 function stripLayoutGroupTags(name) {
@@ -2782,7 +2935,8 @@ function shouldExportTextLayerAsImage(layer, context) {
         if (!rawFont) {
             return true;
         }
-        return !isSourceHanFamily(rawFont);
+        // v2.10：內建思源／源泉系列 + 使用者自訂字型白名單，白名單內保持 TMP。
+        return !isTmpWhitelistedFont(rawFont, context);
     }
 
     return context.textLayerOutput === "image";
@@ -2840,6 +2994,106 @@ function isSourceHanFamily(rawFontName) {
         "notosanscjk",
         "notoserifcjk"
     ]);
+}
+
+// v2.10：TMP 字型白名單 = 內建思源／源泉系列 + 使用者自訂關鍵字。
+// 白名單內的字型保持 TMP 節點；Unity 端用 TmpFontMap（fontToken → Font Asset）套正確字型。
+function isTmpWhitelistedFont(rawFontName, context) {
+    if (isSourceHanFamily(rawFontName)) {
+        return true;
+    }
+
+    var keywords = context ? context.tmpFontKeywords : null;
+    if (!keywords || !keywords.length) {
+        return false;
+    }
+
+    var slug = normalizeAsciiSlug(rawFontName);
+    for (var i = 0; i < keywords.length; i++) {
+        var keyword = normalizeAsciiSlug(keywords[i]);
+        if (keyword && slug.indexOf(keyword) >= 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// 白名單存於使用者資料夾（跨 PSD 共用、不進倉庫）：一行一個關鍵字。
+function userTmpFontWhitelistFile() {
+    var folder = new Folder(Folder.userData.fsName + "/PS_To_Unity_v2");
+    if (!folder.exists) {
+        folder.create();
+    }
+    return new File(folder.fsName + "/tmp_font_whitelist.txt");
+}
+
+function loadUserTmpFontKeywords() {
+    var keywords = [];
+    var file = userTmpFontWhitelistFile();
+    if (!file.exists) {
+        return keywords;
+    }
+
+    try {
+        file.encoding = "UTF8";
+        if (file.open("r")) {
+            while (!file.eof) {
+                var line = trim(file.readln());
+                if (line) {
+                    keywords.push(line);
+                }
+            }
+            file.close();
+        }
+    } catch (e) {
+        try { file.close(); } catch (ignored) {}
+    }
+    return keywords;
+}
+
+function saveUserTmpFontKeywords(keywords) {
+    var file = userTmpFontWhitelistFile();
+    try {
+        file.encoding = "UTF8";
+        if (file.open("w")) {
+            for (var i = 0; i < keywords.length; i++) {
+                file.writeln(keywords[i]);
+            }
+            file.close();
+            return true;
+        }
+    } catch (e) {
+        try { file.close(); } catch (ignored) {}
+    }
+    return false;
+}
+
+// 走訪整份文件收集文字圖層用到的字型（PostScript 名，去重）。
+function collectDocumentTextFonts(doc) {
+    var found = [];
+    var seen = {};
+
+    function walk(layers) {
+        for (var i = 0; i < layers.length; i++) {
+            var layer = layers[i];
+            if (layer.typename === "LayerSet") {
+                walk(layer.layers);
+            } else {
+                var isText = false;
+                try { isText = layer.kind === LayerKind.TEXT; } catch (e) {}
+                if (isText) {
+                    var font = readRawFontName(layer);
+                    if (font && !seen[font]) {
+                        seen[font] = true;
+                        found.push(font);
+                    }
+                }
+            }
+        }
+    }
+
+    try { walk(doc.layers); } catch (e) {}
+    return found;
 }
 
 function readTextLayerStyle(layer) {

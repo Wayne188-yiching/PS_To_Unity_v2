@@ -13,16 +13,23 @@ namespace PhotoshopToUnity.EditorImporter
         private readonly TMP_FontAsset defaultFontAsset;
         private readonly Material defaultMaterialPreset;
         private readonly float outlineThicknessMultiplier;
+        // v2.10：fontToken → Font Asset 對應表（選填）。null 時所有文字沿用預設字型（與舊版行為一致）。
+        private readonly TmpFontMap fontMap;
 
         // F3: 描邊換算超出 SDF 上限時收集警告，由呼叫端在 Generate 結束時集中顯示。
         public readonly List<string> OutlineOverflowWarnings = new List<string>();
+
+        // v2.10：有指定 fontMap 但 fontToken 對不到任何項目時收集警告（同 token 只報一次）。
+        public readonly List<string> FontTokenWarnings = new List<string>();
+        private readonly HashSet<string> warnedFontTokens = new HashSet<string>();
 
         public TmpMapper(
             TMP_FontAsset defaultFontAsset,
             Material defaultMaterialPreset,
             string generatedMaterialFolder = null,
             string materialLibraryFolder = null,
-            float outlineThicknessMultiplier = 1.0f)
+            float outlineThicknessMultiplier = 1.0f,
+            TmpFontMap fontMap = null)
         {
             this.defaultFontAsset = defaultFontAsset;
             this.defaultMaterialPreset = defaultMaterialPreset;
@@ -31,6 +38,7 @@ namespace PhotoshopToUnity.EditorImporter
                 : generatedMaterialFolder;
             this.materialLibraryFolder = materialLibraryFolder;
             this.outlineThicknessMultiplier = Mathf.Clamp(outlineThicknessMultiplier, 0.3f, 1.5f);
+            this.fontMap = fontMap;
         }
 
         public void Apply(TextMeshProUGUI target, PhotoshopUiNode node)
@@ -84,21 +92,40 @@ namespace PhotoshopToUnity.EditorImporter
             // 改成 Center 預設更貼近 PS 視覺；exporter 有寫 alignment 時仍以該值為準。
             target.alignment = ParseAlignment(node.alignment, TextAlignmentOptions.Center);
 
+            // v2.10：先查 fontMap（fontToken → Font Asset），沒指定 fontMap 或對不到才退回預設字型。
             var fontAsset = defaultFontAsset != null ? defaultFontAsset : TMP_Settings.defaultFontAsset;
+            var baseMaterialPreset = defaultMaterialPreset;
+            if (fontMap != null && !string.IsNullOrWhiteSpace(node.fontToken))
+            {
+                if (fontMap.TryGetEntry(node.fontToken, out var entry))
+                {
+                    fontAsset = entry.fontAsset;
+                    baseMaterialPreset = entry.materialPreset != null ? entry.materialPreset : entry.fontAsset.material;
+                }
+                else if (warnedFontTokens.Add(node.fontToken))
+                {
+                    var fallbackName = fontAsset != null ? fontAsset.name : "(無)";
+                    FontTokenWarnings.Add(
+                        $"fontToken「{node.fontToken}」在字型對應表沒有符合的項目，已改用預設字型（{fallbackName}）。" +
+                        "若要正確套字型，請在 TmpFontMap 加一筆 keyword 對應。");
+                }
+            }
+
             if (fontAsset != null)
             {
                 target.font = fontAsset;
             }
 
-            // outline 材質：有 outline 資料時解析專屬材質，否則 fallback 到 defaultMaterialPreset
-            var resolvedMaterial = ResolveGeneratedMaterial(defaultMaterialPreset, node) ?? defaultMaterialPreset;
+            // outline 材質：有 outline 資料時解析專屬材質，否則 fallback 到該字型的基底材質
+            var resolvedMaterial = ResolveGeneratedMaterial(baseMaterialPreset, node, fontAsset) ?? baseMaterialPreset;
             if (resolvedMaterial != null)
             {
                 target.fontSharedMaterial = resolvedMaterial;
             }
         }
 
-        private Material ResolveGeneratedMaterial(Material baseMaterial, PhotoshopUiNode node)
+        // v2.10：fontAsset 由呼叫端傳入（fontMap 解析後的字型），SDF 換算與材質庫比對都以該字型為準。
+        private Material ResolveGeneratedMaterial(Material baseMaterial, PhotoshopUiNode node, TMP_FontAsset fontAsset)
         {
             if (baseMaterial == null || node == null || node.outlineWidth <= 0f || string.IsNullOrWhiteSpace(node.outlineColor))
             {
@@ -113,9 +140,9 @@ namespace PhotoshopToUnity.EditorImporter
             outlineColor.a = Mathf.Clamp01(node.outlineOpacity <= 0f ? 1f : node.outlineOpacity);
 
             // 先從材質庫尋找相近的現成材質球，找到就直接用，不新增
-            var fontAssetForSdf = defaultFontAsset != null ? defaultFontAsset : TMP_Settings.defaultFontAsset;
+            var fontAssetForSdf = fontAsset != null ? fontAsset : (defaultFontAsset != null ? defaultFontAsset : TMP_Settings.defaultFontAsset);
             var targetWidth = ConvertPhotoshopStrokeWidth(node, fontAssetForSdf);
-            var libraryMatch = FindLibraryMaterial(outlineColor, targetWidth);
+            var libraryMatch = FindLibraryMaterial(outlineColor, targetWidth, fontAssetForSdf);
             if (libraryMatch != null)
                 return libraryMatch;
 
@@ -232,7 +259,7 @@ namespace PhotoshopToUnity.EditorImporter
             return Mathf.Clamp(compensated, 0.005f, 0.5f);
         }
 
-        private Material FindLibraryMaterial(Color targetOutlineColor, float targetOutlineWidth)
+        private Material FindLibraryMaterial(Color targetOutlineColor, float targetOutlineWidth, TMP_FontAsset fontAsset)
         {
             if (string.IsNullOrWhiteSpace(materialLibraryFolder) || !AssetDatabase.IsValidFolder(materialLibraryFolder))
                 return null;
@@ -264,6 +291,11 @@ namespace PhotoshopToUnity.EditorImporter
                 if (mat == null ||
                     !mat.HasProperty(ShaderUtilities.ID_OutlineColor) ||
                     !mat.HasProperty(ShaderUtilities.ID_OutlineWidth))
+                    continue;
+
+                // v2.10 多字型：材質球綁定字型 atlas 貼圖，跨字型借用會整段亂碼。
+                // 只比對 atlas 相同（= 同一顆 Font Asset）的材質。
+                if (fontAsset != null && mat.mainTexture != fontAsset.atlasTexture)
                     continue;
 
                 var matColor = mat.GetColor(ShaderUtilities.ID_OutlineColor);
