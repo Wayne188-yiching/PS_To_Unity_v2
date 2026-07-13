@@ -33,7 +33,9 @@ namespace PhotoshopToUnity.EditorImporter
 
             var rootName = string.IsNullOrWhiteSpace(context.prefabName) ? "PhotoshopUiPrefab" : context.prefabName;
             // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q6：prefab root 一律掛 CanvasGroup（整頁 fade/loading disable 是最常見需求；不需要 JSX 標籤觸發）。
-            var root = new GameObject(rootName, typeof(RectTransform), typeof(CanvasGroup));
+            // Photoshop clips every layer to the document canvas. Mirror that behavior in Unity so
+            // oversized layer bounds/effects cannot render outside the generated prefab's root rect.
+            var root = new GameObject(rootName, typeof(RectTransform), typeof(CanvasGroup), typeof(RectMask2D));
 
             try
             {

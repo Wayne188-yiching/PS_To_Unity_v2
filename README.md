@@ -6,7 +6,7 @@ It exports a Photoshop UI as a UI Package, then rebuilds the layout in Unity as 
 
 ## Version
 
-v2.10.0
+v2.10.1
 
 ## Main Workflow
 
@@ -51,7 +51,7 @@ Unity Atlas output:
 - Individual text layers can also override the default by name when a persistent rule is useful:
   - `[PNG]`, `[IMAGE]`, `[IMG]`, `TXTIMG_`, `TXT_IMG_`, `TEXTIMG_`, or `TEXT_IMG_` bakes that text as a PNG image.
   - `[TMP]`, `[TEXT]`, `TMP_`, or `TXT_` keeps that text editable as a Unity TMP node.
-- Fonts outside the built-in Source Han / GenSen whitelist are auto-baked to PNG by default. Use `編輯字型白名單…` in the export dialog to keep additional fonts as TMP, then map each font token to a TMP Font Asset in Unity via a `TmpFontMap` asset (Create > Photoshop UI Importer > Tmp Font Map).
+- All text layers remain TMP by default, regardless of font family. Use a `TmpFontMap` asset (Create > Photoshop UI Importer > Tmp Font Map) to map each exported font token to the matching TMP Font Asset. Enable `白名單外字型改為 PNG` only when intentionally baking unsupported fonts; explicit `[PNG]` naming overrides still work.
 - The export dialog's `命名規則說明` button lists every layer-naming convention that triggers Unity-side behavior (`[GRID]`, `[CG]`, `BTN_`, anchor tokens, and more).
 
 ## Included Tools

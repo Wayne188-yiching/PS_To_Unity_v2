@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.10.0";
+var SCRIPT_VERSION = "2.10.1";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 (function () {
@@ -389,8 +389,8 @@ function showExportDialog(doc) {
     var fontRouteGroup = optionPanel.add("group");
     fontRouteGroup.orientation = "row";
     fontRouteGroup.alignChildren = ["left", "center"];
-    var autoRouteNonSourceHanFonts = fontRouteGroup.add("checkbox", undefined, "白名單外字型自動匯出為 PNG（內建：思源／源泉系列）");
-    autoRouteNonSourceHanFonts.value = true;
+    var autoRouteNonSourceHanFonts = fontRouteGroup.add("checkbox", undefined, "白名單外字型改為 PNG（預設關閉：所有文字保留 TMP）");
+    autoRouteNonSourceHanFonts.value = false;
     var editFontWhitelistButton = fontRouteGroup.add("button", undefined, "編輯字型白名單…");
     editFontWhitelistButton.onClick = function () {
         showFontWhitelistDialog(doc);
@@ -576,7 +576,8 @@ function exportUiPackage(sourceDoc, options) {
             useFastLayerDuplicate: options.useFastLayerDuplicate !== false,
             textLayerOutput: options.textLayerOutput || "tmp",
             selectedTextLayerIds: options.selectedTextLayersAsImages ? readSelectedLayerIdMap(sourceDoc) : {},
-            autoRouteNonSourceHanFonts: options.autoRouteNonSourceHanFonts !== false,
+            // v2.10.1：TMP 是預設路徑；只有使用者明確勾選時才依白名單把文字烘成 PNG。
+            autoRouteNonSourceHanFonts: options.autoRouteNonSourceHanFonts === true,
             // v2.10：使用者自訂 TMP 字型白名單（一行一關鍵字，比對 normalizeAsciiSlug 後 indexOf）
             tmpFontKeywords: loadUserTmpFontKeywords(),
             sourceModified: readDocumentModified(sourceDoc),
@@ -1394,31 +1395,8 @@ function detectLayoutGroupType(group, children) {
         return "vertical";
     }
 
-    var visibleChildren = layoutVisibleChildren(children);
-    if (visibleChildren.length < 2) {
-        return null;
-    }
-
-    var sameY = true;
-    var sameX = true;
-    var baseY = visibleChildren[0].y;
-    var baseX = visibleChildren[0].x;
-    for (var i = 1; i < visibleChildren.length; i++) {
-        if (Math.abs(visibleChildren[i].y - baseY) > 3) {
-            sameY = false;
-        }
-        if (Math.abs(visibleChildren[i].x - baseX) > 3) {
-            sameX = false;
-        }
-    }
-
-    if (sameY) {
-        return "horizontal";
-    }
-    if (sameX) {
-        return "vertical";
-    }
-
+    // v2.10.1：H/V 與 Grid 一樣只接受顯式標籤。普通 PSD 群組常因子層剛好同 X/Y
+    // 被誤判成 LayoutGroup，Unity 便會重排甚至拉伸整組內容，破壞設計稿座標。
     return null;
 }
 
@@ -1754,6 +1732,7 @@ function createTextNode(layer, context, parentBounds) {
     }
 
     var textStyle = readTextLayerStyle(layer);
+    var inheritedFillColor = readInheritedTextFillColor(layer);
     var manualMaterialToken = readMaterialToken(layer);
     var fakeThickness = readFakeThickness(layer.name);
 
@@ -1771,7 +1750,8 @@ function createTextNode(layer, context, parentBounds) {
         fontSize: readFontSize(layer),
         characterSpacing: readTextCharacterSpacing(layer),
         lineSpacing: readTextLineSpacing(layer),
-        color: textStyle.fillColor || readTextColor(layer),
+        // Photoshop 的群組 Color Overlay 會覆蓋子文字；若只讀文字層本身，Unity 顏色會偏掉。
+        color: inheritedFillColor || textStyle.fillColor || readTextColor(layer),
         outlineColor: textStyle.outlineColor,
         outlineWidth: textStyle.outlineWidth,
         outlineOpacity: textStyle.outlineOpacity,
@@ -3158,6 +3138,25 @@ function readTextLayerStyle(layer) {
     }
 
     return style;
+}
+
+// 只繼承父群組的 Color Overlay。群組 Stroke / Gradient 是對整組合成結果套用，
+// 不能安全拆到每個 TMP，因此不在這裡推導。
+function readInheritedTextFillColor(layer) {
+    var fillColor = "";
+    try {
+        var parent = layer.parent;
+        while (parent && parent.typename === "LayerSet") {
+            var parentStyle = readTextLayerStyle(parent);
+            if (parentStyle && parentStyle.fillColor) {
+                // 由內往外走；外層效果最後套用，符合 Photoshop 群組合成順序。
+                fillColor = parentStyle.fillColor;
+            }
+            parent = parent.parent;
+        }
+    } catch (e) {
+    }
+    return fillColor;
 }
 
 function buildTextMaterialToken(textStyle) {
