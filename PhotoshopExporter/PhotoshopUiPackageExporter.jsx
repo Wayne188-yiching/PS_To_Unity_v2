@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.10.1";
+var SCRIPT_VERSION = "2.11.0";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 (function () {
@@ -166,6 +166,10 @@ function showNamingHelpDialog() {
         + "[V] / [VLAYOUT]         Vertical Layout Group\n"
         + "[GRID] / [GLAYOUT]      Grid Layout Group（子圖層寬高差 >20% 自動降級成普通群組並警告）\n"
         + "[CG] / [CANVASGROUP]    Canvas Group（Prefab 根節點免標籤、一律自動掛）\n"
+        + "[SCROLL_V] / [SCROLL_H] ScrollRect 滾動區（Unity 自動組 ScrollView > Viewport > Content 三層；\n"
+        + "                        兩者可同標 = 雙向捲動。群組自身的遮色片 = 可視窗範圍；\n"
+        + "                        群組內圖層的遮色片會自動忽略、匯出完整圖，裁切交給 Unity 端）\n"
+        + "                        可與 [V]/[H]/[GRID] 組合：排版元件會掛在 Content 上\n"
         + "[THICK:下偏移:右偏移]    假厚度文字（Unity 產出上下兩層 TMP）\n"
         + "\n"
         + "── 前綴 ──\n"
@@ -673,8 +677,17 @@ function collectNodes(container, parentVisible, context, pendingImages, parentBo
                 groupBounds = clampBoundsToCanvas(groupBounds, context.doc);
             }
 
+            // OPTIMIZATION_PLAN_zh.html#phase4-5-q2：進入 [SCROLL_*] group 時記深度，
+            // 內部節點改走「boundsNoMask + 不 clamp 畫布 + 去 mask 匯出」語意。
+            var scrollTag = detectScrollDirection(layer.name);
+            if (scrollTag) {
+                context.scrollDepth = (context.scrollDepth || 0) + 1;
+            }
             var childParentBounds = groupBounds || parentBounds;
             var childNodes = collectNodes(layer, effectiveVisible, context, pendingImages, childParentBounds);
+            if (scrollTag) {
+                context.scrollDepth--;
+            }
             if (childNodes.length > 0) {
                 var groupNode = createGroupNode(layer, childNodes, context, parentBounds, groupBounds);
                 if (groupNode) {
@@ -683,6 +696,10 @@ function collectNodes(container, parentVisible, context, pendingImages, parentBo
                 } else {
                     appendNodes(nodes, childNodes);
                 }
+            } else if (scrollTag) {
+                // OPTIMIZATION_PLAN_zh.html#phase4-5-q8：scroll group 沒有任何可匯出子節點 → 降級消失 + 警告。
+                pushWarning(context, String(layer.name || ""), "SCROLL_EMPTY",
+                    "[SCROLL] 群組內沒有任何可匯出的子圖層，已降級忽略；請確認圖層可見性與命名。");
             }
             continue;
         }
@@ -745,8 +762,9 @@ function createGroupNode(layerSet, children, context, parentBounds, bounds) {
     // Auto-dedup disabled in v2.4.2: same width x height does not imply same content.
     // Function dedupeLayoutGroupImages retained for potential opt-in via layer tag in the future.
 
+    var insideScroll = (context.scrollDepth || 0) > 0;
     if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
-        bounds = boundsFromChildren(children, context.doc);
+        bounds = boundsFromChildren(children, context.doc, insideScroll);
     }
 
     if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
@@ -766,12 +784,71 @@ function createGroupNode(layerSet, children, context, parentBounds, bounds) {
         children: children
     };
 
+    if (insideScroll) {
+        // scroll 內的巢狀 group：bounds 不 clamp 畫布，並帶 _visibleBounds 供外層 viewport 聯集。
+        node._insideScroll = true;
+        node._visibleBounds = visibleBoundsFromChildren(children, context.doc);
+    }
+
     applyLayoutMetadata(node, bounds, parentBounds, layerSet.name);
-    applyLayoutGroupMetadata(node, layerSet, children, bounds, context);
+    // OPTIMIZATION_PLAN_zh.html#phase4-5-q7：先算 scroll（會改寫 node 為 viewport rect + content 欄位），
+    // grid 參數（padding / sort / constraint 方向）要以 content bounds 為基準。
+    var scrollContentBounds = applyScrollMetadata(node, layerSet, children, bounds, context);
+    applyLayoutGroupMetadata(node, layerSet, children, scrollContentBounds || bounds, context);
     applyCanvasGroupMetadata(node, layerSet);
     node._parentBounds = parentBounds;
     node._rawName = layerSet.name;
     return node;
+}
+
+// OPTIMIZATION_PLAN_zh.html#phase4-5-q2：scroll 群組的 viewport / content 推導（C+ 自動語意）。
+// 回傳 content bounds（供 grid/padding 計算），非 scroll 群組回傳 null。
+// viewport 優先序：group 自身遮色片（裁切後 boundsNoEffects）→ children 可視 bounds 聯集 → group bounds。
+function applyScrollMetadata(node, layerSet, children, bounds, context) {
+    var rawName = typeof layerSet === "string" ? layerSet : (layerSet && layerSet.name);
+    var direction = detectScrollDirection(rawName);
+    if (!direction) {
+        return null;
+    }
+
+    var doc = context && context.doc ? context.doc : null;
+    // content = children 完整 bounds 聯集（不 clamp 畫布；scroll 內容本可超出畫面）
+    var content = boundsFromChildren(children, doc, true) || bounds;
+
+    var viewport = null;
+    if (layerSet && typeof layerSet !== "string" && layerHasEnabledMask(layerSet)) {
+        // 已在使用者 PS 實測：boundsNoEffects 會套用遮色片、排除效果外擴 → 即為可視窗範圍。
+        viewport = readLayerBoundsNoEffects(layerSet);
+        if (viewport && doc) {
+            viewport = clampBoundsToCanvas(viewport, doc);
+        }
+    }
+    if (!viewport) {
+        viewport = visibleBoundsFromChildren(children, doc);
+    }
+    if (!viewport) {
+        viewport = bounds;
+    }
+
+    node.scrollDirection = direction;
+    node.x = viewport.left;
+    node.y = viewport.top;
+    node.width = viewport.width;
+    node.height = viewport.height;
+    node.contentX = content.left;
+    node.contentY = content.top;
+    node.contentWidth = content.width;
+    node.contentHeight = content.height;
+
+    // OPTIMIZATION_PLAN_zh.html#phase4-5-q7：排列軸 ⊥ 捲動軸 → 照標籤掛，但提醒內容不會往捲動方向長。
+    var layoutType = detectLayoutGroupType(rawName, children);
+    if ((direction === "vertical" && layoutType === "horizontal") ||
+        (direction === "horizontal" && layoutType === "vertical")) {
+        pushWarning(context, node.name, "SCROLL_AXIS_MISMATCH",
+            "排列方向（" + layoutType + "）與捲動方向（" + direction + "）垂直，內容不會往捲動方向增長；請確認標籤組合是否符合預期。");
+    }
+
+    return content;
 }
 
 function refreshGroupBounds(nodes, context) {
@@ -783,7 +860,31 @@ function refreshGroupBounds(nodes, context) {
         }
 
         refreshGroupBounds(node.children || [], context);
-        var bounds = boundsFromChildren(node.children || [], doc);
+
+        // OPTIMIZATION_PLAN_zh.html#phase4-5-q2：scroll 群組——viewport（node.x/y/w/h）在收集期已定，
+        // trim 不會移動遮色片幾何，保持不動；content 依 trim 後的 children 重新聯集（不 clamp）。
+        if (node.scrollDirection) {
+            var refreshedContent = boundsFromChildren(node.children || [], doc, true);
+            if (refreshedContent) {
+                node.contentX = refreshedContent.left;
+                node.contentY = refreshedContent.top;
+                node.contentWidth = refreshedContent.width;
+                node.contentHeight = refreshedContent.height;
+            }
+            var viewportRect = {
+                left: node.x,
+                top: node.y,
+                right: node.x + node.width,
+                bottom: node.y + node.height,
+                width: node.width,
+                height: node.height
+            };
+            applyLayoutMetadata(node, viewportRect, node._parentBounds, node._rawName);
+            applyLayoutGroupMetadata(node, node._rawName, node.children || [], refreshedContent || viewportRect, context && context.doc ? context : null);
+            continue;
+        }
+
+        var bounds = boundsFromChildren(node.children || [], doc, node._insideScroll === true);
         if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
             continue;
         }
@@ -797,7 +898,7 @@ function refreshGroupBounds(nodes, context) {
     }
 }
 
-function boundsFromChildren(children, doc) {
+function boundsFromChildren(children, doc, noClamp) {
     if (!children || children.length === 0) {
         return null;
     }
@@ -823,6 +924,53 @@ function boundsFromChildren(children, doc) {
         return null;
     }
 
+    var union = {
+        left: left,
+        top: top,
+        right: right,
+        bottom: bottom,
+        width: Math.max(0, right - left),
+        height: Math.max(0, bottom - top)
+    };
+    // OPTIMIZATION_PLAN_zh.html#phase4-5-q2：scroll 內容允許超出畫布（noClamp=true），其餘維持 clamp。
+    if (noClamp) {
+        return union;
+    }
+    return clampBoundsToCanvas(union, doc);
+}
+
+// viewport 用：聯集 children 的「可視 bounds」（遮色片裁切後）；沒有 _visibleBounds 的 child 用其節點 bounds。
+function visibleBoundsFromChildren(children, doc) {
+    if (!children || children.length === 0) {
+        return null;
+    }
+
+    var left = Number.POSITIVE_INFINITY;
+    var top = Number.POSITIVE_INFINITY;
+    var right = Number.NEGATIVE_INFINITY;
+    var bottom = Number.NEGATIVE_INFINITY;
+
+    for (var i = 0; i < children.length; i++) {
+        var child = children[i];
+        if (!child) {
+            continue;
+        }
+        var rect = child._visibleBounds || {
+            left: child.x,
+            top: child.y,
+            right: child.x + child.width,
+            bottom: child.y + child.height
+        };
+        left = Math.min(left, rect.left);
+        top = Math.min(top, rect.top);
+        right = Math.max(right, rect.right);
+        bottom = Math.max(bottom, rect.bottom);
+    }
+
+    if (!isFinite(left) || !isFinite(top) || !isFinite(right) || !isFinite(bottom)) {
+        return null;
+    }
+
     return clampBoundsToCanvas({
         left: left,
         top: top,
@@ -838,14 +986,19 @@ function createImageNode(layer, context, parentBounds) {
         return null;
     }
 
-    var bounds = readLayerBounds(layer);
+    // OPTIMIZATION_PLAN_zh.html#phase4-5-q2/q9：scroll 內用未裁切完整 bounds，且不 clamp 畫布
+    //（scroll 內容本可超出畫面，超出部分 runtime 由 Viewport 的 RectMask2D 裁切）。
+    var insideScroll = (context.scrollDepth || 0) > 0;
+    var bounds = insideScroll ? readLayerBoundsNoMask(layer) : readLayerBounds(layer);
     if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
         return null;
     }
 
-    bounds = clampBoundsToCanvas(bounds, context.doc);
-    if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
-        return null;
+    if (!insideScroll) {
+        bounds = clampBoundsToCanvas(bounds, context.doc);
+        if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+            return null;
+        }
     }
 
     var safeName = uniqueFileName(layer.name, context.counters);
@@ -868,9 +1021,26 @@ function createImageNode(layer, context, parentBounds) {
     var noEffectsBounds = readLayerBoundsNoEffects(layer);
     node._exportBounds = bounds;
     node._noEffectsBounds = noEffectsBounds;
-    node._padding = calculateShadowCompensation(bounds, noEffectsBounds);
     node._parentBounds = parentBounds;
     node._rawName = layer.name;
+
+    if (insideScroll) {
+        // OPTIMIZATION_PLAN_zh.html#phase4-5-q9：scroll 內圖層去 mask 匯全圖（快取簽名一併帶 nomask flag）。
+        node._noMaskExport = true;
+        // viewport 用的「可視 bounds」（遮色片裁切後、clamp 畫布）；無遮色片時＝一般 bounds。
+        var visibleBounds = readLayerBounds(layer);
+        visibleBounds = visibleBounds ? clampBoundsToCanvas(visibleBounds, context.doc) : null;
+        node._visibleBounds = visibleBounds || bounds;
+        // 有啟用遮色片時，boundsNoMask（全圖）與 boundsNoEffects（已套 mask）基準不一致，
+        // 陰影補償會算出錯誤 padding → 歸零，座標交給 trim 後的實際像素回寫。
+        if (layerHasEnabledMask(layer)) {
+            node._padding = zeroPadding();
+        } else {
+            node._padding = calculateShadowCompensation(bounds, noEffectsBounds);
+        }
+    } else {
+        node._padding = calculateShadowCompensation(bounds, noEffectsBounds);
+    }
 
     applyLayoutMetadata(node, bounds, parentBounds, layer.name);
     return node;
@@ -920,7 +1090,7 @@ function exportAllImages(pendingImages, context) {
                 result = exportNodeImageFastDuplicate(entry.layer, entry.node, context, exportDoc, file);
             } else {
                 visibleChain = showOnlyLayerChain(entry.layer, visibleChain);
-                result = exportNodeImageReuse(entry.layer, entry.node, context, exportDoc, file);
+                result = exportNodeImageReuseWithMaskHandling(entry.layer, entry.node, context, exportDoc, file);
             }
             if (result === false && context.useFastLayerDuplicate) {
                 if (!fallbackVisibilityPrepared) {
@@ -929,7 +1099,7 @@ function exportAllImages(pendingImages, context) {
                     visibleChain = [];
                 }
                 visibleChain = showOnlyLayerChain(entry.layer, visibleChain);
-                result = exportNodeImageReuse(entry.layer, entry.node, context, exportDoc, file);
+                result = exportNodeImageReuseWithMaskHandling(entry.layer, entry.node, context, exportDoc, file);
             }
             if (result === "saved") {
                 context.imageCount++;
@@ -967,6 +1137,11 @@ function exportNodeImageFastDuplicate(layer, node, context, exportDoc, file) {
         app.activeDocument = exportDoc;
         exportDoc.activeLayer = duplicatedLayer;
         duplicatedLayer.visible = true;
+        // OPTIMIZATION_PLAN_zh.html#phase4-5-q9：scroll 內容匯全圖——duplicate 會帶著遮色片（PS 實測），
+        // 對複製體刪除 mask 後，align + trim 自然以完整像素回寫節點座標。
+        if (node._noMaskExport) {
+            removeActiveLayerMasks();
+        }
         alignActiveLayerToExportOrigin(exportDoc);
 
         if (!trimTransparentPixelsAndApplyPadding(exportDoc, node)) {
@@ -1044,6 +1219,31 @@ function resetExportDocument(doc, width, height) {
         } catch (ignored) {
         }
     }
+}
+
+// OPTIMIZATION_PLAN_zh.html#phase4-5-q9：merged-copy 會把遮色片（含祖先的）烘進合併結果。
+// scroll 內圖層（_noMaskExport）→ 暫時停用自身＋祖先鏈的遮色片，匯完恢復（同 captureVisibility/restore 模式）。
+// 退守：匯出失敗（超出畫布 / 遮色片停用失敗）→ 報 SCROLL_EXPORT_DEGRADED warning，不硬做。
+function exportNodeImageReuseWithMaskHandling(layer, node, context, exportDoc, file) {
+    if (!node._noMaskExport) {
+        return exportNodeImageReuse(layer, node, context, exportDoc, file);
+    }
+
+    app.activeDocument = context.doc;
+    var restore = disableSelfAndAncestorMasks(layer);
+    var result = false;
+    try {
+        result = exportNodeImageReuse(layer, node, context, exportDoc, file);
+    } finally {
+        app.activeDocument = context.doc;
+        restoreMaskStates(restore);
+    }
+
+    if (result === false) {
+        pushWarning(context, node.name || "", "SCROLL_EXPORT_DEGRADED",
+            "scroll 內圖層以 merged-copy 後備路徑匯出失敗（可能超出畫布或遮色片停用失敗），此圖層已跳過；建議調整圖層結構使其可走 fast-duplicate 路徑。");
+    }
+    return result;
 }
 
 function exportNodeImageReuse(layer, node, context, exportDoc, file) {
@@ -1188,7 +1388,8 @@ function applyLayoutGroupMetadata(node, group, children, bounds, context) {
 
     if (layoutType === "grid") {
         // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q5：計算 grid 參數；若子節點寬高差 > 20% → 降級成普通 group（GRID_DEGRADED）。
-        var gridParams = calcGridParams(children, context, displayName);
+        // #phase4-5-q7：scroll 方向會影響 constraint 語意（scroll_h → FixedRowCount，constraintCount 改算行數）。
+        var gridParams = calcGridParams(children, context, displayName, node.scrollDirection || "");
         if (!gridParams) {
             return; // 降級：node.layoutType 維持空字串，走普通 group 路徑
         }
@@ -1256,7 +1457,7 @@ function sortGridChildren(children, gridParams, bounds) {
 // - spacing.x = 同 Y 相鄰節點水平 gap 中位數；spacing.y = 同 X 相鄰節點垂直 gap 中位數
 // - startAxis：第一行同 Y 節點數 > 第一列同 X 節點數 → horizontal，否則 vertical
 // - constraintCount：主軸第一 line 節點數（配 FixedColumnCount，Unity 端固定）
-function calcGridParams(children, context, nodeName) {
+function calcGridParams(children, context, nodeName, scrollDirection) {
     var items = layoutVisibleChildren(children);
     if (items.length < 2) {
         return null;
@@ -1311,7 +1512,9 @@ function calcGridParams(children, context, nodeName) {
     var startAxis = horizontal ? "horizontal" : "vertical";
     // Unity Constraint.FixedColumnCount 語意始終是「欄數」，跟 startAxis 無關；startAxis 只控填充順序。
     // 先前寫法 `horizontal ? firstRowCount : firstColCount` 會讓 rows>cols 的 grid 90° 翻轉（Angle A #1）。
-    var constraintCount = firstRowCount;
+    // OPTIMIZATION_PLAN_zh.html#phase4-5-q7：[SCROLL_H][GRID] 內容要往「右」長 → Unity 端改掛 FixedRowCount，
+    // constraintCount 語意變成「行數」＝第一欄同 X 節點數。其他情境維持 FixedColumnCount（欄數）。
+    var constraintCount = scrollDirection === "horizontal" ? firstColCount : firstRowCount;
 
     // spacing.x：對每一 row（同 y）內排序 by x，收集所有相鄰水平 gap，取整體中位數
     var xGaps = collectGridGaps(items, true);
@@ -1725,7 +1928,9 @@ function trackSkippedImageReason(layer, context) {
 }
 
 function createTextNode(layer, context, parentBounds) {
-    var bounds = readLayerBounds(layer);
+    // OPTIMIZATION_PLAN_zh.html#phase4-5-q2：scroll 內文字同樣用未裁切 bounds（文字不匯圖，僅座標語意）。
+    var insideScroll = (context.scrollDepth || 0) > 0;
+    var bounds = insideScroll ? readLayerBoundsNoMask(layer) : readLayerBounds(layer);
     if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
         return null;
     }
@@ -1768,6 +1973,12 @@ function createTextNode(layer, context, parentBounds) {
         node.fakeThicknessOffsetX = fakeThickness.offsetX;
     }
 
+    if (insideScroll) {
+        var visibleBounds = readLayerBounds(layer);
+        visibleBounds = visibleBounds ? clampBoundsToCanvas(visibleBounds, context.doc) : null;
+        node._visibleBounds = visibleBounds || bounds;
+    }
+
     applyLayoutMetadata(node, bounds, parentBounds, layer.name);
     return node;
 }
@@ -1775,7 +1986,7 @@ function createTextNode(layer, context, parentBounds) {
 function buildLayoutJson(doc, nodes, warnings) {
     var lines = [];
     lines.push("{");
-    lines.push('  "schemaVersion": "2.9",');
+    lines.push('  "schemaVersion": "2.10",');
     lines.push('  "canvas": {');
     lines.push('    "width": ' + jsonNumber(px(doc.width)) + ",");
     lines.push('    "height": ' + jsonNumber(px(doc.height)));
@@ -1864,6 +2075,15 @@ function nodeToJson(node, indent) {
     if (node.hasCanvasGroup) {
         lines.push(childIndent + '"hasCanvasGroup": true,');
     }
+    // OPTIMIZATION_PLAN_zh.html#phase4-5-q8：scroll 欄位只在有標籤時寫出。
+    // node 自身 x/y/w/h = viewport（可視範圍）；content* = children 完整 bounds 聯集（絕對 PS 座標）。
+    if (node.scrollDirection) {
+        lines.push(childIndent + '"scrollDirection": ' + quoteJson(node.scrollDirection) + ",");
+        lines.push(childIndent + '"contentX": ' + jsonNumber(node.contentX || 0) + ",");
+        lines.push(childIndent + '"contentY": ' + jsonNumber(node.contentY || 0) + ",");
+        lines.push(childIndent + '"contentWidth": ' + jsonNumber(node.contentWidth || 0) + ",");
+        lines.push(childIndent + '"contentHeight": ' + jsonNumber(node.contentHeight || 0) + ",");
+    }
 
     if (node.type === "image") {
         lines.push(childIndent + '"imagePath": ' + quoteJson(node.imagePath) + ",");
@@ -1944,6 +2164,151 @@ function readLayerBoundsNoEffects(layer) {
         };
     } catch (e) {
         return null;
+    }
+}
+
+// OPTIMIZATION_PLAN_zh.html#phase4-5-q9：讀「未被遮色片裁切」的完整 bounds。
+// descriptor key boundsNoMask 已在使用者 PS 實測可讀；缺 key（極舊版 PS）fallback 回一般 bounds。
+function readLayerBoundsNoMask(layer) {
+    try {
+        var desc = getLayerDescriptor(layer);
+        var b = getDescriptorObject(desc, ["boundsNoMask"], [], null);
+        if (!b) {
+            return readLayerBounds(layer);
+        }
+        var left = Math.floor(getDescriptorUnitDouble(b, ["left"], ["Left"], 0));
+        var top = Math.floor(getDescriptorUnitDouble(b, ["top"], ["Top "], 0));
+        var right = Math.ceil(getDescriptorUnitDouble(b, ["right"], ["Rght"], 0));
+        var bottom = Math.ceil(getDescriptorUnitDouble(b, ["bottom"], ["Btom"], 0));
+        if (right <= left || bottom <= top) {
+            return readLayerBounds(layer);
+        }
+        return {
+            left: left,
+            top: top,
+            right: right,
+            bottom: bottom,
+            width: Math.max(0, right - left),
+            height: Math.max(0, bottom - top)
+        };
+    } catch (e) {
+        return readLayerBounds(layer);
+    }
+}
+
+// OPTIMIZATION_PLAN_zh.html#phase4-5-q1：scroll 標籤偵測（顯式，group 專用；非 group 圖層上的標籤會被 strip 後靜默忽略）。
+function detectScrollDirection(rawName) {
+    var name = String(rawName || "");
+    var vertical = /\[SCROLL_V\]/i.test(name);
+    var horizontal = /\[SCROLL_H\]/i.test(name);
+    if (vertical && horizontal) {
+        return "both";
+    }
+    if (vertical) {
+        return "vertical";
+    }
+    if (horizontal) {
+        return "horizontal";
+    }
+    return "";
+}
+
+// 讀圖層遮色片啟用狀態（user mask + vector mask）。
+function readLayerMaskState(layer) {
+    try {
+        var desc = getLayerDescriptor(layer);
+        return {
+            hasUser: getDescriptorBoolean(desc, ["hasUserMask"], [], false),
+            userEnabled: getDescriptorBoolean(desc, ["userMaskEnabled"], [], false),
+            hasVector: getDescriptorBoolean(desc, ["hasVectorMask"], [], false),
+            vectorEnabled: getDescriptorBoolean(desc, ["vectorMaskEnabled"], [], false)
+        };
+    } catch (e) {
+        return { hasUser: false, userEnabled: false, hasVector: false, vectorEnabled: false };
+    }
+}
+
+function layerHasEnabledMask(layer) {
+    var state = readLayerMaskState(layer);
+    return (state.hasUser && state.userEnabled) || (state.hasVector && state.vectorEnabled);
+}
+
+// 以 AM setd 切換圖層遮色片啟用狀態；userEnabled / vectorEnabled 傳 null 表示不動該項。
+function setLayerMaskEnabled(layer, userEnabled, vectorEnabled) {
+    try {
+        var descriptor = new ActionDescriptor();
+        var reference = new ActionReference();
+        reference.putIdentifier(charIDToTypeID("Lyr "), layer.id);
+        descriptor.putReference(charIDToTypeID("null"), reference);
+        var props = new ActionDescriptor();
+        if (userEnabled !== null) {
+            props.putBoolean(charIDToTypeID("UsrM"), userEnabled);
+        }
+        if (vectorEnabled !== null) {
+            props.putBoolean(stringIDToTypeID("vectorMaskEnabled"), vectorEnabled);
+        }
+        descriptor.putObject(charIDToTypeID("T   "), charIDToTypeID("Lyr "), props);
+        executeAction(charIDToTypeID("setd"), descriptor, DialogModes.NO);
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+// OPTIMIZATION_PLAN_zh.html#phase4-5-q9：fast-duplicate 路徑——對「複製體」刪除遮色片（丟棄不套用），
+// 源文件零接觸。scroll 語境的 PS 遮色片＝runtime 裁切預覽，由 Unity 端 RectMask2D 接手。
+function removeActiveLayerMasks() {
+    try {
+        var descriptor = new ActionDescriptor();
+        var reference = new ActionReference();
+        reference.putEnumerated(charIDToTypeID("Chnl"), charIDToTypeID("Chnl"), charIDToTypeID("Msk "));
+        descriptor.putReference(charIDToTypeID("null"), reference);
+        descriptor.putBoolean(charIDToTypeID("Aply"), false);
+        executeAction(charIDToTypeID("Dlt "), descriptor, DialogModes.NO);
+    } catch (ignored) {
+    }
+    try {
+        var vectorDescriptor = new ActionDescriptor();
+        var vectorReference = new ActionReference();
+        vectorReference.putEnumerated(charIDToTypeID("Path"), charIDToTypeID("Ordn"), stringIDToTypeID("vectorMask"));
+        vectorDescriptor.putReference(charIDToTypeID("null"), vectorReference);
+        executeAction(charIDToTypeID("Dlt "), vectorDescriptor, DialogModes.NO);
+    } catch (ignored) {
+    }
+}
+
+// OPTIMIZATION_PLAN_zh.html#phase4-5-q9：merged-copy 路徑——暫時停用自身＋祖先鏈上的遮色片（匯完恢復）。
+function disableSelfAndAncestorMasks(layer) {
+    var restore = [];
+    var current = layer;
+    while (current && current.typename !== "Document") {
+        try {
+            var state = readLayerMaskState(current);
+            var disableUser = state.hasUser && state.userEnabled;
+            var disableVector = state.hasVector && state.vectorEnabled;
+            if (disableUser || disableVector) {
+                if (setLayerMaskEnabled(current, disableUser ? false : null, disableVector ? false : null)) {
+                    restore.push({
+                        layer: current,
+                        user: disableUser ? true : null,
+                        vector: disableVector ? true : null
+                    });
+                }
+            }
+            current = current.parent;
+        } catch (e) {
+            break;
+        }
+    }
+    return restore;
+}
+
+function restoreMaskStates(restore) {
+    for (var i = restore.length - 1; i >= 0; i--) {
+        try {
+            setLayerMaskEnabled(restore[i].layer, restore[i].user, restore[i].vector);
+        } catch (ignored) {
+        }
     }
 }
 
@@ -2244,6 +2609,11 @@ function buildExportSignature(layer, node) {
     parts.push(Math.round((node._padding && node._padding.top) || 0));
     parts.push(Math.round((node._padding && node._padding.right) || 0));
     parts.push(Math.round((node._padding && node._padding.bottom) || 0));
+    // OPTIMIZATION_PLAN_zh.html#phase4-5-q9：scroll 內去 mask 匯出的圖，簽名帶 nomask flag——
+    // 防「先以裁切版進 cache → 加 [SCROLL_V] 後 cache hit 沿用半張圖」。只在 true 時附加，不動既有快取。
+    if (node._noMaskExport) {
+        parts.push("nomask");
+    }
     return parts.join(",");
 }
 

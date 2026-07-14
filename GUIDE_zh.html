@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Photoshop → Unity UI 工具 v2.10 — 完整使用說明</title>
+  <title>Photoshop → Unity UI 工具 v2.11 — 完整使用說明</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.10.1</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.11.0</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -894,6 +894,20 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
 
+  <h3>v2.11.0（2026-07-14）— Phase 4.5：ScrollRect 完整套件</h3>
+  <ul>
+    <li><strong><code>[SCROLL_V]</code> / <code>[SCROLL_H]</code> 命名觸發</strong>：群組標記後，Unity 端自動合成 <code>ScrollView（群組本體，掛 ScrollRect）&gt; Viewport（RectMask2D + 透明 raycast Image）&gt; Content</code> 三層，全部 children 進 Content。兩標籤可同標 = 雙向捲動。決議全文見 <a href="OPTIMIZATION_PLAN_zh.html#phase4-5">OPTIMIZATION_PLAN_zh.html#phase4-5</a>（Q1–Q11）。</li>
+    <li><strong>遮色片 C+ 自動語意</strong>：scroll 群組內的 PS 遮色片視為「runtime 裁切預覽」——子圖層以 <code>boundsNoMask</code> 完整範圍計座標並匯出<strong>完整圖</strong>（fast-duplicate 對複製體刪 mask；merged-copy 後備路徑暫時停用自身＋祖先遮色片、匯完恢復，失敗報 <code>SCROLL_EXPORT_DEGRADED</code>）。viewport 優先序：群組自身遮色片 → children 可視 bounds 聯集 → group bounds。既有「mask 掛 row」的 PSD 畫法零遷移。</li>
+    <li><strong>scroll 內容允許超出畫布</strong>：scroll 群組內的節點不再 clamp 到畫布範圍（超出部分 runtime 由 Viewport 裁切）；其餘世界維持 clamp 不變。</li>
+    <li><strong>ScrollRect 參數 hardcode</strong>：Elastic / inertia / decel 0.135 / <code>scrollSensitivity=50</code>（Unity 預設 1 在 1080p canvas 近乎不可用）；Viewport 透明 Image 開 <code>raycastTarget</code> 並設 <code>cullTransparentMesh=true</code>（零 GPU 成本的拖曳 raycast surface，產出 prefab 維持零 runtime 依賴）。Content 用 point anchor + pivot 在捲動起點側，尺寸寫死；初始 anchoredPosition 以絕對 PS 座標換算——PS 畫「已捲動狀態」會原樣保留。</li>
+    <li><strong>與 layout 標籤組合</strong>：<code>[SCROLL_V][GRID]</code> 等組合時排版元件掛在 Content 上並加 CSF（捲動軸 PreferredSize；grid 在 scroll 情境破例掛 CSF）。<code>[SCROLL_H][GRID]</code> 改掛 <code>FixedRowCount</code>（constraintCount 改算行數），內容往右長。排列軸 ⊥ 捲動軸 → <code>SCROLL_AXIS_MISMATCH</code> warning；空 scroll 群組 → <code>SCROLL_EMPTY</code> warning。</li>
+    <li><strong>Schema 2.9 → 2.10</strong>：新欄位 <code>scrollDirection</code> + <code>contentX/Y/Width/Height</code>（絕對 PS 座標）；node 自身 x/y/w/h = viewport。缺欄位 = 不掛（老 JSON 相容）。</li>
+    <li><strong>匯出快取簽名加 <code>nomask</code> flag</strong>：防「先以裁切版進 cache → 加 [SCROLL_V] 後沿用半張圖」；只在 scroll 內圖層附加，既有快取不受影響。</li>
+    <li><strong>統一 tag parser</strong>（兌現 Phase 4 Q8 支票）：方括號標籤收斂為 <code>KNOWN_BRACKET_TAG_PATTERNS</code> 註冊表 + 單一 <code>stripKnownTags()</code>，37 組名字新舊回歸零差異；偵測邏輯不動。</li>
+    <li><strong>reskin 不可碰清單擴充</strong>：ScrollRect（含手感參數）、合成 Viewport / Content 節點與三層 RectTransform 全數加入 <code>PsUiSkinApplier</code> 清單。</li>
+    <li><strong>驗收樣本</strong>：<code>Samples/Phase4_5/README.md</code> 定義 6 個 PSD 樣本與 checklist（含快取 nomask 驗證、reskin guard、Phase 3/4 回歸）。</li>
+  </ul>
+
   <h3>v2.10.1（2026-07-13）— TMP 預設輸出 + 版面誤判修復 + 更新器補檔</h3>
   <ul>
     <li><strong>所有字型預設保留 TMP</strong>：PS 匯出器不再預設把白名單外字型烘成 PNG；只有明確勾選「白名單外字型改為 PNG」、選取轉圖或使用 <code>[PNG]</code> 類標記時才輸出文字圖。</li>
@@ -1021,7 +1035,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.10.1 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.11.0 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

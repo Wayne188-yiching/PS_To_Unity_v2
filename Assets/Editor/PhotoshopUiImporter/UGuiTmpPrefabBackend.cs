@@ -84,6 +84,8 @@ namespace PhotoshopToUnity.EditorImporter
 
             var isVisualNode = node.NormalizedType == "image" || node.NormalizedType == "text";
             var isLayoutGroup = node.NormalizedType == "group" && !string.IsNullOrWhiteSpace(node.layoutType);
+            // OPTIMIZATION_PLAN_zh.html#phase4-5-q1：scroll group 一定有自己的 rect（= viewport 可視範圍）。
+            var isScrollGroup = node.NormalizedType == "group" && node.HasScrollRect;
 
             // 響應式模式下，一般 group 不再展開成 canvas 尺寸的透明容器，
             // 改用自身 PS bounds 建 Rect，子節點 anchor 才能相對 group 邊緣生效
@@ -92,7 +94,7 @@ namespace PhotoshopToUnity.EditorImporter
                                && node.NormalizedType == "group"
                                && node.width > 0f
                                && node.height > 0f;
-            var hasOwnRect = isVisualNode || isLayoutGroup || isSizedGroup;
+            var hasOwnRect = isVisualNode || isLayoutGroup || isSizedGroup || isScrollGroup;
 
             if (hasOwnRect)
             {
@@ -117,6 +119,15 @@ namespace PhotoshopToUnity.EditorImporter
                     ApplyText(gameObject, node, context);
                     break;
                 case "group":
+                    if (isScrollGroup)
+                    {
+                        // OPTIMIZATION_PLAN_zh.html#phase4-5-q1：三層合成，children 全掛 Content 下，
+                        // layout 標籤（H/V/Grid）下沉到 Content；此節點本體 = ScrollView root。
+                        if (node.hasCanvasGroup)
+                            ApplyCanvasGroup(gameObject);
+                        ApplyScrollView(gameObject, rectTransform, node, context);
+                        return;
+                    }
                     if (isLayoutGroup)
                         ApplyLayoutGroup(gameObject, node);
                     if (node.hasCanvasGroup)
@@ -268,6 +279,124 @@ namespace PhotoshopToUnity.EditorImporter
             grid.childAlignment = TextAnchor.UpperLeft;
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = Mathf.Max(1, node.gridConstraintCount);
+        }
+
+        // OPTIMIZATION_PLAN_zh.html#phase4-5：三層合成 ScrollView（node 本體，rect = viewport）> Viewport > Content。
+        // - Viewport：stretch 滿 root，掛 RectMask2D（q3）+ 透明 Image 當拖曳 raycast surface（q5；
+        //   cullTransparentMesh=true → 全透明網格不送 GPU，效果等同專案自製 NonDrawingGraphic 但零 runtime 依賴）
+        // - Content：point anchor + pivot 在捲動起點側（q6），尺寸寫死 = children 完整 bounds 聯集
+        // - 初始 anchoredPosition 以絕對 PS 座標換算 → PS 畫「已捲動狀態」會原樣保留（q8）
+        // - ScrollRect 手感參數全 hardcode（q5），程式後續手調不會被 reskin 吃掉（q10）
+        private static void ApplyScrollView(GameObject gameObject, RectTransform rootRect, PhotoshopUiNode node, PrefabGenerationContext context)
+        {
+            var scrollRect = gameObject.AddComponent<ScrollRect>();
+
+            var direction = string.IsNullOrWhiteSpace(node.scrollDirection)
+                ? string.Empty
+                : node.scrollDirection.Trim().ToLowerInvariant();
+            var vertical = direction == "vertical" || direction == "both";
+            var horizontal = direction == "horizontal" || direction == "both";
+
+            // ── Viewport ─────────────────────────────────────────────
+            var viewportGo = new GameObject("Viewport", typeof(RectTransform), typeof(CanvasRenderer), typeof(RectMask2D), typeof(Image));
+            var viewportRect = viewportGo.GetComponent<RectTransform>();
+            viewportRect.SetParent(rootRect, false);
+            viewportRect.anchorMin = Vector2.zero;
+            viewportRect.anchorMax = Vector2.one;
+            viewportRect.pivot = new Vector2(0.5f, 0.5f);
+            viewportRect.anchoredPosition = Vector2.zero;
+            viewportRect.sizeDelta = Vector2.zero;
+            viewportRect.localScale = Vector3.one;
+            viewportRect.localRotation = Quaternion.identity;
+
+            var viewportImage = viewportGo.GetComponent<Image>();
+            viewportImage.sprite = null;
+            viewportImage.color = new Color(1f, 1f, 1f, 0f);
+            viewportImage.raycastTarget = true; // ScrollRect 需要 raycast 目標才拖得動（本工具其他 Image 皆 false）
+            viewportGo.GetComponent<CanvasRenderer>().cullTransparentMesh = true;
+
+            // ── Content ──────────────────────────────────────────────
+            var contentGo = new GameObject("Content", typeof(RectTransform));
+            var contentRect = contentGo.GetComponent<RectTransform>();
+            contentRect.SetParent(viewportRect, false);
+
+            Vector2 anchor;
+            Vector2 pivot;
+            if (vertical && horizontal)
+            {
+                anchor = new Vector2(0f, 1f);
+                pivot = new Vector2(0f, 1f);
+            }
+            else if (horizontal)
+            {
+                anchor = new Vector2(0f, 0.5f);
+                pivot = new Vector2(0f, 0.5f);
+            }
+            else
+            {
+                anchor = new Vector2(0.5f, 1f);
+                pivot = new Vector2(0.5f, 1f);
+            }
+
+            contentRect.anchorMin = anchor;
+            contentRect.anchorMax = anchor;
+            contentRect.pivot = pivot;
+            contentRect.sizeDelta = new Vector2(node.contentWidth, node.contentHeight);
+            contentRect.localScale = Vector3.one;
+            contentRect.localRotation = Quaternion.identity;
+
+            // 初始位置：pivot 點（PS 座標）相對 anchor 點（PS 座標）的偏移，Y 軸翻轉（同 ApplyNodeRect 語意）。
+            var pivotPsX = node.contentX + node.contentWidth * pivot.x;
+            var pivotPsY = node.contentY + node.contentHeight * (1f - pivot.y);
+            var anchorPsX = node.x + node.width * anchor.x;
+            var anchorPsY = node.y + node.height * (1f - anchor.y);
+            contentRect.anchoredPosition = new Vector2(pivotPsX - anchorPsX, anchorPsY - pivotPsY);
+
+            // ── ScrollRect 參數（#phase4-5-q5，全 hardcode）──────────
+            scrollRect.viewport = viewportRect;
+            scrollRect.content = contentRect;
+            scrollRect.vertical = vertical;
+            scrollRect.horizontal = horizontal;
+            scrollRect.movementType = ScrollRect.MovementType.Elastic;
+            scrollRect.inertia = true;
+            scrollRect.decelerationRate = 0.135f;
+            // Unity 預設 1 = 滾輪一格 1px，1080p canvas 上近乎不可用；50 貼近 OS 捲動手感（只影響滾輪，不影響拖曳）。
+            scrollRect.scrollSensitivity = 50f;
+
+            // ── layout 標籤下沉到 Content（#phase4-5-q7）──────────────
+            if (!string.IsNullOrWhiteSpace(node.layoutType))
+            {
+                ApplyLayoutGroup(contentGo, node);
+
+                // #phase4-5-q7：[SCROLL_H][GRID] 內容要往右長 → FixedRowCount（JSX 端 constraintCount 已改算行數）。
+                if (horizontal && !vertical && string.Equals(node.layoutType, "grid", StringComparison.OrdinalIgnoreCase))
+                {
+                    var grid = contentGo.GetComponent<GridLayoutGroup>();
+                    if (grid != null)
+                    {
+                        grid.constraint = GridLayoutGroup.Constraint.FixedRowCount;
+                    }
+                }
+
+                // #phase4-5-q6：scroll 組合時 CSF 一律「捲動軸 PreferredSize、另一軸 Unconstrained」，
+                // grid 在 scroll 情境破例掛 CSF（content 要隨 item 數量長）。
+                var fitter = contentGo.GetComponent<ContentSizeFitter>();
+                if (fitter == null)
+                {
+                    fitter = contentGo.AddComponent<ContentSizeFitter>();
+                }
+                fitter.horizontalFit = horizontal ? ContentSizeFitter.FitMode.PreferredSize : ContentSizeFitter.FitMode.Unconstrained;
+                fitter.verticalFit = vertical ? ContentSizeFitter.FitMode.PreferredSize : ContentSizeFitter.FitMode.Unconstrained;
+            }
+
+            // ── children 全部掛 Content 下，座標系原點 = content bounds ──
+            if (node.children != null)
+            {
+                foreach (var child in node.children)
+                {
+                    CreateNode(child, contentRect, node.contentX, node.contentY, node.contentWidth, node.contentHeight, contentRect.pivot, context);
+                }
+            }
         }
 
         // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q6 / Q6.1：JSX 偵測 [CG] / [CANVASGROUP] → hasCanvasGroup=true → 掛 CanvasGroup。

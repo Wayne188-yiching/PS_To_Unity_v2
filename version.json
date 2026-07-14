@@ -1,7 +1,7 @@
 {
-    "version":  "2.10.1",
-    "phase":  "v2.10.1 — TMP-by-default + explicit layouts + updater completeness",
-    "updated":  "2026-07-13",
+    "version":  "2.11.0",
+    "phase":  "Phase 4.5 — ScrollRect suite ([SCROLL_V]/[SCROLL_H] + 3-layer synthesis + C+ mask semantics)",
+    "updated":  "2026-07-14",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [
                      {

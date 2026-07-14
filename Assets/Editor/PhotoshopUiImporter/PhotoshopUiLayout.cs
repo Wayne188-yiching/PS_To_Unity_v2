@@ -79,7 +79,17 @@ namespace PhotoshopToUnity.EditorImporter
         public float gridCellSizeY;
         public float gridSpacingX;
         public float gridSpacingY;
+        // Phase 4.5 Scroll（OPTIMIZATION_PLAN_zh.html#phase4-5-q8）：
+        // scrollDirection 空字串 = 不掛（向下相容）。node 自身 x/y/w/h = viewport（可視範圍），
+        // content* = children 完整 bounds 聯集（絕對 PS 座標，可超出畫布）。
+        public string scrollDirection;  // "vertical" | "horizontal" | "both" | ""
+        public float contentX;
+        public float contentY;
+        public float contentWidth;
+        public float contentHeight;
         public List<PhotoshopUiNode> children = new List<PhotoshopUiNode>();
+
+        public bool HasScrollRect => !string.IsNullOrWhiteSpace(scrollDirection);
 
         public string NormalizedType => string.IsNullOrWhiteSpace(type) ? string.Empty : type.Trim().ToLowerInvariant();
     }

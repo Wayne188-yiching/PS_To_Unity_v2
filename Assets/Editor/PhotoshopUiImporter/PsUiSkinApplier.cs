@@ -6,12 +6,15 @@ using UnityEngine.UI;
 
 namespace PhotoshopToUnity.EditorImporter
 {
-    // ── reskin flow 不可碰清單（OPTIMIZATION_PLAN_zh.html#phase4-decisions Q3）────────────────────────────
+    // ── reskin flow 不可碰清單（OPTIMIZATION_PLAN_zh.html#phase4-decisions Q3 / #phase4-5-q10）──────────
     // 以下由 full import（UGuiTmpPrefabBackend）視為 source of truth，reskin 完全不觸碰：
     //   * CanvasGroup（含 root 自動掛的那個）
     //   * GridLayoutGroup（layoutType == "grid" 的節點）
     //   * HorizontalLayoutGroup / VerticalLayoutGroup 的參數（含 padding / spacing / childControl 等）
     //   * ContentSizeFitter
+    //   * ScrollRect（含手感參數 scrollSensitivity / movementType —— 程式常會手調）
+    //   * 合成的 Viewport 節點（RectMask2D + 透明 raycast Image，程式可能換成專案自製 NonDrawingGraphic）
+    //   * 合成的 Content 節點（其 LayoutGroup / CSF）與 scroll 三層的 RectTransform 參數
     // reskin 只做：同名圖檔覆蓋、Prefab 內 Sprite 參照替換。設計師如果手動改上述 component，
     // reskin 不會吃掉他的手調 —— 但下次 full import 一定會覆蓋（因為 PS 是 source of truth）。
     // ─────────────────────────────────────────────────────────────────────────
