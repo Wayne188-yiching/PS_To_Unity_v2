@@ -153,6 +153,7 @@ namespace PhotoshopToUnity.EditorImporter
                         bool changed = false;
                         foreach (var img in prefab.GetComponentsInChildren<Image>(true))
                         {
+                            if (IsSyntheticScrollInfrastructure(img.transform)) continue;
                             if (img.sprite == null) continue;
                             var key = SpriteKey(img.sprite);
                             if (key == null || !refSwapMap.TryGetValue(key, out var newSprite)) continue;
@@ -221,6 +222,7 @@ namespace PhotoshopToUnity.EditorImporter
 
                 foreach (var img in prefab.GetComponentsInChildren<Image>(true))
                 {
+                    if (IsSyntheticScrollInfrastructure(img.transform)) continue;
                     if (img.sprite == null) continue;
                     var key = SpriteKey(img.sprite);
                     if (key == null || existingKeys.Contains(key) || !seenKeys.Add(key)) continue;
@@ -234,6 +236,24 @@ namespace PhotoshopToUnity.EditorImporter
                 EditorUtility.SetDirty(theme);
 
             return added;
+        }
+
+        private static bool IsSyntheticScrollInfrastructure(Transform transform)
+        {
+            if (transform == null) return false;
+
+            // Prefab Asset（非場景 instance）上的 GetComponentInParent 不會可靠地往上找，
+            // reskin 正是直接掃描 AssetDatabase.LoadAssetAtPath 取得的 Prefab Asset。
+            var current = transform;
+            while (current != null)
+            {
+                var scrollRect = current.GetComponent<ScrollRect>();
+                if (scrollRect != null)
+                    return scrollRect.viewport == transform || scrollRect.content == transform;
+                current = current.parent;
+            }
+
+            return false;
         }
 
         private static string SpriteKey(Sprite sprite)

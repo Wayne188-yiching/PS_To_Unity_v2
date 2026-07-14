@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.11.0";
+var SCRIPT_VERSION = "2.11.1";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 (function () {
@@ -2148,6 +2148,32 @@ function readLayerBounds(layer) {
 }
 
 function readLayerBoundsNoEffects(layer) {
+    // LayerSet 的 DOM boundsNoEffects 在部分 Photoshop 版本會忽略群組遮色片，
+    // 但 Action Manager descriptor 的同名欄位會回傳正確的遮色片後範圍。
+    if (layer && layer.typename === "LayerSet") {
+        try {
+            var desc = getLayerDescriptor(layer);
+            var descriptorBounds = getDescriptorObject(desc, ["boundsNoEffects"], [], null);
+            if (descriptorBounds) {
+                var descriptorLeft = Math.floor(getDescriptorUnitDouble(descriptorBounds, ["left"], ["Left"], 0));
+                var descriptorTop = Math.floor(getDescriptorUnitDouble(descriptorBounds, ["top"], ["Top "], 0));
+                var descriptorRight = Math.ceil(getDescriptorUnitDouble(descriptorBounds, ["right"], ["Rght"], 0));
+                var descriptorBottom = Math.ceil(getDescriptorUnitDouble(descriptorBounds, ["bottom"], ["Btom"], 0));
+                if (descriptorRight > descriptorLeft && descriptorBottom > descriptorTop) {
+                    return {
+                        left: descriptorLeft,
+                        top: descriptorTop,
+                        right: descriptorRight,
+                        bottom: descriptorBottom,
+                        width: descriptorRight - descriptorLeft,
+                        height: descriptorBottom - descriptorTop
+                    };
+                }
+            }
+        } catch (ignored) {
+        }
+    }
+
     try {
         var b = layer.boundsNoEffects;
         var left = Math.floor(px(b[0]));

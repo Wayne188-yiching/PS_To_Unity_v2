@@ -1,7 +1,7 @@
-# Phase 4.5 驗收樣本（ScrollRect 完整套件，v2.11.0）
+# Phase 4.5 驗收樣本（ScrollRect 完整套件，v2.11.1）
 
 > **狀態**：6 個 PSD 樣本已於 2026-07-15 建立並完成 Photoshop 2026 + Unity 2022.3.62f1 實機驗收。
-> 本輪結論為 **未通過（2 個阻斷缺陷）**；詳細證據與 Claude Code 交接見本文件末段。
+> v2.11.0 首輪發現 2 個阻斷缺陷；v2.11.1 修復後以同批樣本複驗，結論為 **通過**。
 > 決議依據 [`OPTIMIZATION_PLAN_zh.html#phase4-5`](../../OPTIMIZATION_PLAN_zh.html#phase4-5)（Q1–Q11）。
 > 另以真實 PSD（轉蛋王列表）做內部驗收，公司資產不進 repo。
 
@@ -53,12 +53,12 @@
 
 ## 手動驗收 checklist
 
-- [ ] 樣本 1–6 逐一 full import，對照上述預期（layout.json 欄位 + prefab 結構 + Console warnings）
-- [ ] 樣本 2 匯出資料夾內第 5 row 的 PNG 是完整圖（打開檔案目測）
-- [ ] 任一樣本產出後進 Play mode 實際拖曳：可拖、Elastic 回彈、超出部分被裁切
-- [ ] **快取驗證**：樣本 2 先「拿掉 [SCROLL_V] 匯一次」再「加回 [SCROLL_V] 匯一次」→ 第 5 row PNG 必須重匯成全圖（nomask 簽名生效，不沿用半張快取）
-- [ ] **reskin guard**：對樣本 4 產出手動改 `ScrollRect.scrollSensitivity=25` + 把 Viewport 透明 Image 換掉 → 跑 reskin → 確認沒被覆蓋
-- [ ] **回歸**：Phase 3 + Phase 4 全部樣本重匯,prefab 與先前一致（tag parser 統一重構後必跑）
+- [x] 樣本 1–6 逐一 full import，對照上述預期（layout.json 欄位 + prefab 結構 + Console warnings）
+- [x] 樣本 2 匯出資料夾內第 5 row 的 PNG 是完整圖（實測 400×100）
+- [x] 任一樣本產出後進 Play mode 實際拖曳：可拖、Elastic 回彈、超出部分被裁切
+- [x] **快取驗證**：樣本 2 先「拿掉 [SCROLL_V] 匯一次」再「加回 [SCROLL_V] 匯一次」→ 第 5 row PNG 重匯成全圖
+- [x] **reskin guard**：sensitivity=25 保留，Viewport／Content 本體不換圖，一般 Content 子圖正常換圖
+- [x] **回歸**：Phase 3 + Phase 4 與多字型 TMP 真實 PSD 回歸通過
 
 ## 疑難排解
 
@@ -75,8 +75,8 @@
 
 ### 驗收環境與前置字體
 
-- Photoshop 2026，以 repo 內 v2.11.0 `PhotoshopUiPackageExporter.jsx` 執行真實匯出。
-- Unity 2022.3.62f1，Importer_v2 v2.11.0，以 Unity MCP 產生／讀取 Prefab 並進 Play mode 測試。
+- Photoshop 2026；首輪以 v2.11.0 驗收，修復後以 v2.11.1 `PhotoshopUiPackageExporter.jsx` 重跑 6 份樣本。
+- Unity 2022.3.62f1；Importer_v2 v2.11.1，以 Unity MCP 10.0.0 強制 Refresh／Compile、產生 Prefab 並執行 C# 斷言。
 - 輸出文字 Package 前，已在 Unity 建立 6 組新資產：MiSans Demibold／Semibold、HarmonyOS Sans SC／TC Medium、NotoSansCJK SC／TC Medium；每組都有 TMP Font Asset 與獨立 SDF 材質球。
 - `TmpFontMap_v211` 共 8 筆映射，另沿用既有 `GenSenRounded2TC-M SDF`；`系統字-test.psd` 的 15 個文字節點全部正確對應，FontToken warning = 0。
 
@@ -86,14 +86,14 @@
 |---|---|---|
 | 1. `scroll_v_basic` | PASS | JSON viewport/content 都是 400×460；Unity 為 ScrollRect(vertical、Elastic、sens=50) > Viewport(RectMask2D + raycast Image) > Content，4 rows；`SCROLL_EMPTY` 正確出現。 |
 | 2. `scroll_v_rowmask` | PASS | JSON viewport=400×530、content=400×580；第 5 row PNG 實測 400×100；Unity Content 有 5 rows。 |
-| 3. `scroll_v_groupmask` | **FAIL / BLOCKER** | PSD descriptor 實測 `hasUserMask=true`、`userMaskEnabled=true`，但 JSON viewport 仍是 400×580，未採用預期的 400×350 group mask bounds；Unity 同步產出 580 高 Viewport。 |
+| 3. `scroll_v_groupmask` | **PASS（v2.11.1 修復）** | 改由 Action Manager descriptor 讀 `boundsNoEffects`；JSON 與 Unity MCP 實測 viewport=400×350、content=400×580。 |
 | 4. `scroll_grid_combo` | PASS（結構） | Content 為 GridLayoutGroup：FixedColumnCount=2、cell=150×150、spacing=10×10；CSF=Unconstrained/PreferredSize。 |
 | 5. `scroll_h_grid` | PASS | Content 為 FixedRowCount=2、cell=100×100、spacing=10×10；CSF=PreferredSize/Unconstrained。 |
-| 6. `prescrolled` | **FAIL / BLOCKER** | 因 group mask viewport 沒被採用，JSON viewport/content 同為 400×580；Unity Content anchoredPosition=(0,0)，預期 y≈+120。 |
+| 6. `prescrolled` | **PASS（v2.11.1 修復）** | JSON viewport=400×350@Y250、content=400×580@Y130；Unity MCP 實測 Content `anchoredPosition.y=+120`。 |
 | `SCROLL_AXIS_MISMATCH` | PASS | 暫改 `List[SCROLL_V][H]` 後，JSON 同時輸出 `SCROLL_AXIS_MISMATCH` 與既有 `SCROLL_EMPTY`。 |
 | 快取 nomask 簽名 | PASS | 同一輸出資料夾先移除 scroll tag 再加回：第 5 row PNG 高度由 50 正確重匯為 100，未沿用半張快取。 |
 | Play mode 拖曳 | PASS | Unity MCP 實測 `PLAY=True`，Content anchoredPosition 由 (0,0) 變為 (0,-49.83)，movementType=Elastic；畫面超出部分受 RectMask2D 裁切。 |
-| reskin guard | **FAIL / BLOCKER** | `scrollSensitivity` 人工改 25 後能保留；但人工替換的 Viewport Image sprite 由 `row_01` 被 reskin 改成 `row_02`，違反「合成 Viewport 不可碰」。 |
+| reskin guard | **PASS（v2.11.1 修復）** | Unity MCP 實測 sensitivity=25 保留；Viewport／Content 仍為 `row_01`，一般 Content 子圖換成 `row_02`，`spritesReplaced=1`。 |
 
 ### Phase 3／4 與真實 PSD 回歸
 
@@ -106,20 +106,20 @@
 
 ### 驗收結論
 
-**Phase 4.5 v2.11.0 本輪未通過，不建議進入下一階段。** ScrollRect 三層合成、row mask、Grid 組合、cache、Play mode 拖曳與 TMP 多字型主路徑均通過；但 group mask viewport 與 reskin Viewport guard 是規格明定且可穩定重現的阻斷缺陷。
+**Phase 4.5 v2.11.1 修復複驗通過，可以進入下一階段。** 6 份 Photoshop 樣本、Unity Prefab 尺寸／初始位置、reskin guard、Play mode、cache 與 TMP 多字型主路徑均符合規格；`DFYuanCW9` 仍是非阻斷的外部字型資產缺口。
 
-### Claude Code 修復交接
+### v2.11.1 修復紀錄與複驗條件
 
 1. **Group mask viewport**
    - 重現：匯出本資料夾 `scroll_v_groupmask.psd`。
-   - 現況：group mask 為啟用狀態，但 `applyScrollMetadata()` 取得的 viewport 仍為 children 完整聯集 400×580。
-   - 驗收：JSON `height≈350`、`contentHeight=580`；Unity Viewport 350 高，Content 580 高。
+   - 根因：LayerSet 的 DOM `boundsNoEffects` 在此 Photoshop 版本回傳未裁切聯集；Action Manager descriptor 的同名欄位才是正確 mask bounds。
+   - 修正／結果：descriptor 優先、DOM fallback；JSON `height=350`、`contentHeight=580`，Unity MCP 同值。
 2. **Prescrolled Y 保留**
    - 重現：匯出 `prescrolled.psd`。
-   - 驗收：group viewport 正確後，Unity Content `anchoredPosition.y≈+120`。
+   - 結果：group viewport 修正後，Unity Content `anchoredPosition.y=+120`。
 3. **Reskin synthetic Viewport guard**
    - 重現：`scroll_grid_combo.prefab` 將 sens 改 25，Viewport Image 換成 `row_01`；SkinTheme 把 `row_01` 映射為 `row_02` 後 Apply。
-   - 現況：sens=25 有保留，但 Viewport sprite 被換成 `row_02`。
-   - 驗收：reskin 可替換 Content 一般 Image，但必須完全跳過 ScrollRect 合成的 Viewport／Content 節點及其元件。
+   - 根因：原實作只有不可碰清單註解，替換與掃描迴圈沒有 guard；且 Prefab Asset 上 `GetComponentInParent` 無法可靠找到父 ScrollRect。
+   - 修正／結果：顯式沿 parent chain 找 ScrollRect，替換與掃描都跳過 Viewport／Content 本體；一般 Content 子圖仍正常換膚。
 4. **非阻斷資產項**
    - 若要求 `通用視窗_Test.psd` 字型外觀完全等同 Photoshop，需取得合法可放入 Unity 的 `DFYuanCW9` 字型檔，建立 TMP Font Asset／材質並在 TmpFontMap 加 `dfyuancw9`。

@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.11.0</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.11.1</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -894,6 +894,13 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
 
+  <h3>v2.11.1（2026-07-15）— Phase 4.5 驗收修補</h3>
+  <ul>
+    <li><strong>Group mask viewport 修復</strong>：LayerSet 的 DOM <code>boundsNoEffects</code> 在部分 Photoshop 版本會忽略群組遮色片，改以 Action Manager descriptor 的同名欄位為優先、DOM 為 fallback。<code>scroll_v_groupmask</code> 複驗 viewport/content=350/580；<code>prescrolled</code> Content Y=+120。</li>
+    <li><strong>Reskin synthetic node guard 落實</strong>：SkinTheme 的掃描與 Sprite 替換都跳過 ScrollRect 指定的 Viewport／Content 本體。因直接載入的 Prefab Asset 上 <code>GetComponentInParent</code> 不可靠，改為顯式沿 parent chain 尋找 ScrollRect；Content 底下一般 Image 仍可換膚。</li>
+    <li><strong>實機複驗通過</strong>：Photoshop 2026 重跑 <code>Samples/Phase4_5</code> 6 份 PSD；Unity 2022.3.62f1 + Unity MCP 10.0.0 驗證 group mask、預捲動、reskin guard 與 Console error=0。</li>
+  </ul>
+
   <h3>v2.11.0（2026-07-14）— Phase 4.5：ScrollRect 完整套件</h3>
   <ul>
     <li><strong><code>[SCROLL_V]</code> / <code>[SCROLL_H]</code> 命名觸發</strong>：群組標記後，Unity 端自動合成 <code>ScrollView（群組本體，掛 ScrollRect）&gt; Viewport（RectMask2D + 透明 raycast Image）&gt; Content</code> 三層，全部 children 進 Content。兩標籤可同標 = 雙向捲動。決議全文見 <a href="OPTIMIZATION_PLAN_zh.html#phase4-5">OPTIMIZATION_PLAN_zh.html#phase4-5</a>（Q1–Q11）。</li>
@@ -1035,7 +1042,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.11.0 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.11.1 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 
