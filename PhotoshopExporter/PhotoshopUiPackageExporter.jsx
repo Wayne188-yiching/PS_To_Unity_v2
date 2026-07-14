@@ -753,11 +753,10 @@ function createGroupNode(layerSet, children, context, parentBounds, bounds) {
         return null;
     }
 
-    // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q8：group node 名字統一 strip 掉方括號 tag，避免 prefab 節點名裡出現 [H]/[CG]/[GRID] 等殘留。
-    var displayName = stripCanvasGroupTags(stripGridLayoutTags(stripLayoutGroupTags(layerSet.name)));
-
+    // OPTIMIZATION_PLAN_zh.html#phase4-5-q10：uniqueNodeName 內部已走 stripKnownTags 全清理，
+    // 這裡直接傳原始名即可（節點名不會殘留 [H]/[CG]/[GRID]/[SCROLL_*] 等標籤）。
     var node = {
-        name: uniqueNodeName(displayName, context.counters),
+        name: uniqueNodeName(layerSet.name, context.counters),
         type: "group",
         x: bounds.left,
         y: bounds.top,
@@ -2741,7 +2740,7 @@ function normalizeFileSystemPath(path) {
 }
 
 function uniqueFileName(name, counters) {
-    var base = normalizeAsciiSlug(stripFakeThicknessTags(stripCanvasGroupTags(stripGridLayoutTags(stripLayoutGroupTags(stripLayoutTokens(stripControlPrefix(name)))))));
+    var base = normalizeAsciiSlug(stripKnownTags(stripLayoutTokens(stripControlPrefix(name))));
     if (!base) {
         base = "layer";
     }
@@ -2764,22 +2763,23 @@ function uniqueNodeName(name, counters) {
     return base;
 }
 
-function stripLayoutGroupTags(name) {
-    return String(name || "").replace(/\[(?:H|HLAYOUT|V|VLAYOUT)\]/ig, "");
-}
+// OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。
+// 新增標籤 = 在這裡加一行 regex；名稱清理一律走 stripKnownTags 單一出口，
+// 避免「A 處理過、B 沒處理」的錯位 bug（BTN_ bug 的病根）。各功能的偵測邏輯不在此，各自查表。
+var KNOWN_BRACKET_TAG_PATTERNS = [
+    /\[(?:H|HLAYOUT|V|VLAYOUT)\]/ig,                                            // H/V LayoutGroup（#phase4-decisions Q8）
+    /\[(?:GRID|GLAYOUT)\]/ig,                                                   // GridLayoutGroup（#phase4-decisions Q8）
+    /\[(?:CG|CANVASGROUP)\]/ig,                                                 // CanvasGroup（#phase4-decisions Q8）
+    /\[(?:SCROLL_V|SCROLL_H)\]/ig,                                              // ScrollRect（#phase4-5-q1）
+    /\[THICK\s*:\s*-?\d+(?:\.\d+)?\s*(?::\s*-?\d+(?:\.\d+)?)?\s*\]/ig           // 假厚度文字
+];
 
-// OPTIMIZATION_PLAN_zh.html#phase4-decisions Q8：CanvasGroup 標籤別名 [CG] / [CANVASGROUP]。
-function stripCanvasGroupTags(name) {
-    return String(name || "").replace(/\[(?:CG|CANVASGROUP)\]/ig, "");
-}
-
-// OPTIMIZATION_PLAN_zh.html#phase4-decisions Q8：Grid 標籤別名 [GRID] / [GLAYOUT]。
-function stripGridLayoutTags(name) {
-    return String(name || "").replace(/\[(?:GRID|GLAYOUT)\]/ig, "");
-}
-
-function stripFakeThicknessTags(name) {
-    return String(name || "").replace(/\[THICK\s*:\s*-?\d+(?:\.\d+)?\s*(?::\s*-?\d+(?:\.\d+)?)?\s*\]/ig, "");
+function stripKnownTags(name) {
+    var text = String(name || "");
+    for (var i = 0; i < KNOWN_BRACKET_TAG_PATTERNS.length; i++) {
+        text = text.replace(KNOWN_BRACKET_TAG_PATTERNS[i], "");
+    }
+    return text;
 }
 
 function normalizeAsciiSlug(value) {
