@@ -57,7 +57,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.12.0";
+        private const string ToolVersion = "2.12.1";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -318,14 +318,14 @@ namespace PhotoshopToUnity.EditorImporter
 
                 // F2 補償：用校準板比對後可微調，存 EditorPrefs，跨 session 保留。
                 EditorGUILayout.Space(4);
-                EditorGUILayout.LabelField("描邊厚度補償（v2.6）", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("描邊厚度補償", EditorStyles.boldLabel);
                 using (var check = new EditorGUI.ChangeCheckScope())
                 {
                     var newValue = EditorGUILayout.Slider(
                         new GUIContent(
                             "描邊厚度補償係數",
                             "Unity SDF 描邊邊緣是半透明 falloff，視覺重心比 PS 重。\n" +
-                            "用 CalibrationBoard 比對：Unity 偏厚 → 調低（如 0.85）；偏細 → 調高。\n" +
+                            "Unity 偏厚 → 調低（如 0.85）；偏細 → 調高。\n" +
                             "預設 1.0（不補償，物理寬度 = PS）。"),
                         outlineThicknessMultiplier, 0.3f, 1.5f);
                     if (check.changed)
@@ -337,7 +337,7 @@ namespace PhotoshopToUnity.EditorImporter
                 if (Mathf.Abs(outlineThicknessMultiplier - 1.0f) < 0.001f)
                 {
                     EditorGUILayout.HelpBox(
-                        "目前 = 1.0（不補償）。若描邊比 PS 視覺偏厚，調低（如 0.85）後重新 Generate；用 CalibrationBoard 疊圖比對找到合適值。",
+                        "目前 = 1.0（不補償）。若描邊比 PS 視覺偏厚，調低（如 0.85）後重新 Generate。",
                         MessageType.None);
                 }
                 else
@@ -1504,14 +1504,19 @@ namespace PhotoshopToUnity.EditorImporter
                    Directory.GetFiles(folderPath, "*.png", searchOption).Length > 0;
         }
 
+        // v2.12.1：更新清單改由 repo 的 update_manifest.txt 驅動（bump-version.ps1 每次出版自動重生成）。
+        // 根治「新增檔案忘了加進寫死清單 → 更新後編譯壞掉」的慣犯（v2.10.1 漏 TmpFontMap.cs、
+        // v2.12.0 漏 Phase 5 三檔）。manifest 抓不到時退回內建清單，至少能自我修復到讀得懂 manifest 的版本。
         private void UpdateFromGitHub()
         {
             // 直接使用 raw.githubusercontent.com 下載，不呼叫 GitHub API
             // 避免 unauthenticated API 每小時 60 次的速率限制（403）
             const string rawBase =
                 "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/Assets/Editor/PhotoshopUiImporter/";
+            const string manifestFileName = "update_manifest.txt";
 
-            var fileNames = new[]
+            // 後備清單：只在 manifest 下載失敗時使用（新增檔案「不需要」改這裡，改 manifest 即可）。
+            var fallbackFileNames = new[]
             {
                 "IUiPrefabBackend.cs",
                 "ImageImportService.cs",
@@ -1523,7 +1528,10 @@ namespace PhotoshopToUnity.EditorImporter
                 "SkinMap.cs",
                 "SkinResolver.cs",
                 "TMPStyleMap.cs",
+                "TmpFontAssetFactory.cs",
                 "TmpFontMap.cs",
+                "TmpFontReplacer.cs",
+                "TmpFontReplacerWindow.cs",
                 "TmpMapper.cs",
                 "UGuiTmpPrefabBackend.cs",
                 "PsUiSkinTheme.cs",
@@ -1533,15 +1541,47 @@ namespace PhotoshopToUnity.EditorImporter
             EditorUtility.DisplayProgressBar("更新工具", "正在連線 GitHub...", 0.05f);
             try
             {
-                // Step 1: 取得遠端版本號（只下載 Window 檔，不耗 API 配額）
+                // Step 1: 取得遠端版本號 + 檔案清單（manifest）
                 string remoteVersion = null;
+                string[] fileNames = null;
                 using (var wc = new System.Net.WebClient())
                 {
+                    // 不設 Encoding 時 WebClient 用系統 ANSI 解碼，中文註解會變亂碼——必須指定 UTF-8。
+                    wc.Encoding = Encoding.UTF8;
                     wc.Headers["User-Agent"] = "PhotoshopUiImporter-Updater/1.0";
                     var raw = wc.DownloadString(rawBase + "PhotoshopUiImporterWindow.cs");
                     var vm = System.Text.RegularExpressions.Regex.Match(raw, @"ToolVersion\s*=\s*""([^""]+)""");
                     if (vm.Success)
                         remoteVersion = vm.Groups[1].Value;
+
+                    try
+                    {
+                        wc.Headers["User-Agent"] = "PhotoshopUiImporter-Updater/1.0";
+                        var manifest = wc.DownloadString(rawBase + manifestFileName);
+                        var names = new System.Collections.Generic.List<string>();
+                        foreach (var line in manifest.Split('\n'))
+                        {
+                            var trimmed = line.Trim();
+                            if (trimmed.Length > 0 && !trimmed.StartsWith("#") && trimmed.EndsWith(".cs"))
+                            {
+                                names.Add(trimmed);
+                            }
+                        }
+                        if (names.Count > 0)
+                        {
+                            fileNames = names.ToArray();
+                        }
+                    }
+                    catch (System.Exception)
+                    {
+                        // 遠端還沒有 manifest（老版本 repo）→ 用後備清單。
+                    }
+                }
+
+                var usedManifest = fileNames != null;
+                if (fileNames == null)
+                {
+                    fileNames = fallbackFileNames;
                 }
 
                 EditorUtility.ClearProgressBar();
@@ -1572,24 +1612,36 @@ namespace PhotoshopToUnity.EditorImporter
                 var localDir = Path.GetDirectoryName(
                     Path.GetFullPath(Path.Combine(Application.dataPath, "..", scriptAssetPath)));
 
-                // Step 4: 逐一下載並覆蓋
+                // Step 4: 先全部下載到記憶體，全數成功才寫入磁碟——
+                // 中途斷線不會留下「半套新腳本」的編譯壞死狀態。
+                var downloaded = new System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, string>>();
                 using (var wc = new System.Net.WebClient())
                 {
-                    wc.Headers["User-Agent"] = "PhotoshopUiImporter-Updater/1.0";
+                    wc.Encoding = Encoding.UTF8;
                     for (var i = 0; i < fileNames.Length; i++)
                     {
                         var fileName = fileNames[i];
                         EditorUtility.DisplayProgressBar(
                             "更新工具",
                             $"下載 {fileName}（{i + 1}/{fileNames.Length}）",
-                            (float)(i + 1) / fileNames.Length);
+                            (float)(i + 1) / (fileNames.Length + 1));
+                        // WebClient 每次請求後會清掉自訂 header，UA 要逐次補。
+                        wc.Headers["User-Agent"] = "PhotoshopUiImporter-Updater/1.0";
                         var content = wc.DownloadString(rawBase + fileName);
-                        File.WriteAllText(Path.Combine(localDir, fileName), content, Encoding.UTF8);
+                        downloaded.Add(new System.Collections.Generic.KeyValuePair<string, string>(fileName, content));
                     }
                 }
 
+                EditorUtility.DisplayProgressBar("更新工具", "寫入檔案...", 1f);
+                foreach (var pair in downloaded)
+                {
+                    File.WriteAllText(Path.Combine(localDir, pair.Key), pair.Value, Encoding.UTF8);
+                }
+
                 AssetDatabase.Refresh();
-                SetStatus($"更新完成，已下載 {fileNames.Length} 個腳本。Unity 正在重新編譯。", MessageType.Info);
+                SetStatus(
+                    $"更新完成，已下載 {fileNames.Length} 個腳本（清單來源：{(usedManifest ? "update_manifest.txt" : "內建後備清單")}）。Unity 正在重新編譯。",
+                    MessageType.Info);
             }
             catch (System.Net.WebException webEx)
             {

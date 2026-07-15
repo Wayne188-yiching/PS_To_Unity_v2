@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.12.0</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.12.1</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -894,6 +894,15 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
 
+  <h3>v2.12.1（2026-07-15）— hotfix：「從 GitHub 更新工具」漏檔導致更新後編譯壞掉</h3>
+  <ul>
+    <li><strong>問題</strong>：更新器用<strong>寫死的檔案清單</strong>下載腳本，v2.12.0 新增的 Phase 5 三檔（<code>TmpFontAssetFactory.cs</code> 等）沒進清單 → 使用者按更新後下載了會引用新類別的檔案、卻缺新檔本體 → 編譯失敗（<code>TmpFontAssetFactory could not be found</code>），Unity 繼續跑舊組件，版號停在 v2.11.2、之後怎麼按都「沒更新」。與 v2.10.1 漏 <code>TmpFontMap.cs</code> 是同一類病。</li>
+    <li><strong>根治</strong>：清單改由 repo 的 <code>update_manifest.txt</code> 驅動，而 manifest 由 <code>bump-version.ps1</code> <strong>每次出版自動從實際目錄重生成</strong>（<code>-Check</code> 亦驗證同步）——「新增檔案忘了加清單」這個 bug 類別從流程上消滅。manifest 抓不到（老 repo）時退回內建後備清單。</li>
+    <li><strong>連帶修正</strong>：①下載改為「全部進記憶體、齊全才寫入」——中途斷線不再留下半套腳本的編譯壞死狀態；②<code>WebClient</code> 補設 UTF-8（原本用系統 ANSI 解碼，中文註解下載後會變亂碼）；③WebClient 逐次請求補 User-Agent（每次請求後 header 會被清空）。</li>
+    <li><strong>受影響使用者的一次性修復</strong>：已踩到編譯錯誤的專案，請手動把 repo 的 <code>Assets/Editor/PhotoshopUiImporter/</code> 整包複製覆蓋一次（舊更新器不認識新檔，無法自我修復）；之後的更新即可用視窗按鈕。</li>
+    <li><strong>UI 贅詞清理</strong>：描邊厚度補償區移除「用 CalibrationBoard 疊圖比對」等內部工具術語與版號標記，提示只留可操作的部分。</li>
+  </ul>
+
   <h3>v2.12.0（2026-07-15）— Phase 5：Prefab 字體材質批次替換</h3>
   <ul>
     <li><strong>新視窗 <code>Tools &gt; Photoshop UI Importer &gt; Font Replacer</code></strong>：資料夾遞迴（或單選 Prefab）分析 TMP 字型/材質使用狀況 → 逐列指定目標字型（材質自動配對預填、可覆寫）→ dry-run 報告 → 一鍵套用。<strong>只寫 <code>font</code> 與 <code>fontSharedMaterial</code> 兩個欄位</strong>，排版/字級/顏色/Sprite 一律不動——多語系「只換字體」需求的 Editor 端解法（runtime 語系切換屬遊戲端職責）。決議全文見 <a href="OPTIMIZATION_PLAN_zh.html#phase5">OPTIMIZATION_PLAN_zh.html#phase5</a>（Q1–Q7）。</li>
@@ -1059,7 +1068,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.12.0 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.12.1 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

@@ -1,5 +1,5 @@
 {
-    "version":  "2.12.0",
+    "version":  "2.12.1",
     "phase":  "Phase 5 — TMP font batch replacer (Font Replacer window + TmpFontAssetFactory + package font scan)",
     "updated":  "2026-07-15",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
