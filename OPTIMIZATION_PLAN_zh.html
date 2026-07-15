@@ -234,7 +234,7 @@
     <a href="#phases">階段排程</a>
     <a href="#phase4">Phase 4 決議 Q1–Q13</a>
     <a href="#phase4-5">Phase 4.5 決議 Q1–Q11</a>
-    <a href="#phase5">Phase 5 規劃</a>
+    <a href="#phase5">Phase 5 決議 Q1–Q7</a>
     <a href="#backlog">後續待辦池</a>
     <a href="#howto">執行方式</a>
   </nav>
@@ -878,81 +878,107 @@ OPTIMIZATION_PLAN_zh.html#phase4-5（Q1–Q11，程式碼註解引用 #phase4-5-
   </div>
 
   <!-- ══════════════════════════════════════════════════════ -->
-  <h2 id="phase5">Phase 5 規劃：Prefab 字體材質批次替換工具（stub）</h2>
+  <h2 id="phase5">Phase 5：Prefab 字體材質批次替換工具（決議 Q1–Q7）</h2>
 
-  <div class="phase stub" id="phase5-stub">
-    <h3><span class="tag tag-magenta">Phase 5</span>既有 Prefab 字體 / 材質分析 + 一鍵批次替換<span class="tag tag-magenta">規劃 stub</span></h3>
-    <p class="meta">建立於 2026-07-07；2026-07-14 更新基準為 v2.10.1。尚未 grill，範圍描述只用來讓下一輪 grill-me 有起點，不代表已定案。</p>
+  <div class="phase" id="phase5-decisions">
+    <h3><span class="tag tag-cyan">Phase 5</span>既有 Prefab 字體 / 材質分析 + 一鍵批次替換 → v2.12.0<span class="tag tag-magenta">規劃完成 2026-07-15，待實作</span></h3>
+    <p class="meta">grill-me 於 2026-07-15 完成，Q1–Q7 全決議。程式碼註解引用格式 <code>OPTIMIZATION_PLAN_zh.html#phase5-q?</code>。</p>
 
-    <h4>使用者提出的原始需求</h4>
+    <h4>使用者原始需求（兩段）</h4>
     <blockquote style="border-left:3px solid var(--magenta); padding:6px 12px; margin:6px 0; color:var(--ink); background:var(--magenta-soft); border-radius:4px;">
-      「目前的工具希望能夠有此功能，帶入已有的 Prefab，然後能夠知道上面掛了幾個 TMP，用到了多少個材質球，能夠一鍵替換不同字體的材質球，在不變動該 Prefab 內的排版的狀態下，只將裡面的字體做更換。」
+      「帶入已有的 Prefab，知道上面掛了幾個 TMP、用到多少材質球，一鍵替換不同字體的材質球，在不變動排版的狀態下只更換字體。」<br>
+      「希望 Unity 端工具能偵測 PS 端用到的字體，自動建立對應的文字材質球與 Font Asset。多國語系需求下，不動頁面排版、不衍生重複的圖或 Prefab，只更換字體，能一鍵更換。」
     </blockquote>
 
-    <h4>預期範圍（草案，待 grill 定案）</h4>
-    <ul>
-      <li><strong>分析頁</strong>：帶入 Prefab（或多個 Prefab、資料夾）→ 顯示：
-        <ul>
-          <li>TMP 節點總數（<code>TextMeshProUGUI</code> + <code>TextMeshPro</code>）</li>
-          <li>使用到的 <code>fontMaterial</code> 清單（含每個材質球用了幾次、依賴的 Font Asset）</li>
-          <li>使用到的 Font Asset 清單</li>
-          <li>可選：分佈直方圖（哪些節點使用哪個材質）</li>
-        </ul>
-      </li>
-      <li><strong>替換頁</strong>：從分析結果選要替換的來源材質 / Font Asset → 指定目標 Font Asset → 產生對應材質映射（考慮既有 TmpMapper 材質庫比對邏輯，見 <a href="#phase1">Phase 1</a> F5）→ 一鍵套用</li>
-      <li><strong>非目標（明確排除）</strong>：不動 <code>RectTransform</code>、<code>fontSize</code>、<code>alignment</code>、<code>outline width</code>、任何排版屬性；不動 Prefab 節點結構</li>
-      <li><strong>安全機制</strong>：預設 dry-run 模式（列印將更動什麼但不寫入）；Prefab overrides 保留策略（Prefab Variant 有 override 過材質的節點怎麼處理）；Undo 支援</li>
-    </ul>
+    <h4 class="q" id="phase5-q1">Q1 — 替換單位：以字型為單位 + 逐列覆寫（C 方案）</h4>
+    <div class="panel">
+      <p>主流程「把字型 A 全部換成 B」：掃出用到舊字型的所有 TMP，對每顆舊材質自動產生對應新材質——優先序：<code>TmpFontMap</code> / 材質庫現成（沿用 <code>FindLibraryMaterial</code>，含 v2.10 atlas 貼圖保護）→ 沒有則<strong>克隆-換底</strong>（以新字型預設材質為底，複製舊材質的視覺參數：outline 色/寬、FaceDilate、Underlay…）。分析表每列的「目標材質」欄可手動覆寫（自動配對只是預填值）。</p>
+      <p><strong>技術基礎：</strong>TMP 材質綁死字型 atlas（v2.10 確立），字體替換的本質是「(舊字型, 舊材質) → (新字型, 新材質) 成對替換」。每個 TMP 節點<strong>只寫 <code>font</code> 與 <code>fontSharedMaterial</code> 兩個欄位</strong>，RectTransform / fontSize / 對齊 / 字距 / 顏色 / 漸層 / 排版元件一律不讀不寫。</p>
+    </div>
 
-    <h4>已知需要 grill 的問題（先給 grill-me 起點）</h4>
-    <ul>
-      <li>Q1：入口位置——放在既有 <code>PhotoshopUiImporterWindow</code> 內作為新分頁 / Foldout，還是獨立 Editor Window？</li>
-      <li>Q2：範圍——單 Prefab、多 Prefab、還是整個資料夾遞迴？是否支援 Prefab Variant？</li>
-      <li>Q3：材質配對邏輯——當目標 Font Asset 沒有現成對應材質時，是走 Phase 1 F5 材質庫比對（<code>widthDiff</code> 容差 10%）自動找、還是要求使用者手動指定？</li>
-      <li>Q4：Prefab overrides——Prefab Variant / Instance 有手動 override 過材質的節點該不該覆寫？以什麼為預設？</li>
-      <li>Q5：跟現有 SkinTheme 換皮流程的關係——這功能算是 SkinTheme 的延伸還是獨立工具？是否共用 UI？</li>
-      <li>Q6：schemaVersion 影響——這功能純 Unity 端，不動 JSX / JSON，是否需要 bump schema？（初判：不需要，只 bump ToolVersion）</li>
-      <li>Q7：版號——v2.11.0 已由 Phase 4.5 佔用（2026-07-14 定案），本階段候選為 <strong>v2.12.0</strong>。</li>
-      <li>Q8：測試樣本——需要 <code>Samples/Phase5/</code> 建幾個手工 prefab 走 checklist 嗎？</li>
-    </ul>
+    <h4 class="q" id="phase5-q2">Q2 — 範圍：Editor 層批次；runtime 語系切換明確排除</h4>
+    <div class="panel">
+      <p>使用者產線：美術端出一種語系的 TMP，軟體端自行衍生其他語系——<strong>runtime 語系切換機制是軟體端職責，本工具不做 runtime component</strong>（產出零 runtime 依賴鐵律，v2.10 立）。Phase 5 交付 = Editor 層「一鍵換字、其他配置全不動」。不產生新 Prefab、不產生任何圖；唯一新增資產是新字型的材質球（每種描邊風格一顆，一次性）。</p>
+      <p><strong>物理限制（如實告知）：</strong>不同字型 glyph 寬窄不同，同一框內視覺換行點/密度會有差——任何工具都繞不過。</p>
+    </div>
+
+    <h4 class="q" id="phase5-q3">Q3 — 入口與作用範圍</h4>
+    <div class="panel">
+      <table>
+        <tr><th>子題</th><th>決議</th></tr>
+        <tr><td>入口</td><td>獨立 <code>TmpFontReplacerWindow</code>（<code>Tools &gt; Photoshop UI Importer &gt; Font Replacer</code>）。理由：Importer 視窗已 1,500+ 行且心智模型是「匯入」；字型替換可服務非本工具產的 Prefab。分析/替換引擎抽獨立 class，視窗只畫 UI。</td></tr>
+        <tr><td>作用範圍</td><td>資料夾遞迴為主 + 可單選 Prefab。流程：選資料夾 → 分析 → 列表勾選 → 一鍵替換。</td></tr>
+        <tr><td>TMP 類型</td><td>走 <code>TMP_Text</code> 基底，同時支援 <code>TextMeshProUGUI</code> 與 3D <code>TextMeshPro</code>。</td></tr>
+      </table>
+    </div>
+
+    <h4 class="q" id="phase5-q4">Q4 — 自動建立 Font Asset + 材質球（TmpFontAssetFactory）</h4>
+    <div class="panel">
+      <table>
+        <tr><th>子題</th><th>決議</th></tr>
+        <tr><td>SDF 類型</td><td>一律建 <strong>Dynamic SDF</strong>（零成本、免字集檔、CJK 直接可用）；報告標注「出包前建議轉 Static」（Unity 內建 Font Asset Creator 可轉，工具不越俎代庖）。</td></tr>
+        <tr><td>建立參數</td><td><strong>替換流程</strong>：<code>samplingPointSize</code>/<code>atlasPadding</code> 直接抄被替換的來源 Font Asset → SDF 參數空間相同，舊材質 <code>_OutlineWidth</code>/<code>_FaceDilate</code> 可 1:1 複製、零換算誤差。<strong>匯入流程</strong>：抄預設 TMP Font Asset 的參數。</td></tr>
+        <tr><td>字型檔來源</td><td>只掃<strong>專案 Assets 內已有的 .ttf/.otf</strong>（font family / PostScript 名對 fontToken slug 比對）；找不到 → 缺字型檔清單要人補檔。<strong>不去系統字型資料夾自動複製</strong>（授權紅線，DFYuanCW9 前例）。</td></tr>
+        <tr><td>產出與登記</td><td>存 <code>Assets/Fonts/Generated/</code>（視窗可改路徑）；命名 <code>{FontFamily} SDF</code>；衍生材質沿用 <code>{基底}_{token}</code> 慣例；<strong>自動寫進 TmpFontMap 一筆</strong>（keyword = fontToken slug），建完下次匯入直接生效。</td></tr>
+        <tr><td>兩個入口共用引擎</td><td>① Font Replacer：目標字型缺 Font Asset → 「一鍵建立」；② Importer Typography 區新增「<strong>掃描 Package 字型</strong>」按鈕：列出 layout.json 全部 fontToken，顯示「已對應 / 缺 Font Asset / 缺字型檔」三態，缺資產一鍵補建——即「偵測 PS 端字體、自動建立對應資產」的落地點。</td></tr>
+      </table>
+    </div>
+
+    <h4 class="q" id="phase5-q5">Q5 — Variant / 巢狀 / Override 策略與安全機制</h4>
+    <div class="panel">
+      <table>
+        <tr><th>子題</th><th>決議</th><th>Why</th></tr>
+        <tr><td>作用對象</td><td>只動 Prefab Asset，不掃場景</td><td>場景實例自動繼承；場景 override 維持 Unity 原生行為</td></tr>
+        <tr><td>Variant override</td><td><strong>保留 + 報告</strong>，不自動覆寫</td><td>Variant 上的字型 override 通常是刻意設計（某頁特別用粗體）；報告列出「N 個節點有 override 未替換」供人工決定</td></tr>
+        <tr><td>巢狀 Prefab</td><td>處理時<strong>跳過 nested instance 的 TMP 節點</strong>（<code>PrefabUtility.IsPartOfPrefabInstance</code>）；nested 來源 asset 自己在批次清單處理；來源在範圍外 → 報告列出</td><td>在外層直接改 nested 節點會被記成外層 override，之後來源被換過、外層永遠卡舊值——防雷</td></tr>
+        <tr><td>安全機制</td><td>「分析」只讀；「套用」分開按鈕、按前列完整變更清單；報告輸出文字檔（export_report 慣例）；<strong>不做自動備份</strong>，視窗提示「建議在版控乾淨狀態下執行」</td><td>整包 prefab 副本是假安全；git 才是真安全網</td></tr>
+      </table>
+    </div>
+
+    <h4 class="q" id="phase5-q6">Q6 — 與 SkinTheme 的關係 + 分析頁內容</h4>
+    <div class="panel">
+      <p><strong>平行獨立工具，不共用 UI、不硬抽共用基底</strong>（兩邊改的欄位型別完全不同）。對稱鐵律：<code>PsUiSkinApplier</code> 不碰 TMP；<code>TmpFontReplacer</code> 只寫 <code>font</code>/<code>fontSharedMaterial</code>，Sprite/Image/排版一律不讀不寫。假厚度 <code>[THICK]</code> 雙層 TMP 無需特殊處理（shadow 加深色在 color 欄位，不碰），報告如實列兩筆。</p>
+      <p><strong>分析頁主表格</strong>（一行 = 一個 Font Asset + 材質球組合；stub 的分佈直方圖砍掉——YAGNI）：來源 Font Asset / 材質球｜使用節點數 + 分佈 Prefab 數（可展開明細）｜目標 Font Asset（下拉）｜目標材質（自動配對預填、可逐列改、缺資產顯示「一鍵建立」）。</p>
+    </div>
+
+    <h4 class="q" id="phase5-q7">Q7 — schema / 版號 / 驗收 / 切分</h4>
+    <div class="panel">
+      <table>
+        <tr><th>子題</th><th>決議</th></tr>
+        <tr><td>schemaVersion</td><td><strong>不動（維持 2.10）</strong>——純 Unity 端；「掃描 Package 字型」讀既有 fontToken 欄位。只 bump ToolVersion → <strong>v2.12.0</strong>。</td></tr>
+        <tr><td>驗收樣本</td><td><code>Samples/Phase5/README.md</code> <strong>checklist-only</strong>：Phase 5 輸入是 Unity Prefab（依賴 GUID/meta，本倉庫非 Unity 專案，commit 無法直接用）+ 字型檔授權問題 → Prefab / 字型不進 repo，驗收在使用者 Unity 專案執行（v2.11.1 建好的 MiSans/HarmonyOS/Noto 六組資產當測試字型）。checklist 涵蓋：單純替換、缺資產一鍵建立、Variant override 保留、巢狀跳過、假厚度雙層、scroll Content 內文字、dry-run 報告、與換皮互不干擾回歸。</td></tr>
+        <tr><td>實作切分</td><td>① <code>TmpFontAssetFactory</code> 共用 service（字型檔掃描配對 / Dynamic SDF 建立 / 材質克隆-換底 / TmpFontMap 登記）→ ② 分析引擎（掃 Prefab、聚合 Font+材質組合、override/nested 偵測）→ ③ <code>TmpFontReplacerWindow</code>（分析表 UI、dry-run/套用、報告）→ ④ Importer「掃描 Package 字型」按鈕 + 文件四件套。</td></tr>
+        <tr><td>已知風險</td><td>程式建 Dynamic Font Asset 並<strong>存成磁碟資產</strong>在 Unity 2022.3 有細節坑（atlas texture / material 需 <code>AddObjectToAsset</code> 掛子資產，漏做 domain reload 後斷連結）。<strong>退守</strong>：建立按鈕降級為「開 Font Asset Creator + 自動填參數提示」，建立交人工、TmpFontMap 登記仍自動。</td></tr>
+      </table>
+    </div>
 
     <details class="handoff">
-      <summary>Phase 5 交接提示詞（開規劃用 — grill-me 前置）</summary>
-<pre>你正在協助 PS_To_Unity_v2 專案規劃 Phase 5（既有 Prefab 字體 / 材質分析 + 一鍵批次替換）。
-倉庫在 E:\Wayne\Claude\PS_To_Unity_v2-main。
+      <summary>Phase 5 交接提示詞（實作用）</summary>
+<pre>你正在協助 PS_To_Unity_v2 專案實作 Phase 5（Prefab 字體材質批次替換，v2.12.0）。倉庫在
+E:\Wayne\Claude\PS_To_Unity_v2-main。規劃已於 2026-07-15 grill 完成，全部決議在
+OPTIMIZATION_PLAN_zh.html#phase5（Q1–Q7，程式碼註解引用 #phase5-q? 錨點）。
 
-原始需求：
-「帶入已有的 Prefab → 分析上面掛了幾個 TMP、用到多少個材質球 → 一鍵替換不同字體的材質
-球，在不變動 Prefab 內排版的狀態下只更換字體。」
+實作順序（Q7）：
+1. TmpFontAssetFactory 共用 service：專案內 .ttf/.otf 掃描（family/PostScript 名 vs
+   fontToken slug）、Dynamic SDF Font Asset 建立（sampling/padding 抄來源或預設字型；
+   AddObjectToAsset 掛 atlas/material 子資產）、材質克隆-換底（視覺參數複製）、
+   TmpFontMap 自動登記
+2. 分析引擎：資料夾遞迴掃 Prefab、聚合 (Font Asset, 材質) 組合與使用計數、
+   Variant override 偵測、nested instance 節點跳過（IsPartOfPrefabInstance）
+3. TmpFontReplacerWindow（Tools > Photoshop UI Importer > Font Replacer）：
+   分析主表格（目標欄可編輯、缺資產一鍵建立）、dry-run 預設/套用分離、
+   文字報告輸出、版控提示。只寫 font/fontSharedMaterial 兩欄位
+4. Importer Typography 區「掃描 Package 字型」按鈕（fontToken 三態：已對應/缺
+   Font Asset/缺字型檔，一鍵補建）+ 文件四件套 + Samples/Phase5/README.md checklist
 
-請用 grill-me 模式跟我逐題確認以下（可依討論再加）：
+關鍵事實（不用重查）：
+- TMP 材質綁字型 atlas → 換字型必換材質（v2.10 FindLibraryMaterial 已有 atlas 保護）
+- sampling/padding 抄來源 Font Asset → 材質參數 1:1 複製零換算
+- 不掃系統字型夾（授權紅線）；runtime 語系切換是軟體端職責，工具零 runtime 依賴
+- 批次改 prefab 機械件參考 PsUiSkinApplier（v2.11.1 有 synthetic scroll guard 先例）
 
-Q1 入口位置：放在 PhotoshopUiImporterWindow 內新分頁 / Foldout，還是獨立 Editor Window？
-Q2 範圍：單 Prefab / 多 Prefab / 資料夾遞迴？是否支援 Prefab Variant？
-Q3 材質配對：目標 Font Asset 沒有現成對應材質時，走 TmpMapper.FindLibraryMaterial（Phase 1 F5
-   的 widthDiff 10% 容差），還是要求使用者手動指定 mapping？
-Q4 Prefab overrides：Variant / Instance 有 override 過材質的節點該不該覆寫？預設策略？
-Q5 跟 SkinTheme 換皮流程的關係：延伸還是獨立工具？共用 UI？
-Q6 schemaVersion：這功能純 Unity 端不動 JSX/JSON，是否需要 bump schema？（初判否）
-Q7 版號：v2.11.0 已由 Phase 4.5 佔用，本階段候選 v2.12.0（minor）？
-Q8 測試樣本：需要在 Samples/Phase5/ 建手工 prefab checklist 嗎？
-
-背景參考：
-- OPTIMIZATION_PLAN_zh.html#phase5（本 stub）
-- OPTIMIZATION_PLAN_zh.html#phase1（F5 材質庫比對邏輯，會共用）
-- OPTIMIZATION_PLAN_zh.html#phase2（Unity Importer UX 慣例）
-- 關鍵入口候選：Assets/Editor/PhotoshopUiImporter/PhotoshopUiImporterWindow.cs、
-  Assets/Editor/PhotoshopUiImporter/TmpMapper.cs（FindLibraryMaterial）、
-  Assets/Editor/PhotoshopUiImporter/PsUiSkinApplier.cs（SkinTheme 換皮流程參考）
-- 環境事實：本倉庫非完整 Unity 專案，語法檢查用 Roslyn 指令；實機驗收由使用者把
-  Assets/Editor/PhotoshopUiImporter/ 複製到遊戲專案內測試
-
-規範（來自 OPTIMIZATION_PLAN_zh.html#rules）：
-1. grill 完後，把決議寫進 OPTIMIZATION_PLAN_zh.html 的 #phase5 章節（把 stub 換掉），
-   加 Q1–Q?? 錨點供程式碼引用
-2. 實作結束跑 .\bump-version.ps1 -NewVersion 2.10.0（或依 Q7 決議）
-3. 更新 GUIDE_zh.html 補 changelog + 「Prefab 字體批次替換」使用說明章節
-4. commit + push（每 Phase 結束必做）</pre>
+完成後：.\bump-version.ps1 -NewVersion 2.12.0 → GUIDE changelog + 使用說明章節 →
+commit → push → 交由使用者/Codex 在 Unity 專案實機驗收。</pre>
     </details>
   </div>
 
