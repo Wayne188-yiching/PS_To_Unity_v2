@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Photoshop → Unity UI 工具 v2.11 — 完整使用說明</title>
+  <title>Photoshop → Unity UI 工具 v2.12 — 完整使用說明</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.11.2</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.12.0</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -894,6 +894,16 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
 
+  <h3>v2.12.0（2026-07-15）— Phase 5：Prefab 字體材質批次替換</h3>
+  <ul>
+    <li><strong>新視窗 <code>Tools &gt; Photoshop UI Importer &gt; Font Replacer</code></strong>：資料夾遞迴（或單選 Prefab）分析 TMP 字型/材質使用狀況 → 逐列指定目標字型（材質自動配對預填、可覆寫）→ dry-run 報告 → 一鍵套用。<strong>只寫 <code>font</code> 與 <code>fontSharedMaterial</code> 兩個欄位</strong>，排版/字級/顏色/Sprite 一律不動——多語系「只換字體」需求的 Editor 端解法（runtime 語系切換屬遊戲端職責）。決議全文見 <a href="OPTIMIZATION_PLAN_zh.html#phase5">OPTIMIZATION_PLAN_zh.html#phase5</a>（Q1–Q7）。</li>
+    <li><strong>材質克隆-換底</strong>：來源為預設材質 → 直接用目標字型預設材質；描邊等風格材質 → 整份複製視覺參數後把 atlas 換到目標字型，SDF 空間參數依 sampling/padding 差異自動重縮放（兩邊相同時 1:1 零換算）。同名克隆材質自動重用，不重複生成。</li>
+    <li><strong>TmpFontAssetFactory 字型資產工廠</strong>：從專案內 .ttf/.otf 一鍵建立 <strong>Dynamic SDF</strong> Font Asset（sampling/padding/atlas 尺寸抄參數模板——替換情境填來源字型即可讓材質參數零換算），子資產以 <code>AddObjectToAsset</code> 持久化，並<strong>自動登記 TmpFontMap</strong>。只掃專案內字型檔，不碰系統字型資料夾（授權紅線）。</li>
+    <li><strong>Importer 新增「掃描 Package 字型」</strong>（文字與材質區）：列出 layout.json 全部 fontToken 的三態——已對應 / 缺 Font Asset（可一鍵建立）/ 缺字型檔——「偵測 PS 端字體、自動建資產」的落地點。</li>
+    <li><strong>Variant / 巢狀防雷</strong>：Variant 的字型 override 保留不動並在報告列出；巢狀 Prefab 節點跳過（避免在外層寫 override 造成日後衝突），由來源 asset 自行替換。分析永遠唯讀；套用前需確認，報告輸出 <code>tmp_font_replace_report.txt</code>。</li>
+    <li><strong>schema 不變（2.10）</strong>：純 Unity 端功能，老 Package 完全相容。驗收 checklist 見 <code>Samples/Phase5/README.md</code>（Prefab/字型檔因 GUID 與授權不進 repo）。</li>
+  </ul>
+
   <h3>v2.11.2（2026-07-15）— P0 hotfix：標籤註冊表 hoisting 導致匯出必炸</h3>
   <ul>
     <li><strong>問題</strong>：v2.11.0 引入的 <code>KNOWN_BRACKET_TAG_PATTERNS</code> 用 <code>var</code> 定義在檔案後段（主 IIFE 之後）。function declaration 會整個 hoist，但 <code>var</code> 的賦值不會——從 Photoshop 選單執行匯出時（IIFE 內）呼叫 <code>stripKnownTags</code>，註冊表仍是 <code>undefined</code>，任何含 group 的 PSD 匯出即爆「undefined 不是物件」。以 PS COM 實測確認時序行為。</li>
@@ -1049,7 +1059,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.11.2 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.12.0 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

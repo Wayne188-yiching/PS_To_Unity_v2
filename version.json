@@ -1,6 +1,6 @@
 {
-    "version":  "2.11.2",
-    "phase":  "Phase 4.5 P0 hotfix — tag registry hoisting (export crashed on any grouped PSD)",
+    "version":  "2.12.0",
+    "phase":  "Phase 5 — TMP font batch replacer (Font Replacer window + TmpFontAssetFactory + package font scan)",
     "updated":  "2026-07-15",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [

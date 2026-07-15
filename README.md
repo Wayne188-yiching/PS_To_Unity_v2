@@ -6,7 +6,7 @@ It exports a Photoshop UI as a UI Package, then rebuilds the layout in Unity as 
 
 ## Version
 
-v2.11.2
+v2.12.0
 
 ## Main Workflow
 
@@ -54,6 +54,11 @@ Unity Atlas output:
 - All text layers remain TMP by default, regardless of font family. Use a `TmpFontMap` asset (Create > Photoshop UI Importer > Tmp Font Map) to map each exported font token to the matching TMP Font Asset. Enable `白名單外字型改為 PNG` only when intentionally baking unsupported fonts; explicit `[PNG]` naming overrides still work.
 - The export dialog's `命名規則說明` button lists every layer-naming convention that triggers Unity-side behavior (`[GRID]`, `[CG]`, `[SCROLL_V]`/`[SCROLL_H]`, `BTN_`, anchor tokens, and more).
 - Tag a group `[SCROLL_V]` / `[SCROLL_H]` to auto-build a full ScrollView > Viewport > Content hierarchy in Unity (ScrollRect + RectMask2D). Layer masks inside the group are treated as the runtime-clipping preview: children export as full images, and the group's own mask (if any) defines the viewport window. Combine with `[GRID]`/`[V]`/`[H]` to mount the layout component on Content.
+
+Batch font replacement (`Tools > Photoshop UI Importer > Font Replacer`):
+
+- Analyze prefabs (folder-recursive) for TMP font/material usage, then swap fonts in one click. Only `font` and `fontSharedMaterial` are ever written — layout, sizes, colors, and sprites are untouched. Outline-style materials are cloned onto the target font's atlas automatically.
+- The built-in font asset factory creates Dynamic SDF Font Assets from project `.ttf/.otf` files (parameters copied from a template font for 1:1 material transfer) and auto-registers them into `TmpFontMap`. The Importer's `掃描 Package 字型` button reports every fontToken as mapped / missing font asset (one-click create) / missing font file.
 
 ## Included Tools
 

@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.11.2";
+var SCRIPT_VERSION = "2.12.0";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 // OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。

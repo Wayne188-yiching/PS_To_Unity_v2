@@ -21,6 +21,16 @@ namespace PhotoshopToUnity.EditorImporter
         private Material defaultTmpMaterialPreset;
         // v2.10：fontToken → Font Asset 對應表（選填），多字型 PSD 用；null = 全部套預設字型（舊行為）。
         private TmpFontMap tmpFontMap;
+        // Phase 5（OPTIMIZATION_PLAN_zh.html#phase5-q4）：「掃描 Package 字型」結果快取。
+        private System.Collections.Generic.List<PackageFontScanEntry> packageFontScanEntries;
+
+        private sealed class PackageFontScanEntry
+        {
+            public string fontToken;
+            public int nodeCount;
+            public TMP_FontAsset mappedFont;                        // 已對應（TmpFontMap 查得到）
+            public TmpFontAssetFactory.FontFileCandidate fontFile;  // 缺 Font Asset，但專案內找得到字型檔
+        }
         private bool autoReferenceResolution = true;
         private Vector2 referenceResolution = new Vector2(1920f, 1080f);
         private bool useResponsiveAnchor;
@@ -47,7 +57,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.11.2";
+        private const string ToolVersion = "2.12.0";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -291,6 +301,8 @@ namespace PhotoshopToUnity.EditorImporter
                     EditorGUILayout.HelpBox("字型對應表是空的：請在該 TmpFontMap 資產內新增 keyword → Font Asset 項目。", MessageType.Warning);
                 }
 
+                DrawPackageFontScanControls();
+
                 DrawFolderPathField("TMP 材質球資料夾（選填）", ref materialLibraryFolder, true);
                 skinMap = (SkinMap)EditorGUILayout.ObjectField("Skin Map（選填）", skinMap, typeof(SkinMap), false);
 
@@ -334,6 +346,125 @@ namespace PhotoshopToUnity.EditorImporter
                         $"目前補償係數 = {outlineThicknessMultiplier:0.00}（預設 1.0）。Generate 時所有 _OutlineWidth 都會乘上這個數值。",
                         MessageType.Info);
                 }
+            }
+        }
+
+        // OPTIMIZATION_PLAN_zh.html#phase5-q4：偵測 PS 端字體——列出 layout.json 全部 fontToken，
+        // 顯示「已對應 / 缺 Font Asset / 缺字型檔」三態；缺資產可一鍵建立
+        //（Dynamic SDF、參數抄預設字型、自動登記 TmpFontMap）。
+        private void DrawPackageFontScanControls()
+        {
+            if (GUILayout.Button("掃描 Package 字型（fontToken → 資產狀態）", GUILayout.Height(24)))
+            {
+                ScanPackageFonts();
+            }
+
+            if (packageFontScanEntries == null)
+            {
+                return;
+            }
+
+            if (packageFontScanEntries.Count == 0)
+            {
+                EditorGUILayout.HelpBox("此 Package 沒有任何 TMP 文字節點（或全部烘成了 PNG）。", MessageType.None);
+                return;
+            }
+
+            foreach (var entry in packageFontScanEntries)
+            {
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    if (entry.mappedFont != null)
+                    {
+                        EditorGUILayout.LabelField($"✔ {entry.fontToken}（{entry.nodeCount} 節點）→ {entry.mappedFont.name}", EditorStyles.miniLabel);
+                    }
+                    else if (entry.fontFile != null)
+                    {
+                        EditorGUILayout.LabelField($"△ {entry.fontToken}（{entry.nodeCount} 節點）缺 Font Asset；字型檔：{entry.fontFile.matchedName}", EditorStyles.miniLabel);
+                        if (GUILayout.Button("一鍵建立", GUILayout.Width(72)))
+                        {
+                            CreatePackageFontAsset(entry);
+                            GUIUtility.ExitGUI();
+                        }
+                    }
+                    else
+                    {
+                        EditorGUILayout.LabelField($"✘ {entry.fontToken}（{entry.nodeCount} 節點）缺字型檔——請把 .ttf/.otf 放進專案 Assets（工具不掃系統字型夾）", EditorStyles.miniLabel);
+                    }
+                }
+            }
+        }
+
+        private void ScanPackageFonts()
+        {
+            if (!LayoutReader.TryRead(layoutJsonPath, out var layout, out var readResult))
+            {
+                SetStatus(BuildErrorMessage("掃描 Package 字型失敗", readResult.errors), MessageType.Error);
+                return;
+            }
+
+            var tokenCounts = new System.Collections.Generic.Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
+            CollectFontTokens(layout.nodes, tokenCounts);
+
+            packageFontScanEntries = new System.Collections.Generic.List<PackageFontScanEntry>();
+            foreach (var pair in tokenCounts)
+            {
+                var entry = new PackageFontScanEntry { fontToken = pair.Key, nodeCount = pair.Value };
+                if (tmpFontMap != null && tmpFontMap.TryGetEntry(pair.Key, out var mapEntry))
+                {
+                    entry.mappedFont = mapEntry.fontAsset;
+                }
+                else
+                {
+                    entry.fontFile = TmpFontAssetFactory.FindProjectFontFile(pair.Key);
+                }
+                packageFontScanEntries.Add(entry);
+            }
+
+            packageFontScanEntries.Sort((a, b) => b.nodeCount.CompareTo(a.nodeCount));
+            SetStatus($"Package 字型掃描完成：共 {packageFontScanEntries.Count} 種 fontToken。", MessageType.Info);
+        }
+
+        private static void CollectFontTokens(System.Collections.Generic.List<PhotoshopUiNode> nodes, System.Collections.Generic.Dictionary<string, int> counts)
+        {
+            if (nodes == null)
+            {
+                return;
+            }
+
+            foreach (var node in nodes)
+            {
+                if (node == null)
+                {
+                    continue;
+                }
+
+                if (node.NormalizedType == "text" && !string.IsNullOrWhiteSpace(node.fontToken))
+                {
+                    counts.TryGetValue(node.fontToken, out var count);
+                    counts[node.fontToken] = count + 1;
+                }
+
+                CollectFontTokens(node.children, counts);
+            }
+        }
+
+        private void CreatePackageFontAsset(PackageFontScanEntry entry)
+        {
+            var created = TmpFontAssetFactory.CreateDynamicFontAsset(
+                entry.fontFile.font, defaultTmpFontAsset, TmpFontAssetFactory.DefaultOutputFolder, out var error);
+
+            if (created != null && string.IsNullOrEmpty(error))
+            {
+                var registered = TmpFontAssetFactory.RegisterInFontMap(tmpFontMap, entry.fontToken, created);
+                SetStatus($"已建立 {created.name}（Dynamic SDF，出包前建議轉 Static）。" +
+                          (registered ? "已自動登記 TmpFontMap。" : "未指定 TmpFontMap，請手動登記對應。"), MessageType.Info);
+                EditorGUIUtility.PingObject(created);
+                ScanPackageFonts();
+            }
+            else
+            {
+                SetStatus(error ?? "建立 Font Asset 失敗。", MessageType.Error);
             }
         }
 
