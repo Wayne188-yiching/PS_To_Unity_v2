@@ -57,7 +57,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.12.1";
+        private const string ToolVersion = "2.12.2";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -195,11 +195,12 @@ namespace PhotoshopToUnity.EditorImporter
                 var sourceAssetPath = PathUtility.ToProjectRelativeAssetPath(sourceImageFolder);
                 if (PathUtility.IsAssetPath(sourceAssetPath))
                 {
-                    EditorGUILayout.HelpBox($"圖片來源已在 Unity 專案內，會直接使用：{sourceAssetPath}", MessageType.Info);
+                    EditorGUILayout.HelpBox($"圖片來源已在 Unity 專案內，會直接使用 {sourceAssetPath}", MessageType.Info);
                 }
-                else
+                else if (!string.IsNullOrWhiteSpace(importFolder))
                 {
-                    EditorGUILayout.HelpBox($"圖片來源若在 Unity 專案外，Generate 時會複製到：{importFolder}", MessageType.None);
+                    // 路徑未定（尚未填專案資料夾名稱）時不顯示，避免出現吊著的空句尾。
+                    EditorGUILayout.HelpBox($"圖片來源若在 Unity 專案外，Generate 時會複製到 {importFolder}", MessageType.None);
                 }
 
                 // U3：主流程改以「建立專案資料夾」為主視覺按鈕（最常用），其餘變體收進進階區。

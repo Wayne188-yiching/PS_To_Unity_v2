@@ -2,7 +2,7 @@
 
 將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。
 
-**目前版本：v2.12.1**
+**目前版本：v2.12.2**
 
 ---
 
