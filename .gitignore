@@ -8,3 +8,7 @@ QC_Output/
 Thumbs.db
 .DS_Store
 
+
+# Acceptance-run artifacts (local only)
+TestArtifacts/
+ps_exporter_current.png

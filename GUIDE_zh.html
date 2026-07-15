@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.11.1</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.11.2</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -894,6 +894,13 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
 
+  <h3>v2.11.2（2026-07-15）— P0 hotfix：標籤註冊表 hoisting 導致匯出必炸</h3>
+  <ul>
+    <li><strong>問題</strong>：v2.11.0 引入的 <code>KNOWN_BRACKET_TAG_PATTERNS</code> 用 <code>var</code> 定義在檔案後段（主 IIFE 之後）。function declaration 會整個 hoist，但 <code>var</code> 的賦值不會——從 Photoshop 選單執行匯出時（IIFE 內）呼叫 <code>stripKnownTags</code>，註冊表仍是 <code>undefined</code>，任何含 group 的 PSD 匯出即爆「undefined 不是物件」。以 PS COM 實測確認時序行為。</li>
+    <li><strong>為何 v2.11.1 驗收沒抓到</strong>：驗收機上有一份未提交的本機修正（把註冊表提前），push 時漏掉；且 node 回歸測試把整檔包裹後才呼叫函數，賦值已執行完畢，重現不了 IIFE 的真實時序。</li>
+    <li><strong>修正</strong>：註冊表定義整段移到主 IIFE 之前（單一定義、附時序警告註解）。新增「探針注入 IIFE 入口」的忠實時序測試：對壞版 v2.11.1 準確重現錯誤、對修正版通過，並保留 37 組名字 strip 回歸與 20 項 scroll 邏輯測試全數通過。</li>
+  </ul>
+
   <h3>v2.11.1（2026-07-15）— Phase 4.5 驗收修補</h3>
   <ul>
     <li><strong>Group mask viewport 修復</strong>：LayerSet 的 DOM <code>boundsNoEffects</code> 在部分 Photoshop 版本會忽略群組遮色片，改以 Action Manager descriptor 的同名欄位為優先、DOM 為 fallback。<code>scroll_v_groupmask</code> 複驗 viewport/content=350/580；<code>prescrolled</code> Content Y=+120。</li>
@@ -1042,7 +1049,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.11.1 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.11.2 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

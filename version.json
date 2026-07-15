@@ -1,6 +1,6 @@
 {
-    "version":  "2.11.1",
-    "phase":  "Phase 4.5 hotfix — group-mask viewport bounds + reskin synthetic-node guard",
+    "version":  "2.11.2",
+    "phase":  "Phase 4.5 P0 hotfix — tag registry hoisting (export crashed on any grouped PSD)",
     "updated":  "2026-07-15",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [

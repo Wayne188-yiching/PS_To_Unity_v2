@@ -1,7 +1,22 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.11.1";
+var SCRIPT_VERSION = "2.11.2";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
+
+// OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。
+// 新增標籤 = 在這裡加一行 regex；名稱清理一律走 stripKnownTags 單一出口，
+// 避免「A 處理過、B 沒處理」的錯位 bug（BTN_ bug 的病根）。各功能的偵測邏輯不在此，各自查表。
+//
+// v2.11.2：這個定義必須放在下方主 IIFE「之前」。function declaration 會整個 hoist，
+// 但 var 的「賦值」不會 —— 定義若留在檔案後段，匯出流程（IIFE 內）呼叫 stripKnownTags 時
+// 本陣列仍是 undefined，任何含 group 的 PSD 一匯出就爆「undefined 不是物件」（PS COM 實測）。
+var KNOWN_BRACKET_TAG_PATTERNS = [
+    /\[(?:H|HLAYOUT|V|VLAYOUT)\]/ig,                                            // H/V LayoutGroup（#phase4-decisions Q8）
+    /\[(?:GRID|GLAYOUT)\]/ig,                                                   // GridLayoutGroup（#phase4-decisions Q8）
+    /\[(?:CG|CANVASGROUP)\]/ig,                                                 // CanvasGroup（#phase4-decisions Q8）
+    /\[(?:SCROLL_V|SCROLL_H)\]/ig,                                              // ScrollRect（#phase4-5-q1）
+    /\[THICK\s*:\s*-?\d+(?:\.\d+)?\s*(?::\s*-?\d+(?:\.\d+)?)?\s*\]/ig           // 假厚度文字
+];
 
 (function () {
     if (!app.documents.length) {
@@ -3158,17 +3173,6 @@ function uniqueNodeName(name, counters) {
     }
     return base;
 }
-
-// OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。
-// 新增標籤 = 在這裡加一行 regex；名稱清理一律走 stripKnownTags 單一出口，
-// 避免「A 處理過、B 沒處理」的錯位 bug（BTN_ bug 的病根）。各功能的偵測邏輯不在此，各自查表。
-var KNOWN_BRACKET_TAG_PATTERNS = [
-    /\[(?:H|HLAYOUT|V|VLAYOUT)\]/ig,                                            // H/V LayoutGroup（#phase4-decisions Q8）
-    /\[(?:GRID|GLAYOUT)\]/ig,                                                   // GridLayoutGroup（#phase4-decisions Q8）
-    /\[(?:CG|CANVASGROUP)\]/ig,                                                 // CanvasGroup（#phase4-decisions Q8）
-    /\[(?:SCROLL_V|SCROLL_H)\]/ig,                                              // ScrollRect（#phase4-5-q1）
-    /\[THICK\s*:\s*-?\d+(?:\.\d+)?\s*(?::\s*-?\d+(?:\.\d+)?)?\s*\]/ig           // 假厚度文字
-];
 
 function stripKnownTags(name) {
     var text = String(name || "");
