@@ -76,6 +76,13 @@ namespace PhotoshopToUnity.EditorImporter
                         continue;
                     }
 
+                    // Style-only names such as Medium or Regular do not identify a font family.
+                    // Accepting them can match any font that happens to use the same weight.
+                    if (IsGenericStyleSlug(nameSlug))
+                    {
+                        continue;
+                    }
+
                     int score;
                     if (nameSlug == tokenSlug)
                     {
@@ -93,12 +100,38 @@ namespace PhotoshopToUnity.EditorImporter
                     if (score > bestScore)
                     {
                         bestScore = score;
-                        best = new FontFileCandidate { font = font, assetPath = path, matchedName = name };
+                        best = new FontFileCandidate
+                        {
+                            font = font,
+                            assetPath = path,
+                            matchedName = Path.GetFileName(path)
+                        };
                     }
                 }
             }
 
             return best;
+        }
+
+        // Find the TMP Font Asset created from the same source font.
+        public static TMP_FontAsset FindExistingFontAsset(Font sourceFontFile)
+        {
+            if (sourceFontFile == null)
+            {
+                return null;
+            }
+
+            foreach (var guid in AssetDatabase.FindAssets("t:TMP_FontAsset"))
+            {
+                var path = AssetDatabase.GUIDToAssetPath(guid);
+                var fontAsset = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(path);
+                if (fontAsset != null && fontAsset.sourceFontFile == sourceFontFile)
+                {
+                    return fontAsset;
+                }
+            }
+
+            return null;
         }
 
         // ── Dynamic SDF Font Asset 建立（含子資產持久化）─────────────────
@@ -390,6 +423,42 @@ namespace PhotoshopToUnity.EditorImporter
             }
 
             return builder.ToString();
+        }
+
+        private static bool IsGenericStyleSlug(string value)
+        {
+            switch (value)
+            {
+                case "thin":
+                case "extralight":
+                case "ultralight":
+                case "light":
+                case "regular":
+                case "normal":
+                case "book":
+                case "medium":
+                case "semibold":
+                case "demibold":
+                case "bold":
+                case "extrabold":
+                case "ultrabold":
+                case "black":
+                case "heavy":
+                case "italic":
+                case "oblique":
+                case "thinitalic":
+                case "extralightitalic":
+                case "lightitalic":
+                case "mediumitalic":
+                case "semibolditalic":
+                case "demibolditalic":
+                case "bolditalic":
+                case "extrabolditalic":
+                case "blackitalic":
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private static string MakeSafeFileName(string value)

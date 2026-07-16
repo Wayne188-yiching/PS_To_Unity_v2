@@ -20,6 +20,7 @@ namespace PhotoshopToUnity.EditorImporter
         private TMP_FontAsset defaultTmpFontAsset;
         private Material defaultTmpMaterialPreset;
         // v2.10：fontToken → Font Asset 對應表（選填），多字型 PSD 用；null = 全部套預設字型（舊行為）。
+        [SerializeField]
         private TmpFontMap tmpFontMap;
         // Phase 5（OPTIMIZATION_PLAN_zh.html#phase5-q4）：「掃描 Package 字型」結果快取。
         private System.Collections.Generic.List<PackageFontScanEntry> packageFontScanEntries;
@@ -30,6 +31,7 @@ namespace PhotoshopToUnity.EditorImporter
             public int nodeCount;
             public TMP_FontAsset mappedFont;                        // 已對應（TmpFontMap 查得到）
             public TmpFontAssetFactory.FontFileCandidate fontFile;  // 缺 Font Asset，但專案內找得到字型檔
+            public TMP_FontAsset existingFontAsset;                 // 已建立，但尚未由 TmpFontMap 對應
         }
         private bool autoReferenceResolution = true;
         private Vector2 referenceResolution = new Vector2(1920f, 1080f);
@@ -57,7 +59,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.12.2";
+        private const string ToolVersion = "2.12.3";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -381,11 +383,22 @@ namespace PhotoshopToUnity.EditorImporter
                     }
                     else if (entry.fontFile != null)
                     {
-                        EditorGUILayout.LabelField($"△ {entry.fontToken}（{entry.nodeCount} 節點）缺 Font Asset；字型檔：{entry.fontFile.matchedName}", EditorStyles.miniLabel);
-                        if (GUILayout.Button("一鍵建立", GUILayout.Width(72)))
+                        if (entry.existingFontAsset != null)
                         {
-                            CreatePackageFontAsset(entry);
-                            GUIUtility.ExitGUI();
+                            EditorGUILayout.LabelField($"✔ {entry.fontToken}（{entry.nodeCount} 節點）Font Asset 已建立：{entry.existingFontAsset.name}（尚未對應）", EditorStyles.miniLabel);
+                            using (new EditorGUI.DisabledScope(true))
+                            {
+                                GUILayout.Button("已建立", GUILayout.Width(72));
+                            }
+                        }
+                        else
+                        {
+                            EditorGUILayout.LabelField($"△ {entry.fontToken}（{entry.nodeCount} 節點）缺 Font Asset；字型檔：{entry.fontFile.matchedName}", EditorStyles.miniLabel);
+                            if (GUILayout.Button("一鍵建立", GUILayout.Width(72)))
+                            {
+                                CreatePackageFontAsset(entry);
+                                GUIUtility.ExitGUI();
+                            }
                         }
                     }
                     else
@@ -418,6 +431,10 @@ namespace PhotoshopToUnity.EditorImporter
                 else
                 {
                     entry.fontFile = TmpFontAssetFactory.FindProjectFontFile(pair.Key);
+                    if (entry.fontFile != null)
+                    {
+                        entry.existingFontAsset = TmpFontAssetFactory.FindExistingFontAsset(entry.fontFile.font);
+                    }
                 }
                 packageFontScanEntries.Add(entry);
             }
@@ -452,6 +469,16 @@ namespace PhotoshopToUnity.EditorImporter
 
         private void CreatePackageFontAsset(PackageFontScanEntry entry)
         {
+            var existing = TmpFontAssetFactory.FindExistingFontAsset(entry.fontFile.font);
+            if (existing != null)
+            {
+                entry.existingFontAsset = existing;
+                SetStatus($"{existing.name} 已建立，不會重複建立；請將它加入 TmpFontMap 對應。", MessageType.Warning);
+                EditorGUIUtility.PingObject(existing);
+                Repaint();
+                return;
+            }
+
             var created = TmpFontAssetFactory.CreateDynamicFontAsset(
                 entry.fontFile.font, defaultTmpFontAsset, TmpFontAssetFactory.DefaultOutputFolder, out var error);
 
