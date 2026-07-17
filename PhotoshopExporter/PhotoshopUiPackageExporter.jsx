@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.12.3";
+var SCRIPT_VERSION = "2.12.4";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 // OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。
@@ -15,6 +15,7 @@ var KNOWN_BRACKET_TAG_PATTERNS = [
     /\[(?:GRID|GLAYOUT)\]/ig,                                                   // GridLayoutGroup（#phase4-decisions Q8）
     /\[(?:CG|CANVASGROUP)\]/ig,                                                 // CanvasGroup（#phase4-decisions Q8）
     /\[(?:SCROLL_V|SCROLL_H)\]/ig,                                              // ScrollRect（#phase4-5-q1）
+    /\[MERGE\]/ig,                                                             // 群組合併成單張 PNG
     /\[THICK\s*:\s*-?\d+(?:\.\d+)?\s*(?::\s*-?\d+(?:\.\d+)?)?\s*\]/ig           // 假厚度文字
 ];
 
@@ -173,14 +174,16 @@ function downloadUrlToFile(url, destPath) {
 
 // ---------------------------------------------------------------------------
 
-// v2.10：命名規則速查——集中列出所有會觸發 Unity 端行為的圖層命名約定。
-function showNamingHelpDialog() {
+// v2.12.4：Photoshop ExtendScript 的 palette 會在腳本結束後被回收。
+// 改開本機 HTML 速查頁，讓使用者可放在 Photoshop 旁邊、搜尋內容並直接操作圖層面板。
+function buildNamingHelpText() {
     var text = ""
-        + "── 群組標籤（自動掛 Unity Component）──\n"
+        + "── 群組標籤 ──\n"
         + "[H] / [HLAYOUT]         Horizontal Layout Group\n"
         + "[V] / [VLAYOUT]         Vertical Layout Group\n"
         + "[GRID] / [GLAYOUT]      Grid Layout Group（子圖層寬高差 >20% 自動降級成普通群組並警告）\n"
         + "[CG] / [CANVASGROUP]    Canvas Group（Prefab 根節點免標籤、一律自動掛）\n"
+        + "[MERGE]                  群組可見內容合成單張 PNG（文字／效果／遮色片一併烘入；優先於排版與 Scroll 標籤）\n"
         + "[SCROLL_V] / [SCROLL_H] ScrollRect 滾動區（Unity 自動組 ScrollView > Viewport > Content 三層；\n"
         + "                        兩者可同標 = 雙向捲動。群組自身的遮色片 = 可視窗範圍；\n"
         + "                        群組內圖層的遮色片會自動忽略、匯出完整圖，裁切交給 Unity 端）\n"
@@ -205,20 +208,55 @@ function showNamingHelpDialog() {
         + "・標籤不分大小寫、可寫在圖層名任意位置，可組合：Cards[GRID][CG]\n"
         + "・標籤與前綴會自動從 Unity 節點名移除（BTN_ 會保留在節點名）\n"
         + "・未知 [標籤] 一律放行不報錯（可自由用 [Hover] 等描述性標記）";
-
-    var dialog = new Window("dialog", "圖層命名規則速查　v" + SCRIPT_VERSION);
-    dialog.orientation = "column";
-    dialog.alignChildren = "fill";
-    var body = dialog.add("edittext", undefined, text, { multiline: true, scrolling: true, readonly: true });
-    body.preferredSize = [660, 400];
-    var closeButton = dialog.add("button", undefined, "關閉", { name: "ok" });
-    closeButton.alignment = "right";
-    closeButton.onClick = function () {
-        dialog.close(1);
-    };
-    dialog.show();
+    return text;
 }
 
+function escapeNamingHelpHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
+function showNamingHelpReference() {
+    var outputFile = new File(Folder.temp.fsName + "/PS_To_Unity_Naming_Reference_v" + SCRIPT_VERSION + ".html");
+    var html = ""
+        + "<!doctype html><html lang='zh-Hant'><head><meta charset='utf-8'>"
+        + "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        + "<title>圖層命名規則速查 v" + SCRIPT_VERSION + "</title>"
+        + "<style>"
+        + "body{margin:0;background:#252525;color:#f3f3f3;font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;}"
+        + "main{max-width:920px;margin:0 auto;padding:28px 34px 48px;}"
+        + "h1{margin:0 0 8px;font-size:24px;}p{margin:0 0 20px;color:#bfc5cc;}"
+        + "pre{margin:0;padding:22px 24px;background:#333;border:1px solid #555;border-radius:10px;"
+        + "white-space:pre-wrap;word-break:break-word;font:15px/1.6 Consolas,'Microsoft JhengHei',monospace;}"
+        + "code{color:#9bd3ff;}@media(max-width:700px){main{padding:18px}pre{padding:16px;font-size:14px;}}"
+        + "</style></head><body><main>"
+        + "<h1>圖層命名規則速查　v" + SCRIPT_VERSION + "</h1>"
+        + "<p>此頁可保持開啟並放在 Photoshop 旁邊；使用瀏覽器搜尋可快速找標籤。</p>"
+        + "<pre>" + escapeNamingHelpHtml(buildNamingHelpText()) + "</pre>"
+        + "</main></body></html>";
+
+    try {
+        outputFile.encoding = "UTF8";
+        if (!outputFile.open("w")) {
+            throw new Error("無法建立速查頁");
+        }
+        outputFile.write(html);
+        outputFile.close();
+
+        if (!outputFile.execute()) {
+            alert("無法自動開啟命名速查頁。\n\n請手動開啟：\n" + outputFile.fsName);
+        }
+    } catch (e) {
+        try {
+            if (outputFile.opened) {
+                outputFile.close();
+            }
+        } catch (closeError) {}
+        alert("命名速查頁建立失敗。\n\n錯誤：" + e.message);
+    }
+}
 // v2.10：TMP 字型白名單編輯——白名單內字型保持 TMP，不會被「白名單外字型自動匯出為 PNG」轉成圖。
 function showFontWhitelistDialog(doc) {
     var dialog = new Window("dialog", "TMP 字型白名單");
@@ -323,7 +361,8 @@ function showExportDialog(doc) {
     var helpButton = headerGroup.add("button", undefined, "命名規則說明");
     helpButton.alignment = "right";
     helpButton.onClick = function () {
-        showNamingHelpDialog();
+        dialog.close(0);
+        showNamingHelpReference();
     };
     var updateButton = headerGroup.add("button", undefined, "檢查更新");
     updateButton.alignment = "right";
@@ -692,6 +731,17 @@ function collectNodes(container, parentVisible, context, pendingImages, parentBo
         }
 
         if (layer.typename === "LayerSet") {
+            if (hasMergeGroupTag(layer.name)) {
+                var mergedGroupNode = createImageNode(layer, context, parentBounds);
+                if (mergedGroupNode) {
+                    pendingImages.push({ layer: layer, node: mergedGroupNode });
+                    nodes.push(mergedGroupNode);
+                } else {
+                    context.skippedCount++;
+                }
+                continue;
+            }
+
             var groupBounds = readLayerBounds(layer);
             if (groupBounds) {
                 groupBounds = clampBoundsToCanvas(groupBounds, context.doc);
@@ -775,6 +825,10 @@ function appendNodes(target, source) {
     for (var i = 0; i < source.length; i++) {
         target.push(source[i]);
     }
+}
+
+function hasMergeGroupTag(name) {
+    return /\[MERGE\]/i.test(String(name || ""));
 }
 
 function createGroupNode(layerSet, children, context, parentBounds, bounds) {
@@ -1002,7 +1056,7 @@ function visibleBoundsFromChildren(children, doc) {
 }
 
 function createImageNode(layer, context, parentBounds) {
-    if (isClippingLayer(layer) || isAdjustmentLikeLayer(layer)) {
+    if (layer.typename !== "LayerSet" && (isClippingLayer(layer) || isAdjustmentLikeLayer(layer))) {
         return null;
     }
 

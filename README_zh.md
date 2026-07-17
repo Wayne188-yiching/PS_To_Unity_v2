@@ -2,7 +2,7 @@
 
 將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。
 
-**目前版本：v2.12.3**
+**目前版本：v2.12.4**
 
 ---
 
@@ -28,7 +28,9 @@
 6. 指定「預設 TMP Font Asset」（UI 含文字時必填）。所有字型預設都會保留為 TMP；多字型 PSD 可另指定「字型對應表 TmpFontMap」（fontToken 關鍵字 → Font Asset）。只有明確勾選「白名單外字型改為 PNG」或使用 `[PNG]` 標記時，文字才會轉成圖片。
 7. 點「Validate」確認，再點「Generate Prefab」完成。
 
-> 圖層命名會觸發哪些 Unity 端行為（`[GRID]`、`[CG]`、`[SCROLL_V]`/`[SCROLL_H]`、`BTN_`…），見 PS 匯出對話框的「命名規則說明」按鈕。
+> PS 匯出對話框的「命名規則說明」會關閉匯出主視窗，並在瀏覽器開啟可搜尋的本機速查頁；可放在 Photoshop 旁邊，邊看邊修改圖層名稱。
+>
+> 群組名稱加入 `[MERGE]`，會將目前可見內容（含文字、效果、遮色片）烘成一張 PNG，Unity 只建立一個 Image 節點。子項需要互動、動畫、換皮或改字時不要使用。
 >
 > 群組標 `[SCROLL_V]` / `[SCROLL_H]` 會在 Unity 自動組出 ScrollView > Viewport > Content 三層（ScrollRect + RectMask2D）。群組內圖層的遮色片視為「runtime 裁切預覽」——子圖層一律匯出完整圖；群組自身的遮色片（若有）定義可視窗範圍。可與 `[GRID]`/`[V]`/`[H]` 組合，排版元件會掛在 Content 上。
 >
