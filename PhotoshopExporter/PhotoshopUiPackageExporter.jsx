@@ -396,13 +396,18 @@ function showExportDialog(doc) {
     var selectedTextAsImage = optionPanel.add("checkbox", undefined, "把目前選取的文字圖層強制輸出為 PNG");
     selectedTextAsImage.value = false;
 
-    // U12：顯示目前選取的文字圖層數與名稱，讓使用者勾選前就知道會影響哪些圖層
-    var selectedTextSummary = summarizeSelectedTextLayers(doc);
-    var selectedSummaryText = selectedTextSummary.count > 0
-        ? "目前選取：" + selectedTextSummary.count + " 個文字圖層（" + selectedTextSummary.names.join("、") + "）"
-        : "目前選取：0 個文字圖層";
-    var selectedSummaryLabel = optionPanel.add("statictext", undefined, selectedSummaryText);
+    // 大型 PSD 遞迴掃描所有圖層很慢；只有使用者啟用此功能時才取得摘要。
+    var selectedSummaryLabel = optionPanel.add("statictext", undefined, "勾選後顯示目前選取的文字圖層。");
     selectedSummaryLabel.characters = 82;
+    selectedTextAsImage.onClick = function () {
+        if (!selectedTextAsImage.value) {
+            return;
+        }
+        var selectedTextSummary = summarizeSelectedTextLayers(doc);
+        selectedSummaryLabel.text = selectedTextSummary.count > 0
+            ? "目前選取：" + selectedTextSummary.count + " 個文字圖層（" + selectedTextSummary.names.join("、") + "）"
+            : "目前選取：0 個文字圖層";
+    };
 
     // v2.10：白名單 = 內建思源／源泉系列 + 使用者自訂關鍵字（編輯對話框維護，存於使用者資料夾）。
     var fontRouteGroup = optionPanel.add("group");
@@ -526,7 +531,7 @@ function showExportDialog(doc) {
     return accepted === 1 ? dialog.result : null;
 }
 
-// U12 輔助：在開對話框前先掃一次目前選取的文字圖層
+// U12 輔助：使用者啟用「選取文字轉 PNG」時才掃描目前選取的文字圖層
 function summarizeSelectedTextLayers(doc) {
     var result = { count: 0, names: [] };
     try {

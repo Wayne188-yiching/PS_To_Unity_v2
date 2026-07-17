@@ -901,6 +901,7 @@ TXT_score_[THICK:2]</code></pre>
     <li><strong>掃描穩定性</strong>：忽略只有 Medium／Regular 等樣式名稱的錯誤候選、顯示實際字型檔名，並保存 TmpFontMap 欄位，避免 <code>????</code> 誤判與腳本重載後對應表遺失。</li>
     <li><strong>多行文字修正</strong>：匯入時將 Photoshop 的單獨 CR 換行轉為 TMP 可辨識的 LF，避免多行文字被視為單行而串接、重疊。</li>
     <li><strong>H/V 排列順序修正</strong>：一般群組仍以反向 sibling 保留 Photoshop 前後景；只有 <code>[H]</code>/<code>[V]</code> 群組依 PS 座標排成左→右／上→下，避免 Layout Group 頭尾顛倒。</li>
+    <li><strong>PS 工具啟動加速</strong>：不再於匯出視窗顯示前遞迴掃描整份 PSD；只有勾選「把目前選取的文字圖層強制輸出為 PNG」時才更新摘要，大型文件可更快開啟工具。</li>
   </ul>
 
   <h3>v2.12.2（2026-07-15）— UI 修飾：空路徑提示不再顯示吊尾冒號</h3>
