@@ -48,7 +48,8 @@ namespace PhotoshopToUnity.EditorImporter
                 return;
             }
 
-            target.text = node.text ?? string.Empty;
+            // Photoshop stores paragraph breaks as bare CR characters, while TMP expects LF/CRLF.
+            target.text = (node.text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
             target.raycastTarget = false;
             target.enableAutoSizing = false;
             target.enableWordWrapping = false;
