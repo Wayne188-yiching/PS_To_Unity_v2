@@ -1437,7 +1437,21 @@ function applyLayoutGroupMetadata(node, group, children, bounds, context) {
     node.layoutPaddingBottom = padding.padBottom;
     node.contentSizeFitter = true;
     // Auto-dedup disabled in v2.4.2 to avoid wrongly merging same-size but different-content images.
-    node.children = children;
+    // H/V Layout Group uses sibling index as layout order. PS layer order is depth order,
+    // so sort by visual position instead of reusing the bottom-to-top drawing order.
+    node.children = sortLinearLayoutChildren(children, layoutType);
+}
+
+function sortLinearLayoutChildren(children, layoutType) {
+    if (!children || children.length < 2) return children;
+
+    var sorted = children.slice();
+    sorted.sort(function (a, b) {
+        var primary = layoutType === "horizontal" ? a.x - b.x : a.y - b.y;
+        if (primary !== 0) return primary;
+        return layoutType === "horizontal" ? a.y - b.y : a.x - b.x;
+    });
+    return sorted;
 }
 
 // Sort a group's children into the sibling order that Unity's GridLayoutGroup will fill visually.
