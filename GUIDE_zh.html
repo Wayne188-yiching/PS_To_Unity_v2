@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.12.5</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.12.6</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -903,6 +903,13 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
 
+  <h3>v2.12.6（2026-07-17）— PNG 去重掃描最佳化</h3>
+  <ul>
+    <li><strong>先篩選候選圖片</strong>：先用 PNG 檔案大小與像素尺寸分組，明顯不可能重複的圖片不再讀取完整檔案。</li>
+    <li><strong>每檔只計算一次</strong>：只有同規格候選者才計算完整雜湊，同一張候選圖片在單次 Export 中最多計算一次。</li>
+    <li><strong>結果保持一致</strong>：仍使用原本的完整檔案雜湊與首張圖作為共用資源；版面 JSON、圖片像素與 Unity 引用規則不變。</li>
+  </ul>
+
   <h3>v2.12.5（2026-07-17）— 大型 PSD 的 MERGE 匯出最佳化</h3>
   <ul>
     <li><strong>逐組可見合成</strong>：<code>[MERGE]</code> 不再把整個 LayerSet（含巢狀圖層與 Smart Object）複製到暫存文件；改為只隔離目標分支並取得可見合成像素，資源成本主要取決於輸出寬高。</li>
@@ -1103,7 +1110,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.12.5 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.12.6 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

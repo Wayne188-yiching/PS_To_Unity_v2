@@ -1,6 +1,6 @@
 {
-    "version":  "2.12.5",
-    "phase":  "v2.12.5 — sequential visible-composite export for MERGE groups",
+    "version":  "2.12.6",
+    "phase":  "v2.12.6 — prefiltered single-pass PNG pixel dedup",
     "updated":  "2026-07-17",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [

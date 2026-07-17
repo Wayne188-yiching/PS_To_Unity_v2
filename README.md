@@ -6,7 +6,7 @@ It exports a Photoshop UI as a UI Package, then rebuilds the layout in Unity as 
 
 ## Version
 
-v2.12.5
+v2.12.6
 
 ## Main Workflow
 
@@ -40,6 +40,7 @@ Exporter speed notes:
 - First-time export uses fast layer duplicate export when possible, then falls back to the safer merged-copy path for layers Photoshop cannot duplicate directly.
 - Fast duplicate export no longer hides every PSD layer up front. The slower visibility-isolated path is prepared only when fallback is needed.
 - PNG saving uses Photoshop Save for Web first, then falls back to normal PNG save if needed.
+- Since v2.12.6, pixel dedup first groups PNGs by byte length and dimensions. Only possible duplicates receive a full-file hash, and each candidate file is hashed at most once.
 
 Unity Atlas output:
 

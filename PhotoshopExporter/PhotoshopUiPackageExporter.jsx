@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.12.5";
+var SCRIPT_VERSION = "2.12.6";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 // OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。
@@ -2933,6 +2933,39 @@ function computeFileHash(file) {
     return ((hash >>> 0).toString(16)) + "_" + len; // 串上長度進一步降低碰撞
 }
 
+// Read only the fixed PNG header. This keeps singleton images out of the much
+// more expensive full-file hash pass while preserving exact hash dedup for
+// files that can actually be duplicates.
+function readPngDimensionsKey(file) {
+    var header = null;
+    try {
+        file.encoding = "BINARY";
+        if (!file.open("r")) {
+            return "unknown";
+        }
+        header = file.read(24);
+        file.close();
+    } catch (e) {
+        try { file.close(); } catch (e2) {}
+        return "unknown";
+    }
+
+    if (!header || header.length < 24 ||
+        (header.charCodeAt(0) & 0xFF) !== 137 || header.substr(1, 3) !== "PNG" ||
+        header.substr(12, 4) !== "IHDR") {
+        return "unknown";
+    }
+
+    function readUint32(offset) {
+        return ((header.charCodeAt(offset) & 0xFF) * 0x1000000) +
+            ((header.charCodeAt(offset + 1) & 0xFF) << 16) +
+            ((header.charCodeAt(offset + 2) & 0xFF) << 8) +
+            (header.charCodeAt(offset + 3) & 0xFF);
+    }
+
+    return readUint32(16) + "x" + readUint32(20);
+}
+
 // Phase 3 dedup：呼叫前 PNG 已寫到 imageFolder。回傳 { dedupedCount, savedBytes }。
 // - 同 hash 群組：保留第一個遇到的 imagePath 為 canonical，其餘檔案刪除、節點 imagePath 重指到 canonical
 // - 同步清理 export cache 中對應「已刪除路徑」的紀錄，避免下次 run 認為檔案還在而誤跳過匯出
@@ -2942,8 +2975,9 @@ function dedupPngsByHash(pendingImages, imageFolder, context) {
         return stats;
     }
 
-    var hashMap = {}; // hash -> canonical imagePath
-    var deletedPaths = {}; // deletedPath -> canonicalPath
+    var records = [];
+    var recordByPath = {};
+    var candidateCounts = {};
 
     for (var i = 0; i < pendingImages.length; i++) {
         var p = pendingImages[i];
@@ -2952,32 +2986,58 @@ function dedupPngsByHash(pendingImages, imageFolder, context) {
         }
         stats.originalCount++;
 
-        // 若該 node 的 imagePath 已被重指過（多個 node 共用同檔），跳過實體掃描
-        if (deletedPaths.hasOwnProperty(p.node.imagePath)) {
-            p.node.imagePath = deletedPaths[p.node.imagePath];
-            stats.dedupedCount++;
+        var imagePath = p.node.imagePath;
+        if (recordByPath.hasOwnProperty(imagePath)) {
+            recordByPath[imagePath].entries.push(p);
             continue;
         }
 
-        var file = new File(imageFolder.fsName + "/" + p.node.imagePath);
+        var file = new File(imageFolder.fsName + "/" + imagePath);
         if (!file.exists) {
             continue;
         }
-        var hash = computeFileHash(file);
+
+        var candidateKey = String(file.length) + "|" + readPngDimensionsKey(file);
+        var record = {
+            imagePath: imagePath,
+            file: file,
+            candidateKey: candidateKey,
+            entries: [p],
+            hash: null
+        };
+        recordByPath[imagePath] = record;
+        records.push(record);
+        candidateCounts[candidateKey] = (candidateCounts[candidateKey] || 0) + 1;
+    }
+
+    var hashMap = {}; // candidateKey + hash -> canonical imagePath
+    for (var r = 0; r < records.length; r++) {
+        var current = records[r];
+
+        // A different byte length or PNG size proves the files cannot be exact
+        // duplicates, so singleton candidates skip the full-file hash.
+        if (candidateCounts[current.candidateKey] < 2) {
+            stats.uniqueCount++;
+            continue;
+        }
+
+        current.hash = computeFileHash(current.file); // at most once per file
+        var hash = current.hash;
         if (!hash) {
             continue;
         }
 
-        if (hashMap.hasOwnProperty(hash)) {
-            var canonical = hashMap[hash];
-            stats.savedBytes += file.length;
-            var oldPath = p.node.imagePath;
-            try { file.remove(); } catch (e) {}
-            deletedPaths[oldPath] = canonical;
-            p.node.imagePath = canonical;
+        var hashKey = current.candidateKey + "|" + hash;
+        if (hashMap.hasOwnProperty(hashKey)) {
+            var canonical = hashMap[hashKey];
+            stats.savedBytes += current.file.length;
+            var oldPath = current.imagePath;
+            try { current.file.remove(); } catch (e) {}
+            for (var entryIndex = 0; entryIndex < current.entries.length; entryIndex++) {
+                current.entries[entryIndex].node.imagePath = canonical;
+            }
             stats.dedupedCount++;
 
-            // 清掉 cache 內被刪除路徑的條目
             if (context.exportCache) {
                 var keysToDelete = [];
                 for (var k in context.exportCache) {
@@ -2992,7 +3052,7 @@ function dedupPngsByHash(pendingImages, imageFolder, context) {
                 }
             }
         } else {
-            hashMap[hash] = p.node.imagePath;
+            hashMap[hashKey] = current.imagePath;
             stats.uniqueCount++;
         }
     }
