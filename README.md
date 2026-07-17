@@ -6,7 +6,7 @@ It exports a Photoshop UI as a UI Package, then rebuilds the layout in Unity as 
 
 ## Version
 
-v2.12.2
+v2.12.6
 
 ## Main Workflow
 
@@ -40,6 +40,7 @@ Exporter speed notes:
 - First-time export uses fast layer duplicate export when possible, then falls back to the safer merged-copy path for layers Photoshop cannot duplicate directly.
 - Fast duplicate export no longer hides every PSD layer up front. The slower visibility-isolated path is prepared only when fallback is needed.
 - PNG saving uses Photoshop Save for Web first, then falls back to normal PNG save if needed.
+- Since v2.12.6, pixel dedup first groups PNGs by byte length and dimensions. Only possible duplicates receive a full-file hash, and each candidate file is hashed at most once.
 
 Unity Atlas output:
 
@@ -52,7 +53,8 @@ Unity Atlas output:
   - `[PNG]`, `[IMAGE]`, `[IMG]`, `TXTIMG_`, `TXT_IMG_`, `TEXTIMG_`, or `TEXT_IMG_` bakes that text as a PNG image.
   - `[TMP]`, `[TEXT]`, `TMP_`, or `TXT_` keeps that text editable as a Unity TMP node.
 - All text layers remain TMP by default, regardless of font family. Use a `TmpFontMap` asset (Create > Photoshop UI Importer > Tmp Font Map) to map each exported font token to the matching TMP Font Asset. Enable `白名單外字型改為 PNG` only when intentionally baking unsupported fonts; explicit `[PNG]` naming overrides still work.
-- The export dialog's `命名規則說明` button lists every layer-naming convention that triggers Unity-side behavior (`[GRID]`, `[CG]`, `[SCROLL_V]`/`[SCROLL_H]`, `BTN_`, anchor tokens, and more).
+- The export dialog's `命名規則說明` button closes the modal exporter and opens a searchable local reference page in the browser, so it can stay beside Photoshop while layers are renamed.
+- Add `[MERGE]` to a group name to bake its visible contents (including text, effects, and masks) into one PNG and one Unity Image node. Do not use it when child layers must remain interactive, animated, reskinnable, or editable. Since v2.12.5, MERGE groups are composited sequentially from visible pixels and their temporary raster layer is released immediately.
 - Tag a group `[SCROLL_V]` / `[SCROLL_H]` to auto-build a full ScrollView > Viewport > Content hierarchy in Unity (ScrollRect + RectMask2D). Layer masks inside the group are treated as the runtime-clipping preview: children export as full images, and the group's own mask (if any) defines the viewport window. Combine with `[GRID]`/`[V]`/`[H]` to mount the layout component on Content.
 
 Batch font replacement (`Tools > Photoshop UI Importer > Font Replacer`):

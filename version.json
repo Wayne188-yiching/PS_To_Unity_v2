@@ -1,7 +1,7 @@
 {
-    "version":  "2.12.2",
-    "phase":  "Phase 5 — TMP font batch replacer (Font Replacer window + TmpFontAssetFactory + package font scan)",
-    "updated":  "2026-07-15",
+    "version":  "2.12.6",
+    "phase":  "v2.12.6 — prefiltered single-pass PNG pixel dedup",
+    "updated":  "2026-07-17",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [
                      {

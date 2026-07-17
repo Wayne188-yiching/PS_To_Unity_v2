@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.12.2";
+var SCRIPT_VERSION = "2.12.6";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 // OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。
@@ -15,6 +15,7 @@ var KNOWN_BRACKET_TAG_PATTERNS = [
     /\[(?:GRID|GLAYOUT)\]/ig,                                                   // GridLayoutGroup（#phase4-decisions Q8）
     /\[(?:CG|CANVASGROUP)\]/ig,                                                 // CanvasGroup（#phase4-decisions Q8）
     /\[(?:SCROLL_V|SCROLL_H)\]/ig,                                              // ScrollRect（#phase4-5-q1）
+    /\[MERGE\]/ig,                                                             // 群組合併成單張 PNG
     /\[THICK\s*:\s*-?\d+(?:\.\d+)?\s*(?::\s*-?\d+(?:\.\d+)?)?\s*\]/ig           // 假厚度文字
 ];
 
@@ -173,14 +174,16 @@ function downloadUrlToFile(url, destPath) {
 
 // ---------------------------------------------------------------------------
 
-// v2.10：命名規則速查——集中列出所有會觸發 Unity 端行為的圖層命名約定。
-function showNamingHelpDialog() {
+// v2.12.4：Photoshop ExtendScript 的 palette 會在腳本結束後被回收。
+// 改開本機 HTML 速查頁，讓使用者可放在 Photoshop 旁邊、搜尋內容並直接操作圖層面板。
+function buildNamingHelpText() {
     var text = ""
-        + "── 群組標籤（自動掛 Unity Component）──\n"
+        + "── 群組標籤 ──\n"
         + "[H] / [HLAYOUT]         Horizontal Layout Group\n"
         + "[V] / [VLAYOUT]         Vertical Layout Group\n"
         + "[GRID] / [GLAYOUT]      Grid Layout Group（子圖層寬高差 >20% 自動降級成普通群組並警告）\n"
         + "[CG] / [CANVASGROUP]    Canvas Group（Prefab 根節點免標籤、一律自動掛）\n"
+        + "[MERGE]                  群組可見內容合成單張 PNG（文字／效果／遮色片一併烘入；優先於排版與 Scroll 標籤）\n"
         + "[SCROLL_V] / [SCROLL_H] ScrollRect 滾動區（Unity 自動組 ScrollView > Viewport > Content 三層；\n"
         + "                        兩者可同標 = 雙向捲動。群組自身的遮色片 = 可視窗範圍；\n"
         + "                        群組內圖層的遮色片會自動忽略、匯出完整圖，裁切交給 Unity 端）\n"
@@ -205,20 +208,55 @@ function showNamingHelpDialog() {
         + "・標籤不分大小寫、可寫在圖層名任意位置，可組合：Cards[GRID][CG]\n"
         + "・標籤與前綴會自動從 Unity 節點名移除（BTN_ 會保留在節點名）\n"
         + "・未知 [標籤] 一律放行不報錯（可自由用 [Hover] 等描述性標記）";
-
-    var dialog = new Window("dialog", "圖層命名規則速查　v" + SCRIPT_VERSION);
-    dialog.orientation = "column";
-    dialog.alignChildren = "fill";
-    var body = dialog.add("edittext", undefined, text, { multiline: true, scrolling: true, readonly: true });
-    body.preferredSize = [660, 400];
-    var closeButton = dialog.add("button", undefined, "關閉", { name: "ok" });
-    closeButton.alignment = "right";
-    closeButton.onClick = function () {
-        dialog.close(1);
-    };
-    dialog.show();
+    return text;
 }
 
+function escapeNamingHelpHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
+function showNamingHelpReference() {
+    var outputFile = new File(Folder.temp.fsName + "/PS_To_Unity_Naming_Reference_v" + SCRIPT_VERSION + ".html");
+    var html = ""
+        + "<!doctype html><html lang='zh-Hant'><head><meta charset='utf-8'>"
+        + "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        + "<title>圖層命名規則速查 v" + SCRIPT_VERSION + "</title>"
+        + "<style>"
+        + "body{margin:0;background:#252525;color:#f3f3f3;font-family:'Microsoft JhengHei','Noto Sans TC',sans-serif;}"
+        + "main{max-width:920px;margin:0 auto;padding:28px 34px 48px;}"
+        + "h1{margin:0 0 8px;font-size:24px;}p{margin:0 0 20px;color:#bfc5cc;}"
+        + "pre{margin:0;padding:22px 24px;background:#333;border:1px solid #555;border-radius:10px;"
+        + "white-space:pre-wrap;word-break:break-word;font:15px/1.6 Consolas,'Microsoft JhengHei',monospace;}"
+        + "code{color:#9bd3ff;}@media(max-width:700px){main{padding:18px}pre{padding:16px;font-size:14px;}}"
+        + "</style></head><body><main>"
+        + "<h1>圖層命名規則速查　v" + SCRIPT_VERSION + "</h1>"
+        + "<p>此頁可保持開啟並放在 Photoshop 旁邊；使用瀏覽器搜尋可快速找標籤。</p>"
+        + "<pre>" + escapeNamingHelpHtml(buildNamingHelpText()) + "</pre>"
+        + "</main></body></html>";
+
+    try {
+        outputFile.encoding = "UTF8";
+        if (!outputFile.open("w")) {
+            throw new Error("無法建立速查頁");
+        }
+        outputFile.write(html);
+        outputFile.close();
+
+        if (!outputFile.execute()) {
+            alert("無法自動開啟命名速查頁。\n\n請手動開啟：\n" + outputFile.fsName);
+        }
+    } catch (e) {
+        try {
+            if (outputFile.opened) {
+                outputFile.close();
+            }
+        } catch (closeError) {}
+        alert("命名速查頁建立失敗。\n\n錯誤：" + e.message);
+    }
+}
 // v2.10：TMP 字型白名單編輯——白名單內字型保持 TMP，不會被「白名單外字型自動匯出為 PNG」轉成圖。
 function showFontWhitelistDialog(doc) {
     var dialog = new Window("dialog", "TMP 字型白名單");
@@ -323,7 +361,8 @@ function showExportDialog(doc) {
     var helpButton = headerGroup.add("button", undefined, "命名規則說明");
     helpButton.alignment = "right";
     helpButton.onClick = function () {
-        showNamingHelpDialog();
+        dialog.close(0);
+        showNamingHelpReference();
     };
     var updateButton = headerGroup.add("button", undefined, "檢查更新");
     updateButton.alignment = "right";
@@ -396,13 +435,18 @@ function showExportDialog(doc) {
     var selectedTextAsImage = optionPanel.add("checkbox", undefined, "把目前選取的文字圖層強制輸出為 PNG");
     selectedTextAsImage.value = false;
 
-    // U12：顯示目前選取的文字圖層數與名稱，讓使用者勾選前就知道會影響哪些圖層
-    var selectedTextSummary = summarizeSelectedTextLayers(doc);
-    var selectedSummaryText = selectedTextSummary.count > 0
-        ? "目前選取：" + selectedTextSummary.count + " 個文字圖層（" + selectedTextSummary.names.join("、") + "）"
-        : "目前選取：0 個文字圖層";
-    var selectedSummaryLabel = optionPanel.add("statictext", undefined, selectedSummaryText);
+    // 大型 PSD 遞迴掃描所有圖層很慢；只有使用者啟用此功能時才取得摘要。
+    var selectedSummaryLabel = optionPanel.add("statictext", undefined, "勾選後顯示目前選取的文字圖層。");
     selectedSummaryLabel.characters = 82;
+    selectedTextAsImage.onClick = function () {
+        if (!selectedTextAsImage.value) {
+            return;
+        }
+        var selectedTextSummary = summarizeSelectedTextLayers(doc);
+        selectedSummaryLabel.text = selectedTextSummary.count > 0
+            ? "目前選取：" + selectedTextSummary.count + " 個文字圖層（" + selectedTextSummary.names.join("、") + "）"
+            : "目前選取：0 個文字圖層";
+    };
 
     // v2.10：白名單 = 內建思源／源泉系列 + 使用者自訂關鍵字（編輯對話框維護，存於使用者資料夾）。
     var fontRouteGroup = optionPanel.add("group");
@@ -526,7 +570,7 @@ function showExportDialog(doc) {
     return accepted === 1 ? dialog.result : null;
 }
 
-// U12 輔助：在開對話框前先掃一次目前選取的文字圖層
+// U12 輔助：使用者啟用「選取文字轉 PNG」時才掃描目前選取的文字圖層
 function summarizeSelectedTextLayers(doc) {
     var result = { count: 0, names: [] };
     try {
@@ -687,6 +731,17 @@ function collectNodes(container, parentVisible, context, pendingImages, parentBo
         }
 
         if (layer.typename === "LayerSet") {
+            if (hasMergeGroupTag(layer.name)) {
+                var mergedGroupNode = createImageNode(layer, context, parentBounds);
+                if (mergedGroupNode) {
+                    pendingImages.push({ layer: layer, node: mergedGroupNode });
+                    nodes.push(mergedGroupNode);
+                } else {
+                    context.skippedCount++;
+                }
+                continue;
+            }
+
             var groupBounds = readLayerBounds(layer);
             if (groupBounds) {
                 groupBounds = clampBoundsToCanvas(groupBounds, context.doc);
@@ -770,6 +825,10 @@ function appendNodes(target, source) {
     for (var i = 0; i < source.length; i++) {
         target.push(source[i]);
     }
+}
+
+function hasMergeGroupTag(name) {
+    return /\[MERGE\]/i.test(String(name || ""));
 }
 
 function createGroupNode(layerSet, children, context, parentBounds, bounds) {
@@ -997,7 +1056,7 @@ function visibleBoundsFromChildren(children, doc) {
 }
 
 function createImageNode(layer, context, parentBounds) {
-    if (isClippingLayer(layer) || isAdjustmentLikeLayer(layer)) {
+    if (layer.typename !== "LayerSet" && (isClippingLayer(layer) || isAdjustmentLikeLayer(layer))) {
         return null;
     }
 
@@ -1067,7 +1126,9 @@ function exportAllImages(pendingImages, context) {
     }
 
     var fallbackVisibilityPrepared = false;
+    var fallbackOriginalVisibility = null;
     if (!context.useFastLayerDuplicate) {
+        fallbackOriginalVisibility = captureVisibility(context.doc);
         hideAllLayers(context.doc);
         fallbackVisibilityPrepared = true;
     }
@@ -1101,14 +1162,33 @@ function exportAllImages(pendingImages, context) {
             }
 
             var result;
-            if (context.useFastLayerDuplicate) {
+            var isMergedGroup = entry.layer.typename === "LayerSet" && hasMergeGroupTag(entry.layer.name);
+            if (isMergedGroup) {
+                // v2.12.5：MERGE 不複製整個 LayerSet。只隔離目標分支後 Copy Merged，
+                // 成本取決於輸出像素，不再隨巢狀圖層／Smart Object 數量膨脹。
+                if (fallbackVisibilityPrepared && fallbackOriginalVisibility) {
+                    restoreVisibility(fallbackOriginalVisibility);
+                    visibleChain = [];
+                }
+                result = exportMergedGroupComposite(entry.layer, entry.node, context, exportDoc, file);
+                if (result === false && context.useFastLayerDuplicate) {
+                    pushWarning(context, entry.node.name || "", "MERGE_COMPOSITE_FALLBACK",
+                        "MERGE 可見合成失敗，已改用整組複製後備路徑；此群組可能較慢。");
+                    result = exportNodeImageFastDuplicate(entry.layer, entry.node, context, exportDoc, file);
+                }
+                if (fallbackVisibilityPrepared) {
+                    hideAllLayers(context.doc);
+                    visibleChain = [];
+                }
+            } else if (context.useFastLayerDuplicate) {
                 result = exportNodeImageFastDuplicate(entry.layer, entry.node, context, exportDoc, file);
             } else {
                 visibleChain = showOnlyLayerChain(entry.layer, visibleChain);
                 result = exportNodeImageReuseWithMaskHandling(entry.layer, entry.node, context, exportDoc, file);
             }
-            if (result === false && context.useFastLayerDuplicate) {
+            if (result === false && context.useFastLayerDuplicate && !isMergedGroup) {
                 if (!fallbackVisibilityPrepared) {
+                    fallbackOriginalVisibility = captureVisibility(context.doc);
                     hideAllLayers(context.doc);
                     fallbackVisibilityPrepared = true;
                     visibleChain = [];
@@ -1236,6 +1316,57 @@ function resetExportDocument(doc, width, height) {
     }
 }
 
+// v2.12.5：一次隔離並合成一個 [MERGE] 群組。只切換目標到文件根節點沿途的兄弟層，
+// 不改動目標群組內部的可見狀態；匯出後立即還原，下一個 MERGE 再獨立處理。
+function exportMergedGroupComposite(layerSet, node, context, exportDoc, file) {
+    app.activeDocument = context.doc;
+    var visibilityStates = isolateLayerBranchPreservingDescendants(layerSet);
+    var exportLayerCountBefore = exportDoc.layers.length;
+    var result = false;
+    try {
+        result = exportNodeImageReuse(layerSet, node, context, exportDoc, file);
+    } finally {
+        // Copy Merged 只留下單一暫存像素層；存檔後立即移除，避免多個 MERGE 累積圖層與 RAM。
+        app.activeDocument = exportDoc;
+        while (exportDoc.layers.length > exportLayerCountBefore) {
+            try {
+                exportDoc.layers[0].remove();
+            } catch (removeError) {
+                break;
+            }
+        }
+        app.activeDocument = context.doc;
+        restoreVisibility(visibilityStates);
+    }
+    return result;
+}
+
+function isolateLayerBranchPreservingDescendants(layer) {
+    var states = [];
+    var current = layer;
+
+    while (current && current.typename !== "Document") {
+        var container = current.parent;
+        if (!container || !container.layers) {
+            break;
+        }
+
+        for (var i = 0; i < container.layers.length; i++) {
+            var sibling = container.layers[i];
+            var visible = true;
+            try {
+                visible = sibling.visible;
+            } catch (e) {
+            }
+            states.push({ layer: sibling, visible: visible });
+            setLayerVisible(sibling, sibling === current);
+        }
+
+        current = container;
+    }
+
+    return states;
+}
 // OPTIMIZATION_PLAN_zh.html#phase4-5-q9：merged-copy 會把遮色片（含祖先的）烘進合併結果。
 // scroll 內圖層（_noMaskExport）→ 暫時停用自身＋祖先鏈的遮色片，匯完恢復（同 captureVisibility/restore 模式）。
 // 退守：匯出失敗（超出畫布 / 遮色片停用失敗）→ 報 SCROLL_EXPORT_DEGRADED warning，不硬做。
@@ -1437,7 +1568,21 @@ function applyLayoutGroupMetadata(node, group, children, bounds, context) {
     node.layoutPaddingBottom = padding.padBottom;
     node.contentSizeFitter = true;
     // Auto-dedup disabled in v2.4.2 to avoid wrongly merging same-size but different-content images.
-    node.children = children;
+    // H/V Layout Group uses sibling index as layout order. PS layer order is depth order,
+    // so sort by visual position instead of reusing the bottom-to-top drawing order.
+    node.children = sortLinearLayoutChildren(children, layoutType);
+}
+
+function sortLinearLayoutChildren(children, layoutType) {
+    if (!children || children.length < 2) return children;
+
+    var sorted = children.slice();
+    sorted.sort(function (a, b) {
+        var primary = layoutType === "horizontal" ? a.x - b.x : a.y - b.y;
+        if (primary !== 0) return primary;
+        return layoutType === "horizontal" ? a.y - b.y : a.x - b.x;
+    });
+    return sorted;
 }
 
 // Sort a group's children into the sibling order that Unity's GridLayoutGroup will fill visually.
@@ -2788,6 +2933,39 @@ function computeFileHash(file) {
     return ((hash >>> 0).toString(16)) + "_" + len; // 串上長度進一步降低碰撞
 }
 
+// Read only the fixed PNG header. This keeps singleton images out of the much
+// more expensive full-file hash pass while preserving exact hash dedup for
+// files that can actually be duplicates.
+function readPngDimensionsKey(file) {
+    var header = null;
+    try {
+        file.encoding = "BINARY";
+        if (!file.open("r")) {
+            return "unknown";
+        }
+        header = file.read(24);
+        file.close();
+    } catch (e) {
+        try { file.close(); } catch (e2) {}
+        return "unknown";
+    }
+
+    if (!header || header.length < 24 ||
+        (header.charCodeAt(0) & 0xFF) !== 137 || header.substr(1, 3) !== "PNG" ||
+        header.substr(12, 4) !== "IHDR") {
+        return "unknown";
+    }
+
+    function readUint32(offset) {
+        return ((header.charCodeAt(offset) & 0xFF) * 0x1000000) +
+            ((header.charCodeAt(offset + 1) & 0xFF) << 16) +
+            ((header.charCodeAt(offset + 2) & 0xFF) << 8) +
+            (header.charCodeAt(offset + 3) & 0xFF);
+    }
+
+    return readUint32(16) + "x" + readUint32(20);
+}
+
 // Phase 3 dedup：呼叫前 PNG 已寫到 imageFolder。回傳 { dedupedCount, savedBytes }。
 // - 同 hash 群組：保留第一個遇到的 imagePath 為 canonical，其餘檔案刪除、節點 imagePath 重指到 canonical
 // - 同步清理 export cache 中對應「已刪除路徑」的紀錄，避免下次 run 認為檔案還在而誤跳過匯出
@@ -2797,8 +2975,9 @@ function dedupPngsByHash(pendingImages, imageFolder, context) {
         return stats;
     }
 
-    var hashMap = {}; // hash -> canonical imagePath
-    var deletedPaths = {}; // deletedPath -> canonicalPath
+    var records = [];
+    var recordByPath = {};
+    var candidateCounts = {};
 
     for (var i = 0; i < pendingImages.length; i++) {
         var p = pendingImages[i];
@@ -2807,32 +2986,58 @@ function dedupPngsByHash(pendingImages, imageFolder, context) {
         }
         stats.originalCount++;
 
-        // 若該 node 的 imagePath 已被重指過（多個 node 共用同檔），跳過實體掃描
-        if (deletedPaths.hasOwnProperty(p.node.imagePath)) {
-            p.node.imagePath = deletedPaths[p.node.imagePath];
-            stats.dedupedCount++;
+        var imagePath = p.node.imagePath;
+        if (recordByPath.hasOwnProperty(imagePath)) {
+            recordByPath[imagePath].entries.push(p);
             continue;
         }
 
-        var file = new File(imageFolder.fsName + "/" + p.node.imagePath);
+        var file = new File(imageFolder.fsName + "/" + imagePath);
         if (!file.exists) {
             continue;
         }
-        var hash = computeFileHash(file);
+
+        var candidateKey = String(file.length) + "|" + readPngDimensionsKey(file);
+        var record = {
+            imagePath: imagePath,
+            file: file,
+            candidateKey: candidateKey,
+            entries: [p],
+            hash: null
+        };
+        recordByPath[imagePath] = record;
+        records.push(record);
+        candidateCounts[candidateKey] = (candidateCounts[candidateKey] || 0) + 1;
+    }
+
+    var hashMap = {}; // candidateKey + hash -> canonical imagePath
+    for (var r = 0; r < records.length; r++) {
+        var current = records[r];
+
+        // A different byte length or PNG size proves the files cannot be exact
+        // duplicates, so singleton candidates skip the full-file hash.
+        if (candidateCounts[current.candidateKey] < 2) {
+            stats.uniqueCount++;
+            continue;
+        }
+
+        current.hash = computeFileHash(current.file); // at most once per file
+        var hash = current.hash;
         if (!hash) {
             continue;
         }
 
-        if (hashMap.hasOwnProperty(hash)) {
-            var canonical = hashMap[hash];
-            stats.savedBytes += file.length;
-            var oldPath = p.node.imagePath;
-            try { file.remove(); } catch (e) {}
-            deletedPaths[oldPath] = canonical;
-            p.node.imagePath = canonical;
+        var hashKey = current.candidateKey + "|" + hash;
+        if (hashMap.hasOwnProperty(hashKey)) {
+            var canonical = hashMap[hashKey];
+            stats.savedBytes += current.file.length;
+            var oldPath = current.imagePath;
+            try { current.file.remove(); } catch (e) {}
+            for (var entryIndex = 0; entryIndex < current.entries.length; entryIndex++) {
+                current.entries[entryIndex].node.imagePath = canonical;
+            }
             stats.dedupedCount++;
 
-            // 清掉 cache 內被刪除路徑的條目
             if (context.exportCache) {
                 var keysToDelete = [];
                 for (var k in context.exportCache) {
@@ -2847,7 +3052,7 @@ function dedupPngsByHash(pendingImages, imageFolder, context) {
                 }
             }
         } else {
-            hashMap[hash] = p.node.imagePath;
+            hashMap[hashKey] = current.imagePath;
             stats.uniqueCount++;
         }
     }

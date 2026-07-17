@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.12.2</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.12.6</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -529,6 +529,10 @@
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="ps-dialog">PS 匯出對話框</h2>
 
+  <div class="callout ok">
+    <strong>邊看規則邊命名</strong>：按下「命名規則說明」後，匯出主視窗會先關閉，再於瀏覽器開啟本機速查頁。您可以把速查放在 Photoshop 旁邊、使用瀏覽器搜尋，並直接操作圖層面板修改名稱；完成後重新執行匯出工具即可。
+  </div>
+
   <table>
     <tr><th>欄位／選項</th><th>說明</th></tr>
     <tr><td><code>PNG output folder</code></td><td>PNG 圖片輸出目的地。</td></tr>
@@ -585,7 +589,12 @@
     <tr><td><code>IMG_</code></td><td>圖片前綴（前綴本身會從 PNG 檔名中移除）。</td></tr>
     <tr><td><code>TXT_</code></td><td>文字前綴（前綴本身會從節點名稱中移除）。</td></tr>
     <tr><td><code>BTN_</code> <span class="tag tag-new">v2.4.3</span></td><td>圖片節點以 <code>BTN_</code> 開頭時（不分大小寫），Unity 匯入後自動在該 GameObject 加上 <code>Button</code> 元件，省去手動加掛步驟。</td></tr>
+    <tr><td><code>[MERGE]</code> <span class="tag tag-new">v2.12.4</span></td><td>加在群組名稱中，將群組目前可見的內容合成一張 PNG；Unity 端只建立一個 Image 節點，不保留子階層。文字、圖層效果與遮色片會一併烘入圖片。若同時存在 <code>[H]</code>、<code>[V]</code>、<code>[GRID]</code>、<code>[CG]</code> 或 Scroll 標籤，以 <code>[MERGE]</code> 為優先。</td></tr>
   </table>
+
+  <div class="callout warn">
+    <strong>[MERGE] 適用情境</strong>：適合不需要在 Unity 個別操作的背景裝飾、固定組合圖示或複雜視覺效果。若子項需要按鈕事件、換字、動畫、換皮或獨立縮放，請保留原群組階層，不要使用 <code>[MERGE]</code>。 v2.12.5 起會一次隔離並合成一個群組，存檔後立即釋放暫存像素層；操作上仍只需按一次 Export。
+  </div>
 
   <h3>文字圖層輸出控制</h3>
   <p>個別圖層可在名稱中指定輸出方式，覆蓋對話框的預設設定：</p>
@@ -894,6 +903,34 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
 
+  <h3>v2.12.6（2026-07-17）— PNG 去重掃描最佳化</h3>
+  <ul>
+    <li><strong>先篩選候選圖片</strong>：先用 PNG 檔案大小與像素尺寸分組，明顯不可能重複的圖片不再讀取完整檔案。</li>
+    <li><strong>每檔只計算一次</strong>：只有同規格候選者才計算完整雜湊，同一張候選圖片在單次 Export 中最多計算一次。</li>
+    <li><strong>結果保持一致</strong>：仍使用原本的完整檔案雜湊與首張圖作為共用資源；版面 JSON、圖片像素與 Unity 引用規則不變。</li>
+  </ul>
+
+  <h3>v2.12.5（2026-07-17）— 大型 PSD 的 MERGE 匯出最佳化</h3>
+  <ul>
+    <li><strong>逐組可見合成</strong>：<code>[MERGE]</code> 不再把整個 LayerSet（含巢狀圖層與 Smart Object）複製到暫存文件；改為只隔離目標分支並取得可見合成像素，資源成本主要取決於輸出寬高。</li>
+    <li><strong>即時釋放</strong>：一次只處理一個 MERGE 群組，PNG 存檔後立即移除暫存像素層，再自動處理下一組；使用者仍只需按一次 Export。</li>
+    <li><strong>安全退守</strong>：可見合成失敗時才回到原本整組複製路徑，並輸出 <code>MERGE_COMPOSITE_FALLBACK</code> warning；所有圖層可見狀態於每組完成後還原。</li>
+  </ul>
+  <h3>v2.12.4（2026-07-17）— 群組合併輸出 + 可並行操作命名速查</h3>
+  <ul>
+    <li><strong>群組合併輸出</strong>：群組名稱加入 <code>[MERGE]</code>，即可將群組可見內容（含文字、效果與遮色片）輸出成一張 PNG，Unity 端建立單一 Image 節點。</li>
+    <li><strong>命名速查外部化</strong>：「命名規則說明」改為本機瀏覽器速查頁；開啟時會關閉匯出主視窗，讓使用者可保留、縮放與搜尋速查內容，同時直接操作 Photoshop 圖層面板改名。</li>
+  </ul>
+  <h3>v2.12.3（2026-07-16）— 字型掃描防止重複建立 TMP Font Asset</h3>
+  <ul>
+    <li><strong>已建立狀態</strong>：掃描時以來源 <code>.ttf/.otf</code> 的 Unity 物件參照尋找現有 TMP Font Asset；找到後顯示「已建立（尚未對應）」並禁用按鈕，不再保留可二次點擊的「一鍵建立」。</li>
+    <li><strong>雙層防護</strong>：即使畫面尚未重新掃描，建立入口仍會再次檢查現有資產並中止，避免產生 <code>... SDF 1.asset</code> 等重複資產。</li>
+    <li><strong>掃描穩定性</strong>：忽略只有 Medium／Regular 等樣式名稱的錯誤候選、顯示實際字型檔名，並保存 TmpFontMap 欄位，避免 <code>????</code> 誤判與腳本重載後對應表遺失。</li>
+    <li><strong>多行文字修正</strong>：匯入時將 Photoshop 的單獨 CR 換行轉為 TMP 可辨識的 LF，避免多行文字被視為單行而串接、重疊。</li>
+    <li><strong>H/V 排列順序修正</strong>：一般群組仍以反向 sibling 保留 Photoshop 前後景；只有 <code>[H]</code>/<code>[V]</code> 群組依 PS 座標排成左→右／上→下，避免 Layout Group 頭尾顛倒。</li>
+    <li><strong>PS 工具啟動加速</strong>：不再於匯出視窗顯示前遞迴掃描整份 PSD；只有勾選「把目前選取的文字圖層強制輸出為 PNG」時才更新摘要，大型文件可更快開啟工具。</li>
+  </ul>
+
   <h3>v2.12.2（2026-07-15）— UI 修飾：空路徑提示不再顯示吊尾冒號</h3>
   <ul>
     <li>「圖片來源若在 Unity 專案外，Generate 時會複製到：」在尚未填專案資料夾名稱時，冒號後面是空字串、句尾吊著——改為<strong>路徑未定時整行不顯示</strong>，有路徑時以空格取代冒號。</li>
@@ -1073,7 +1110,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.12.2 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.12.6 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 
