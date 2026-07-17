@@ -1,6 +1,6 @@
 {
-    "version":  "2.12.4",
-    "phase":  "v2.12.4 — merged group export + searchable naming reference",
+    "version":  "2.12.5",
+    "phase":  "v2.12.5 — sequential visible-composite export for MERGE groups",
     "updated":  "2026-07-17",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [

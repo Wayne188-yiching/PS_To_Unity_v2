@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.12.4</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.12.5</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -593,7 +593,7 @@
   </table>
 
   <div class="callout warn">
-    <strong>[MERGE] 適用情境</strong>：適合不需要在 Unity 個別操作的背景裝飾、固定組合圖示或複雜視覺效果。若子項需要按鈕事件、換字、動畫、換皮或獨立縮放，請保留原群組階層，不要使用 <code>[MERGE]</code>。
+    <strong>[MERGE] 適用情境</strong>：適合不需要在 Unity 個別操作的背景裝飾、固定組合圖示或複雜視覺效果。若子項需要按鈕事件、換字、動畫、換皮或獨立縮放，請保留原群組階層，不要使用 <code>[MERGE]</code>。 v2.12.5 起會一次隔離並合成一個群組，存檔後立即釋放暫存像素層；操作上仍只需按一次 Export。
   </div>
 
   <h3>文字圖層輸出控制</h3>
@@ -903,6 +903,12 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
 
+  <h3>v2.12.5（2026-07-17）— 大型 PSD 的 MERGE 匯出最佳化</h3>
+  <ul>
+    <li><strong>逐組可見合成</strong>：<code>[MERGE]</code> 不再把整個 LayerSet（含巢狀圖層與 Smart Object）複製到暫存文件；改為只隔離目標分支並取得可見合成像素，資源成本主要取決於輸出寬高。</li>
+    <li><strong>即時釋放</strong>：一次只處理一個 MERGE 群組，PNG 存檔後立即移除暫存像素層，再自動處理下一組；使用者仍只需按一次 Export。</li>
+    <li><strong>安全退守</strong>：可見合成失敗時才回到原本整組複製路徑，並輸出 <code>MERGE_COMPOSITE_FALLBACK</code> warning；所有圖層可見狀態於每組完成後還原。</li>
+  </ul>
   <h3>v2.12.4（2026-07-17）— 群組合併輸出 + 可並行操作命名速查</h3>
   <ul>
     <li><strong>群組合併輸出</strong>：群組名稱加入 <code>[MERGE]</code>，即可將群組可見內容（含文字、效果與遮色片）輸出成一張 PNG，Unity 端建立單一 Image 節點。</li>
@@ -1097,7 +1103,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.12.4 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.12.5 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.12.4";
+var SCRIPT_VERSION = "2.12.5";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 // OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。
@@ -1126,7 +1126,9 @@ function exportAllImages(pendingImages, context) {
     }
 
     var fallbackVisibilityPrepared = false;
+    var fallbackOriginalVisibility = null;
     if (!context.useFastLayerDuplicate) {
+        fallbackOriginalVisibility = captureVisibility(context.doc);
         hideAllLayers(context.doc);
         fallbackVisibilityPrepared = true;
     }
@@ -1160,14 +1162,33 @@ function exportAllImages(pendingImages, context) {
             }
 
             var result;
-            if (context.useFastLayerDuplicate) {
+            var isMergedGroup = entry.layer.typename === "LayerSet" && hasMergeGroupTag(entry.layer.name);
+            if (isMergedGroup) {
+                // v2.12.5：MERGE 不複製整個 LayerSet。只隔離目標分支後 Copy Merged，
+                // 成本取決於輸出像素，不再隨巢狀圖層／Smart Object 數量膨脹。
+                if (fallbackVisibilityPrepared && fallbackOriginalVisibility) {
+                    restoreVisibility(fallbackOriginalVisibility);
+                    visibleChain = [];
+                }
+                result = exportMergedGroupComposite(entry.layer, entry.node, context, exportDoc, file);
+                if (result === false && context.useFastLayerDuplicate) {
+                    pushWarning(context, entry.node.name || "", "MERGE_COMPOSITE_FALLBACK",
+                        "MERGE 可見合成失敗，已改用整組複製後備路徑；此群組可能較慢。");
+                    result = exportNodeImageFastDuplicate(entry.layer, entry.node, context, exportDoc, file);
+                }
+                if (fallbackVisibilityPrepared) {
+                    hideAllLayers(context.doc);
+                    visibleChain = [];
+                }
+            } else if (context.useFastLayerDuplicate) {
                 result = exportNodeImageFastDuplicate(entry.layer, entry.node, context, exportDoc, file);
             } else {
                 visibleChain = showOnlyLayerChain(entry.layer, visibleChain);
                 result = exportNodeImageReuseWithMaskHandling(entry.layer, entry.node, context, exportDoc, file);
             }
-            if (result === false && context.useFastLayerDuplicate) {
+            if (result === false && context.useFastLayerDuplicate && !isMergedGroup) {
                 if (!fallbackVisibilityPrepared) {
+                    fallbackOriginalVisibility = captureVisibility(context.doc);
                     hideAllLayers(context.doc);
                     fallbackVisibilityPrepared = true;
                     visibleChain = [];
@@ -1295,6 +1316,57 @@ function resetExportDocument(doc, width, height) {
     }
 }
 
+// v2.12.5：一次隔離並合成一個 [MERGE] 群組。只切換目標到文件根節點沿途的兄弟層，
+// 不改動目標群組內部的可見狀態；匯出後立即還原，下一個 MERGE 再獨立處理。
+function exportMergedGroupComposite(layerSet, node, context, exportDoc, file) {
+    app.activeDocument = context.doc;
+    var visibilityStates = isolateLayerBranchPreservingDescendants(layerSet);
+    var exportLayerCountBefore = exportDoc.layers.length;
+    var result = false;
+    try {
+        result = exportNodeImageReuse(layerSet, node, context, exportDoc, file);
+    } finally {
+        // Copy Merged 只留下單一暫存像素層；存檔後立即移除，避免多個 MERGE 累積圖層與 RAM。
+        app.activeDocument = exportDoc;
+        while (exportDoc.layers.length > exportLayerCountBefore) {
+            try {
+                exportDoc.layers[0].remove();
+            } catch (removeError) {
+                break;
+            }
+        }
+        app.activeDocument = context.doc;
+        restoreVisibility(visibilityStates);
+    }
+    return result;
+}
+
+function isolateLayerBranchPreservingDescendants(layer) {
+    var states = [];
+    var current = layer;
+
+    while (current && current.typename !== "Document") {
+        var container = current.parent;
+        if (!container || !container.layers) {
+            break;
+        }
+
+        for (var i = 0; i < container.layers.length; i++) {
+            var sibling = container.layers[i];
+            var visible = true;
+            try {
+                visible = sibling.visible;
+            } catch (e) {
+            }
+            states.push({ layer: sibling, visible: visible });
+            setLayerVisible(sibling, sibling === current);
+        }
+
+        current = container;
+    }
+
+    return states;
+}
 // OPTIMIZATION_PLAN_zh.html#phase4-5-q9：merged-copy 會把遮色片（含祖先的）烘進合併結果。
 // scroll 內圖層（_noMaskExport）→ 暫時停用自身＋祖先鏈的遮色片，匯完恢復（同 captureVisibility/restore 模式）。
 // 退守：匯出失敗（超出畫布 / 遮色片停用失敗）→ 報 SCROLL_EXPORT_DEGRADED warning，不硬做。
