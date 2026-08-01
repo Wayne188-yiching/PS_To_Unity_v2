@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.12.2";
+var SCRIPT_VERSION = "2.12.10";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 // OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。
@@ -11,10 +11,12 @@ var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_
 // 但 var 的「賦值」不會 —— 定義若留在檔案後段，匯出流程（IIFE 內）呼叫 stripKnownTags 時
 // 本陣列仍是 undefined，任何含 group 的 PSD 一匯出就爆「undefined 不是物件」（PS COM 實測）。
 var KNOWN_BRACKET_TAG_PATTERNS = [
+    /\[(?:SLICED|9SLICE|9S)\s*(?::|=)\s*[^\]]+\]/ig,                          // Nine-slice border metadata
     /\[(?:H|HLAYOUT|V|VLAYOUT)\]/ig,                                            // H/V LayoutGroup（#phase4-decisions Q8）
     /\[(?:GRID|GLAYOUT)\]/ig,                                                   // GridLayoutGroup（#phase4-decisions Q8）
     /\[(?:CG|CANVASGROUP)\]/ig,                                                 // CanvasGroup（#phase4-decisions Q8）
     /\[(?:SCROLL_V|SCROLL_H)\]/ig,                                              // ScrollRect（#phase4-5-q1）
+    /\[(?:SOFTMASK_BOTTOM|SOFTMASK_Y|FADE_BOTTOM)\s*(?::|=)\s*\d+(?:\.\d+)?\s*\]/ig, // Bottom-only ScrollRect fade
     /\[THICK\s*:\s*-?\d+(?:\.\d+)?\s*(?::\s*-?\d+(?:\.\d+)?)?\s*\]/ig           // 假厚度文字
 ];
 
@@ -25,7 +27,15 @@ var KNOWN_BRACKET_TAG_PATTERNS = [
     }
 
     var sourceDoc = app.activeDocument;
-    var options = showExportDialog(sourceDoc);
+    var options = null;
+    var automated = false;
+    if ($.global.PS_TO_UNITY_V2_AUTOMATION_OPTIONS) {
+        automated = true;
+        options = $.global.PS_TO_UNITY_V2_AUTOMATION_OPTIONS;
+        $.global.PS_TO_UNITY_V2_AUTOMATION_OPTIONS = null;
+    } else {
+        options = showExportDialog(sourceDoc);
+    }
 
     if (!options) {
         return;
@@ -42,9 +52,22 @@ var KNOWN_BRACKET_TAG_PATTERNS = [
             "UI Package 匯出完成。\n\n" +
             "圖層：" + result.imageCount + "　文字：" + result.textCount + "　群組：" + result.groupCount + dedupLine + "\n\n" +
             "詳細報告：\n" + result.reportFile.fsName;
-        alert(summary);
+        if (automated) {
+            $.global.PS_TO_UNITY_V2_AUTOMATION_RESULT = {
+                imageCount: result.imageCount,
+                textCount: result.textCount,
+                groupCount: result.groupCount,
+                reportFile: result.reportFile.fsName
+            };
+        } else {
+            alert(summary);
+        }
     } catch (e) {
-        alert("UI Package 匯出失敗。\n\n錯誤：" + e.message);
+        if (automated) {
+            $.global.PS_TO_UNITY_V2_AUTOMATION_RESULT = { error: e.message };
+        } else {
+            alert("UI Package 匯出失敗。\n\n錯誤：" + e.message);
+        }
     }
 })();
 
@@ -176,6 +199,7 @@ function downloadUrlToFile(url, destPath) {
 // v2.10：命名規則速查——集中列出所有會觸發 Unity 端行為的圖層命名約定。
 function showNamingHelpDialog() {
     var text = ""
+        + "[SLICED=32] / [SLICED=L,T,R,B]  Unity 9-slice border; importer sets Image Type = Sliced\n\n"
         + "── 群組標籤（自動掛 Unity Component）──\n"
         + "[H] / [HLAYOUT]         Horizontal Layout Group\n"
         + "[V] / [VLAYOUT]         Vertical Layout Group\n"
@@ -185,6 +209,7 @@ function showNamingHelpDialog() {
         + "                        兩者可同標 = 雙向捲動。群組自身的遮色片 = 可視窗範圍；\n"
         + "                        群組內圖層的遮色片會自動忽略、匯出完整圖，裁切交給 Unity 端）\n"
         + "                        可與 [V]/[H]/[GRID] 組合：排版元件會掛在 Content 上\n"
+        + "[SOFTMASK_BOTTOM=64]    Scroll Viewport 底邊柔化像素（需搭配 [SCROLL_V]/[SCROLL_H]）\n"
         + "[THICK:下偏移:右偏移]    假厚度文字（Unity 產出上下兩層 TMP）\n"
         + "\n"
         + "── 前綴 ──\n"
@@ -334,7 +359,7 @@ function showExportDialog(doc) {
         }
     };
 
-    var intro = dialog.add("statictext", undefined, "把非文字圖層輸出為 PNG + 命名 Layout JSON 給 Unity。文字圖層維持為 TMP 節點。");
+    var intro = dialog.add("statictext", undefined, "把非文字圖層輸出為 PNG + 命名 Layout JSON 給 Unity。一般文字維持 TMP；TMP 無法重現的複合效果文字會自動保留為 PNG。");
     intro.characters = 82;
 
     var defaultImageOutput = defaultImageFolder(doc);
@@ -396,12 +421,10 @@ function showExportDialog(doc) {
     var selectedTextAsImage = optionPanel.add("checkbox", undefined, "把目前選取的文字圖層強制輸出為 PNG");
     selectedTextAsImage.value = false;
 
-    // U12：顯示目前選取的文字圖層數與名稱，讓使用者勾選前就知道會影響哪些圖層
-    var selectedTextSummary = summarizeSelectedTextLayers(doc);
-    var selectedSummaryText = selectedTextSummary.count > 0
-        ? "目前選取：" + selectedTextSummary.count + " 個文字圖層（" + selectedTextSummary.names.join("、") + "）"
-        : "目前選取：0 個文字圖層";
-    var selectedSummaryLabel = optionPanel.add("statictext", undefined, selectedSummaryText);
+    // Large production PSDs can make even Action Manager's targetLayers query slow.
+    // Read the selection only after the user clicks Export; opening the window must be instant.
+    var selectedSummaryLabel = optionPanel.add("statictext", undefined,
+        "選取的文字圖層會在按下匯出時讀取（開啟視窗時不預掃 PSD）");
     selectedSummaryLabel.characters = 82;
 
     // v2.10：白名單 = 內建思源／源泉系列 + 使用者自訂關鍵字（編輯對話框維護，存於使用者資料夾）。
@@ -530,26 +553,30 @@ function showExportDialog(doc) {
 function summarizeSelectedTextLayers(doc) {
     var result = { count: 0, names: [] };
     try {
-        var idMap = readSelectedLayerIdMap(doc);
-        // idMap 是 {id: true}，把圖層走一遍對名稱
-        walk(doc.layers);
-        function walk(layers) {
-            for (var i = 0; i < layers.length; i++) {
-                var layer = layers[i];
-                if (layer.typename === "LayerSet") {
-                    walk(layer.layers);
-                    continue;
-                }
-                if (layer.typename !== "ArtLayer") continue;
-                if (!isTextLayer(layer)) continue;
-                if (idMap[layer.id]) {
-                    result.count++;
-                    if (result.names.length < 5) {
-                        result.names.push(layer.name);
-                    } else if (result.names.length === 5) {
-                        result.names.push("…");
-                    }
-                }
+        var selectedIds = readSelectedLayerIdsByActionManager();
+        if (selectedIds.length === 0) {
+            try {
+                selectedIds.push(doc.activeLayer.id);
+            } catch (activeLayerError) {
+            }
+        }
+
+        // Read only selected layer descriptors. Walking doc.layers here makes the
+        // export window wait for every layer in large production PSDs.
+        for (var i = 0; i < selectedIds.length; i++) {
+            var layerRef = new ActionReference();
+            layerRef.putIdentifier(charIDToTypeID("Lyr "), selectedIds[i]);
+            var layerDescriptor = executeActionGet(layerRef);
+            if (!layerDescriptor.hasKey(stringIDToTypeID("textKey"))) continue;
+
+            result.count++;
+            if (result.names.length < 5) {
+                var nameKey = charIDToTypeID("Nm  ");
+                result.names.push(layerDescriptor.hasKey(nameKey)
+                    ? layerDescriptor.getString(nameKey)
+                    : ("Layer " + selectedIds[i]));
+            } else if (result.names.length === 5) {
+                result.names.push("…");
             }
         }
     } catch (e) {}
@@ -695,14 +722,19 @@ function collectNodes(container, parentVisible, context, pendingImages, parentBo
             // OPTIMIZATION_PLAN_zh.html#phase4-5-q2：進入 [SCROLL_*] group 時記深度，
             // 內部節點改走「boundsNoMask + 不 clamp 畫布 + 去 mask 匯出」語意。
             var scrollTag = detectScrollDirection(layer.name);
+            var previousScrollContentGroupDepth = context.scrollContentGroupDepth || 0;
             if (scrollTag) {
                 context.scrollDepth = (context.scrollDepth || 0) + 1;
+                context.scrollContentGroupDepth = 0;
+            } else if ((context.scrollDepth || 0) > 0) {
+                context.scrollContentGroupDepth = previousScrollContentGroupDepth + 1;
             }
             var childParentBounds = groupBounds || parentBounds;
             var childNodes = collectNodes(layer, effectiveVisible, context, pendingImages, childParentBounds);
             if (scrollTag) {
                 context.scrollDepth--;
             }
+            context.scrollContentGroupDepth = previousScrollContentGroupDepth;
             if (childNodes.length > 0) {
                 var groupNode = createGroupNode(layer, childNodes, context, parentBounds, groupBounds);
                 if (groupNode) {
@@ -774,10 +806,22 @@ function appendNodes(target, source) {
 
 function createGroupNode(layerSet, children, context, parentBounds, bounds) {
     var layoutType = detectLayoutGroupType(layerSet, children);
+    var insideScroll = (context.scrollDepth || 0) > 0;
+    var isScrollNode = !!detectScrollDirection(layerSet.name);
+    var isDirectScrollItem = insideScroll && (context.scrollContentGroupDepth || 0) === 0;
+    var clipToBounds = !isScrollNode && !isDirectScrollItem && layerHasEnabledMask(layerSet);
     // Auto-dedup disabled in v2.4.2: same width x height does not imply same content.
     // Function dedupeLayoutGroupImages retained for potential opt-in via layer tag in the future.
 
-    var insideScroll = (context.scrollDepth || 0) > 0;
+    if (clipToBounds) {
+        var maskBounds = readLayerBoundsNoEffects(layerSet);
+        maskBounds = maskBounds ? clampBoundsToCanvas(maskBounds, context.doc) : null;
+        if (maskBounds && maskBounds.width > 0 && maskBounds.height > 0) {
+            bounds = maskBounds;
+        } else {
+            clipToBounds = false;
+        }
+    }
     if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
         bounds = boundsFromChildren(children, context.doc, insideScroll);
     }
@@ -798,6 +842,10 @@ function createGroupNode(layerSet, children, context, parentBounds, bounds) {
         visible: true,
         children: children
     };
+
+    if (clipToBounds) {
+        node.clipToBounds = true;
+    }
 
     if (insideScroll) {
         // scroll 內的巢狀 group：bounds 不 clamp 畫布，並帶 _visibleBounds 供外層 viewport 聯集。
@@ -854,6 +902,7 @@ function applyScrollMetadata(node, layerSet, children, bounds, context) {
     node.contentY = content.top;
     node.contentWidth = content.width;
     node.contentHeight = content.height;
+    node.scrollSoftnessY = detectScrollSoftnessY(rawName);
 
     // OPTIMIZATION_PLAN_zh.html#phase4-5-q7：排列軸 ⊥ 捲動軸 → 照標籤掛，但提醒內容不會往捲動方向長。
     var layoutType = detectLayoutGroupType(rawName, children);
@@ -875,6 +924,20 @@ function refreshGroupBounds(nodes, context) {
         }
 
         refreshGroupBounds(node.children || [], context);
+
+        if (node.clipToBounds) {
+            var clippedRect = {
+                left: node.x,
+                top: node.y,
+                right: node.x + node.width,
+                bottom: node.y + node.height,
+                width: node.width,
+                height: node.height
+            };
+            applyLayoutMetadata(node, clippedRect, node._parentBounds, node._rawName);
+            applyLayoutGroupMetadata(node, node._rawName, node.children || [], clippedRect, context && context.doc ? context : null);
+            continue;
+        }
 
         // OPTIMIZATION_PLAN_zh.html#phase4-5-q2：scroll 群組——viewport（node.x/y/w/h）在收集期已定，
         // trim 不會移動遮色片幾何，保持不動；content 依 trim 後的 children 重新聯集（不 clamp）。
@@ -1004,7 +1067,10 @@ function createImageNode(layer, context, parentBounds) {
     // OPTIMIZATION_PLAN_zh.html#phase4-5-q2/q9：scroll 內用未裁切完整 bounds，且不 clamp 畫布
     //（scroll 內容本可超出畫面，超出部分 runtime 由 Viewport 的 RectMask2D 裁切）。
     var insideScroll = (context.scrollDepth || 0) > 0;
-    var bounds = insideScroll ? readLayerBoundsNoMask(layer) : readLayerBounds(layer);
+    // Only direct Scroll Content items may represent a row clipped by the viewport.
+    // Masks deeper inside an item are part of its actual artwork and must be preserved.
+    var removeMaskForScroll = insideScroll && (context.scrollContentGroupDepth || 0) === 0;
+    var bounds = removeMaskForScroll ? readLayerBoundsNoMask(layer) : readLayerBounds(layer);
     if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
         return null;
     }
@@ -1033,6 +1099,15 @@ function createImageNode(layer, context, parentBounds) {
         children: []
     };
 
+    var sliced = parseSlicedTag(layer.name);
+    if (sliced) {
+        node.imageType = "sliced";
+        node.spriteBorderLeft = sliced.left;
+        node.spriteBorderTop = sliced.top;
+        node.spriteBorderRight = sliced.right;
+        node.spriteBorderBottom = sliced.bottom;
+    }
+
     var noEffectsBounds = readLayerBoundsNoEffects(layer);
     node._exportBounds = bounds;
     node._noEffectsBounds = noEffectsBounds;
@@ -1040,15 +1115,16 @@ function createImageNode(layer, context, parentBounds) {
     node._rawName = layer.name;
 
     if (insideScroll) {
-        // OPTIMIZATION_PLAN_zh.html#phase4-5-q9：scroll 內圖層去 mask 匯全圖（快取簽名一併帶 nomask flag）。
-        node._noMaskExport = true;
+        // Direct scroll items drop their viewport-preview mask; nested artwork keeps
+        // its own design masks. The cache signature carries nomask only when removed.
+        node._noMaskExport = removeMaskForScroll;
         // viewport 用的「可視 bounds」（遮色片裁切後、clamp 畫布）；無遮色片時＝一般 bounds。
         var visibleBounds = readLayerBounds(layer);
         visibleBounds = visibleBounds ? clampBoundsToCanvas(visibleBounds, context.doc) : null;
         node._visibleBounds = visibleBounds || bounds;
         // 有啟用遮色片時，boundsNoMask（全圖）與 boundsNoEffects（已套 mask）基準不一致，
         // 陰影補償會算出錯誤 padding → 歸零，座標交給 trim 後的實際像素回寫。
-        if (layerHasEnabledMask(layer)) {
+        if (removeMaskForScroll && layerHasEnabledMask(layer)) {
             node._padding = zeroPadding();
         } else {
             node._padding = calculateShadowCompensation(bounds, noEffectsBounds);
@@ -1157,6 +1233,11 @@ function exportNodeImageFastDuplicate(layer, node, context, exportDoc, file) {
         if (node._noMaskExport) {
             removeActiveLayerMasks();
         }
+        var duplicateBounds = readLayerBounds(duplicatedLayer);
+        if (duplicateBounds) {
+            node._duplicateExportOriginX = duplicateBounds.left;
+            node._duplicateExportOriginY = duplicateBounds.top;
+        }
         alignActiveLayerToExportOrigin(exportDoc);
 
         if (!trimTransparentPixelsAndApplyPadding(exportDoc, node)) {
@@ -1178,6 +1259,8 @@ function exportNodeImageFastDuplicate(layer, node, context, exportDoc, file) {
         } catch (ignored) {
         }
         app.activeDocument = context.doc;
+        try { delete node._duplicateExportOriginX; } catch (ignoredOriginX) {}
+        try { delete node._duplicateExportOriginY; } catch (ignoredOriginY) {}
     }
 
     return saved;
@@ -1308,7 +1391,12 @@ function exportNodeImageReuse(layer, node, context, exportDoc, file) {
 }
 
 function trimTransparentPixelsAndApplyPadding(doc, node) {
-    var contentBounds = readLayerBounds(doc.activeLayer);
+    // Smart Objects can retain a document-sized transparent canvas even when
+    // only a small decoration is visible. Rasterizing in the temporary export
+    // document and trimming its transparent canvas gives the real pixel rect.
+    // Two-stage trim preserves the removed left/top offset for Layout JSON.
+    var smartObjectTrim = trimActiveSmartObjectTransparency(doc);
+    var contentBounds = smartObjectTrim || readLayerBounds(doc.activeLayer);
     if (!contentBounds || contentBounds.width <= 0 || contentBounds.height <= 0) {
         return false;
     }
@@ -1321,20 +1409,29 @@ function trimTransparentPixelsAndApplyPadding(doc, node) {
     var finalWidth = Math.max(1, contentBounds.width + padLeft + padRight);
     var finalHeight = Math.max(1, contentBounds.height + padTop + padBottom);
 
-    doc.crop([
-        UnitValue(contentBounds.left, "px"),
-        UnitValue(contentBounds.top, "px"),
-        UnitValue(contentBounds.right, "px"),
-        UnitValue(contentBounds.bottom, "px")
-    ]);
+    if (!smartObjectTrim) {
+        doc.crop([
+            UnitValue(contentBounds.left, "px"),
+            UnitValue(contentBounds.top, "px"),
+            UnitValue(contentBounds.right, "px"),
+            UnitValue(contentBounds.bottom, "px")
+        ]);
+    }
 
     doc.resizeCanvas(finalWidth, finalHeight, AnchorPosition.TOPLEFT);
     if (padLeft > 0 || padTop > 0) {
         doc.activeLayer.translate(padLeft, padTop);
     }
 
-    node.x = Math.round(node.x + contentBounds.left - padLeft);
-    node.y = Math.round(node.y + contentBounds.top - padTop);
+    var isOversizedSmartObject = smartObjectTrim &&
+        (contentBounds.width < node.width * 0.5 || contentBounds.height < node.height * 0.5);
+    if (isOversizedSmartObject && typeof node._duplicateExportOriginX === "number") {
+        node.x = Math.round(node._duplicateExportOriginX + contentBounds.left - padLeft);
+        node.y = Math.round(node._duplicateExportOriginY + contentBounds.top - padTop);
+    } else {
+        node.x = Math.round(node.x + contentBounds.left - padLeft);
+        node.y = Math.round(node.y + contentBounds.top - padTop);
+    }
     node.width = finalWidth;
     node.height = finalHeight;
     applyLayoutMetadata(node, {
@@ -1346,6 +1443,34 @@ function trimTransparentPixelsAndApplyPadding(doc, node) {
         height: node.height
     }, node._parentBounds, node._rawName);
     return true;
+}
+
+function trimActiveSmartObjectTransparency(doc) {
+    try {
+        if (!doc.activeLayer || doc.activeLayer.kind !== LayerKind.SMARTOBJECT) return null;
+        doc.activeLayer.rasterize(RasterizeType.ENTIRELAYER);
+
+        var originalWidth = px(doc.width);
+        var originalHeight = px(doc.height);
+        doc.trim(TrimType.TRANSPARENT, true, true, false, false);
+        var removedLeft = Math.max(0, originalWidth - px(doc.width));
+        var removedTop = Math.max(0, originalHeight - px(doc.height));
+        doc.trim(TrimType.TRANSPARENT, true, true, true, true);
+
+        var width = Math.max(0, Math.round(px(doc.width)));
+        var height = Math.max(0, Math.round(px(doc.height)));
+        if (width <= 0 || height <= 0) return null;
+        return {
+            left: removedLeft,
+            top: removedTop,
+            right: removedLeft + width,
+            bottom: removedTop + height,
+            width: width,
+            height: height
+        };
+    } catch (error) {
+        return null;
+    }
 }
 
 function clampBoundsToCanvas(bounds, doc) {
@@ -1437,7 +1562,21 @@ function applyLayoutGroupMetadata(node, group, children, bounds, context) {
     node.layoutPaddingBottom = padding.padBottom;
     node.contentSizeFitter = true;
     // Auto-dedup disabled in v2.4.2 to avoid wrongly merging same-size but different-content images.
-    node.children = children;
+    node.children = sortLinearLayoutChildren(children, layoutType);
+}
+
+function sortLinearLayoutChildren(children, layoutType) {
+    if (!children || children.length < 2) return children;
+    var sorted = children.slice();
+    sorted.sort(function (a, b) {
+        if (layoutType === "vertical") {
+            if (a.y !== b.y) return a.y - b.y;
+            return a.x - b.x;
+        }
+        if (a.x !== b.x) return a.x - b.x;
+        return a.y - b.y;
+    });
+    return sorted;
 }
 
 // Sort a group's children into the sibling order that Unity's GridLayoutGroup will fill visually.
@@ -1632,7 +1771,7 @@ function calcLayoutSpacing(layoutType, children) {
         var current = items[i];
         var next = items[i + 1];
         var gap = layoutType === "horizontal" ? next.x - (current.x + current.width) : next.y - (current.y + current.height);
-        gaps.push(Math.max(0, round2(gap)));
+        gaps.push(round2(gap));
     }
 
     gaps.sort(function (a, b) {
@@ -1641,9 +1780,9 @@ function calcLayoutSpacing(layoutType, children) {
 
     var middle = Math.floor(gaps.length / 2);
     if (gaps.length % 2 === 1) {
-        return Math.max(0, round2(gaps[middle]));
+        return round2(gaps[middle]);
     }
-    return Math.max(0, round2((gaps[middle - 1] + gaps[middle]) / 2));
+    return round2((gaps[middle - 1] + gaps[middle]) / 2);
 }
 
 function calcLayoutPadding(bounds, children) {
@@ -2090,6 +2229,9 @@ function nodeToJson(node, indent) {
     if (node.hasCanvasGroup) {
         lines.push(childIndent + '"hasCanvasGroup": true,');
     }
+    if (node.clipToBounds) {
+        lines.push(childIndent + '"clipToBounds": true,');
+    }
     // OPTIMIZATION_PLAN_zh.html#phase4-5-q8：scroll 欄位只在有標籤時寫出。
     // node 自身 x/y/w/h = viewport（可視範圍）；content* = children 完整 bounds 聯集（絕對 PS 座標）。
     if (node.scrollDirection) {
@@ -2098,10 +2240,20 @@ function nodeToJson(node, indent) {
         lines.push(childIndent + '"contentY": ' + jsonNumber(node.contentY || 0) + ",");
         lines.push(childIndent + '"contentWidth": ' + jsonNumber(node.contentWidth || 0) + ",");
         lines.push(childIndent + '"contentHeight": ' + jsonNumber(node.contentHeight || 0) + ",");
+        if (node.scrollSoftnessY > 0) {
+            lines.push(childIndent + '"scrollSoftnessY": ' + jsonNumber(node.scrollSoftnessY) + ",");
+        }
     }
 
     if (node.type === "image") {
         lines.push(childIndent + '"imagePath": ' + quoteJson(node.imagePath) + ",");
+        if (node.imageType === "sliced") {
+            lines.push(childIndent + '"imageType": "sliced",');
+            lines.push(childIndent + '"spriteBorderLeft": ' + jsonNumber(node.spriteBorderLeft || 0) + ",");
+            lines.push(childIndent + '"spriteBorderTop": ' + jsonNumber(node.spriteBorderTop || 0) + ",");
+            lines.push(childIndent + '"spriteBorderRight": ' + jsonNumber(node.spriteBorderRight || 0) + ",");
+            lines.push(childIndent + '"spriteBorderBottom": ' + jsonNumber(node.spriteBorderBottom || 0) + ",");
+        }
     } else if (node.type === "text") {
         lines.push(childIndent + '"text": ' + quoteJson(node.text) + ",");
         lines.push(childIndent + '"fontToken": ' + quoteJson(node.fontToken) + ",");
@@ -3182,6 +3334,40 @@ function stripKnownTags(name) {
     return text;
 }
 
+function detectScrollSoftnessY(rawName) {
+    var match = /\[(?:SOFTMASK_BOTTOM|SOFTMASK_Y|FADE_BOTTOM)\s*(?::|=)\s*(\d+(?:\.\d+)?)\s*\]/i.exec(String(rawName || ""));
+    if (!match) return 0;
+    var value = parseFloat(match[1]);
+    return isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function parseSlicedTag(name) {
+    var match = String(name || "").match(/\[(?:SLICED|9SLICE|9S)\s*(?::|=)\s*([^\]]+)\]/i);
+    if (!match) {
+        return null;
+    }
+
+    var parts = match[1].split(",");
+    if (parts.length !== 1 && parts.length !== 4) {
+        return null;
+    }
+
+    var values = [];
+    for (var i = 0; i < parts.length; i++) {
+        var value = parseFloat(parts[i]);
+        if (!isFinite(value) || value < 0) {
+            return null;
+        }
+        values.push(value);
+    }
+
+    if (values.length === 1) {
+        return { left: values[0], top: values[0], right: values[0], bottom: values[0] };
+    }
+
+    return { left: values[0], top: values[1], right: values[2], bottom: values[3] };
+}
+
 function normalizeAsciiSlug(value) {
     return String(value)
         .toLowerCase()
@@ -3310,6 +3496,14 @@ function shouldExportTextLayerAsImage(layer, context) {
         return false;
     }
 
+    // Photoshop can stack multiple shadows, glows, bevels and other effects on
+    // one text layer. A single TMP SDF material cannot reproduce those effects
+    // faithfully, so preserve the rendered pixels unless the layer explicitly
+    // opts into TMP with a naming directive above.
+    if (hasEnabledUnsupportedTextEffects(layer)) {
+        return true;
+    }
+
     if (context.autoRouteNonSourceHanFonts) {
         var rawFont = readRawFontName(layer);
         if (!rawFont) {
@@ -3320,6 +3514,43 @@ function shouldExportTextLayerAsImage(layer, context) {
     }
 
     return context.textLayerOutput === "image";
+}
+
+function hasEnabledUnsupportedTextEffects(layer) {
+    try {
+        var descriptor = getLayerDescriptor(layer);
+        var effects = getDescriptorObject(descriptor, ["layerEffects"], ["Lefx"]);
+        if (!effects) return false;
+
+        var objectEffects = [
+            "dropShadow", "innerShadow", "outerGlow", "innerGlow",
+            "bevelEmboss", "satin", "patternFill"
+        ];
+        for (var i = 0; i < objectEffects.length; i++) {
+            var effect = getDescriptorObject(effects, [objectEffects[i]], []);
+            if (effect && getDescriptorBoolean(effect, ["enabled"], ["enab"], true)) {
+                return true;
+            }
+        }
+
+        var listEffects = [
+            "dropShadowMulti", "innerShadowMulti", "outerGlowMulti", "innerGlowMulti",
+            "bevelEmbossMulti", "satinMulti", "patternFillMulti",
+            "solidFillMulti", "gradientFillMulti", "frameFXMulti"
+        ];
+        for (var j = 0; j < listEffects.length; j++) {
+            var list = getDescriptorList(effects, [listEffects[j]], []);
+            if (!list) continue;
+            for (var k = 0; k < list.count; k++) {
+                var listEffect = getDescriptorListItemAt(list, k);
+                if (listEffect && getDescriptorBoolean(listEffect, ["enabled"], ["enab"], true)) {
+                    return true;
+                }
+            }
+        }
+    } catch (ignored) {
+    }
+    return false;
 }
 
 function readText(layer) {

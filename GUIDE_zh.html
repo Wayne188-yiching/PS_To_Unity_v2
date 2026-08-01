@@ -441,7 +441,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.12.2</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.12.10</span></h1>
     <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
   </header>
 
@@ -585,7 +585,14 @@
     <tr><td><code>IMG_</code></td><td>圖片前綴（前綴本身會從 PNG 檔名中移除）。</td></tr>
     <tr><td><code>TXT_</code></td><td>文字前綴（前綴本身會從節點名稱中移除）。</td></tr>
     <tr><td><code>BTN_</code> <span class="tag tag-new">v2.4.3</span></td><td>圖片節點以 <code>BTN_</code> 開頭時（不分大小寫），Unity 匯入後自動在該 GameObject 加上 <code>Button</code> 元件，省去手動加掛步驟。</td></tr>
+    <tr><td><code>[SLICED=32]</code> / <code>[SLICED=左,上,右,下]</code> <span class="tag tag-new">v2.12.4</span></td><td>圖片匯出時把九宮格 Border 寫入 JSON；Unity 自動套用 Sprite Border，並把生成的 Image Type 設為 <code>Sliced</code>。可用別名 <code>[9SLICE=…]</code>、<code>[9S=…]</code>。</td></tr>
+    <tr><td><code>[SOFTMASK_BOTTOM=64]</code> <span class="tag tag-new">v2.12.5</span></td><td>搭配 <code>[SCROLL_V]</code> / <code>[SCROLL_H]</code> 使用；Unity 以雙層原生 <code>RectMask2D</code> 只柔化捲動視窗底邊，不增加 runtime 套件。<code>[SOFTMASK_Y=64]</code> 保留為相容別名。</td></tr>
   </table>
+
+  <h3>九宮格圖片自動化</h3>
+  <pre><code>IMG_panel_[SLICED=32]
+IMG_dialog_[SLICED=24,40,24,32]</code></pre>
+  <p>單一數值代表左、上、右、下都使用相同像素；四個數值的順序固定為「左、上、右、下」。Border 以匯出 PNG 的像素為單位。若圖層未加標記，Unity 不會覆蓋 Sprite Editor 內原有的 Border；只要 Sprite 已有非零 Border，產生 Prefab 時仍會自動改用 <code>Image.Type.Sliced</code>。</p>
 
   <h3>文字圖層輸出控制</h3>
   <p>個別圖層可在名稱中指定輸出方式，覆蓋對話框的預設設定：</p>
@@ -665,8 +672,8 @@ TXT_score_[THICK:2]</code></pre>
   <pre><code>Assets/Temp/{專案名稱}/
 ├── Animation/
 ├── Atlas/
+│   ├── SpriteAtlas.spriteatlasv2     ← 自動建立、更新並立即 Pack
 │   └── SpriteAtlas/
-│       ├── SpriteAtlas.spriteatlas   ← 自動建立，打包來源為 SpriteAtlas/ 資料夾
 │       ├── Base/                      ← 美術圖（預設語言）
 │       ├── CHS/                       ← 簡體中文文字圖
 │       ├── CHT/                       ← 繁體中文文字圖
@@ -683,8 +690,8 @@ TXT_score_[THICK:2]</code></pre>
     <strong>SpriteAtlas 自動設定 <span class="tag tag-new">v2.4.3</span></strong>：建立後 SpriteAtlas 自動套用專案標準設定——
     Packing（無旋轉、無緊密排列、Padding 4）、
     Texture（sRGB、Bilinear、無 Mip Maps）、
-    Android / iOS 平台（ASTC 6×6、2048、Best）。
-    Objects for Packing 已指向 <code>SpriteAtlas/</code> 資料夾，放入圖片後在 Unity 點「Pack Preview」即可打包。
+    Default 以及 Android / iOS 平台（ASTC 6×6、Best）的最大尺寸會依來源圖自動選擇 2048／4096／8192。
+    生成 Prefab 時會以唯一 Sprite 引用更新 Objects for Packing，全部 TextureImporter 完成後只 Pack 一次，不需再手動點「Pack Preview」。像素相同的別名 PNG 仍會保留，確保同一 Package 可重複匯入。
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
@@ -894,6 +901,29 @@ TXT_score_[THICK:2]</code></pre>
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
 
+  <h3>v2.12.6（2026-08-01）— 保留重疊式 Layout 間距</h3>
+  <ul>
+    <li>PS 匯出垂直／水平 Layout 時保留負間距，讓刻意重疊的列表項目在 Unity 中維持與 PSD 一致的位置。</li>
+  </ul>
+
+  <h3>v2.12.5（2026-08-01）— PS 視窗加速與捲動遮罩柔化</h3>
+  <ul>
+    <li>PS 匯出視窗顯示前不再讀取圖層選取狀態或遞迴掃描 PSD；選取文字只在按下「匯出」後才讀取，讓大型製作檔能立即顯示工具視窗。</li>
+    <li>新增 <code>[SOFTMASK_BOTTOM=像素]</code> 命名規則；Scroll Viewport 以雙層原生 <code>RectMask2D</code> 只柔化底邊。</li>
+    <li>Unity 匯入大量 Sprite 時先暫時移除 Atlas packable folder，全部 TextureImporter 設定完成後才重新掛回並 Pack 一次，避免每張圖都觸發完整 SpriteAtlas 重打包。</li>
+    <li>Scroll 遮罩規則收斂為「只解除直接子項的 viewport 預覽遮罩」；子項內更深層的設計遮罩會保留，避免複雜房間列被誤匯成整張 Canvas。</li>
+    <li>Unity JSON Reader 補齊九宮格 Border 與 <code>scrollSoftnessY</code> 欄位；Atlas／來源 Sprite 最大尺寸依素材自動選擇 2048／4096／8192。</li>
+    <li>像素去重改為只合併 Atlas 與 Prefab 引用，不刪除 PS 匯出的別名 PNG，修正第二次匯入同一 Package 時報缺圖。</li>
+    <li>新增無彈窗的驗收入口，讓大型 PSD 可由自動化流程直接匯出並讀取結果。</li>
+  </ul>
+
+  <h3>v2.12.4（2026-08-01）— 九宮格與 SpriteAtlas 全自動化</h3>
+  <ul>
+    <li>PS 圖片圖層新增 <code>[SLICED=值]</code> 與 <code>[SLICED=左,上,右,下]</code> 命名規則，Border 隨 Layout JSON 傳到 Unity。</li>
+    <li>Unity 自動寫入 Sprite Border；有標記或既有手動 Border 時，自動生成 <code>Image.Type.Sliced</code>。</li>
+    <li>Prefab 生成流程自動建立／更新 <code>.spriteatlasv2</code>、套用 4096 平台設定並立即 Pack；來源 Sprite 改為未壓縮、最大 4096。</li>
+  </ul>
+
   <h3>v2.12.2（2026-07-15）— UI 修飾：空路徑提示不再顯示吊尾冒號</h3>
   <ul>
     <li>「圖片來源若在 Unity 專案外，Generate 時會複製到：」在尚未填專案資料夾名稱時，冒號後面是空字串、句尾吊著——改為<strong>路徑未定時整行不顯示</strong>，有路徑時以空格取代冒號。</li>
@@ -1073,7 +1103,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.12.2 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.12.10 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 
