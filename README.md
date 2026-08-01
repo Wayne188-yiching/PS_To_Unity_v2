@@ -6,7 +6,7 @@ It exports a Photoshop UI as a UI Package, then rebuilds the layout in Unity as 
 
 ## Version
 
-v2.12.2
+v2.12.10
 
 ## Main Workflow
 
@@ -34,6 +34,7 @@ This keeps Spine export as a separate pipeline while sharing the same Photoshop 
 
 Exporter speed notes:
 
+- Opening the exporter window does not scan the PSD or query the current layer selection. Layer and selection inspection starts only after Export is clicked.
 - The exporter keeps a `.ps_to_unity_export_cache.tsv` file in the PNG output folder.
 - If the PSD is saved, unchanged, and an existing PNG still matches the cached layer signature, that PNG is skipped without opening a temporary export document.
 - The cache is ignored automatically when the PSD has unsaved changes.
@@ -54,6 +55,10 @@ Unity Atlas output:
 - All text layers remain TMP by default, regardless of font family. Use a `TmpFontMap` asset (Create > Photoshop UI Importer > Tmp Font Map) to map each exported font token to the matching TMP Font Asset. Enable `白名單外字型改為 PNG` only when intentionally baking unsupported fonts; explicit `[PNG]` naming overrides still work.
 - The export dialog's `命名規則說明` button lists every layer-naming convention that triggers Unity-side behavior (`[GRID]`, `[CG]`, `[SCROLL_V]`/`[SCROLL_H]`, `BTN_`, anchor tokens, and more).
 - Tag a group `[SCROLL_V]` / `[SCROLL_H]` to auto-build a full ScrollView > Viewport > Content hierarchy in Unity (ScrollRect + RectMask2D). Layer masks inside the group are treated as the runtime-clipping preview: children export as full images, and the group's own mask (if any) defines the viewport window. Combine with `[GRID]`/`[V]`/`[H]` to mount the layout component on Content.
+- Vertical and horizontal layout groups preserve negative spacing from Photoshop, so intentionally overlapping rows or columns keep their authored positions in Unity.
+- Add `[SOFTMASK_BOTTOM=64]` to a scroll group when the viewport should feather only its bottom edge by 64 pixels. Unity builds the effect from nested native `RectMask2D` components; no extra runtime package is required. `[SOFTMASK_Y=64]` remains an accepted alias.
+- Tag an image layer `[SLICED=32]` for a uniform nine-slice border, or `[SLICED=left,top,right,bottom]` for explicit borders. Unity writes the Sprite Editor border and sets the generated `Image` to `Sliced`. Existing manual Sprite Editor borders are preserved when the tag is absent.
+- Prefab generation automatically creates or updates `Atlas/SpriteAtlas.spriteatlasv2` and packs it once after all TextureImporters are ready. Atlas max size is selected from 2048/4096/8192 according to the largest source image. Pixel-identical Sprite references are packed only once while every exported PNG remains on disk, so the same package can be imported repeatedly.
 
 Batch font replacement (`Tools > Photoshop UI Importer > Font Replacer`):
 

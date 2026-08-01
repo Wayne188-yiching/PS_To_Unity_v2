@@ -150,6 +150,11 @@ namespace PhotoshopToUnity.EditorImporter
                 anchorMax = GetVector2(source, "anchorMax", new Vector2(0, 1)),
                 pivot = GetVector2(source, "pivot", new Vector2(0, 1)),
                 imagePath = GetString(source, "imagePath"),
+                imageType = GetString(source, "imageType"),
+                spriteBorderLeft = GetFloat(source, "spriteBorderLeft"),
+                spriteBorderTop = GetFloat(source, "spriteBorderTop"),
+                spriteBorderRight = GetFloat(source, "spriteBorderRight"),
+                spriteBorderBottom = GetFloat(source, "spriteBorderBottom"),
                 skinKey = GetString(source, "skinKey"),
                 text = GetString(source, "text"),
                 fontToken = GetString(source, "fontToken"),
@@ -175,6 +180,7 @@ namespace PhotoshopToUnity.EditorImporter
                 layoutPaddingBottom = GetFloat(source, "layoutPaddingBottom"),
                 contentSizeFitter = GetBool(source, "contentSizeFitter", false),
                 hasCanvasGroup = GetBool(source, "hasCanvasGroup", false),
+                clipToBounds = GetBool(source, "clipToBounds", false),
                 gridConstraintCount = (int)GetFloat(source, "gridConstraintCount"),
                 gridStartAxis = GetString(source, "gridStartAxis"),
                 gridCellSizeX = GetFloat(source, "gridCellSizeX"),
@@ -186,6 +192,7 @@ namespace PhotoshopToUnity.EditorImporter
                 contentY = GetFloat(source, "contentY"),
                 contentWidth = GetFloat(source, "contentWidth"),
                 contentHeight = GetFloat(source, "contentHeight"),
+                scrollSoftnessY = GetFloat(source, "scrollSoftnessY"),
                 children = ParseNodes(GetArray(source, "children"))
             };
         }

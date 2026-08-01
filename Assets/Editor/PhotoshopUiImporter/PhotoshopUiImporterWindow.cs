@@ -57,7 +57,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.12.2";
+        private const string ToolVersion = "2.12.10";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -913,6 +913,12 @@ namespace PhotoshopToUnity.EditorImporter
             }
 
             EditorUtility.DisplayProgressBar("生成 Prefab", "匯入圖片...", 0.4f);
+            // Detach the packable folder while sprites are configured. Otherwise every
+            // TextureImporter.SaveAndReimport triggers a full atlas repack (minutes on
+            // production packages with large full-screen sprites). The final call below
+            // reattaches the folder and packs exactly once.
+            DetachSpriteAtlasFolderForImageImport(ResolveSpriteAtlasFolder(importFolder));
+
             var importResult = ImageImportService.ImportImages(layout, sourceImageFolder, importFolder);
             if (!importResult.IsValid)
             {
@@ -921,6 +927,9 @@ namespace PhotoshopToUnity.EditorImporter
             }
 
             EditorUtility.DisplayProgressBar("生成 Prefab", "生成 Prefab 節點...", 0.75f);
+            EditorUtility.DisplayProgressBar("Generate Prefab", "Create and pack SpriteAtlas...", 0.65f);
+            CreateOrUpdateSpriteAtlas(ResolveSpriteAtlasFolder(importFolder));
+
             var skinResolver = new SkinResolver(skinMap, importResult.sprites);
             var generatedMaterialFolder = string.IsNullOrWhiteSpace(projectFolder)
                 ? "Assets/GeneratedMaterials"
@@ -993,7 +1002,7 @@ namespace PhotoshopToUnity.EditorImporter
         {
             return string.IsNullOrWhiteSpace(projectFolder)
                 ? string.Empty
-                : $"Assets/Temp/{projectFolder}/Atlas";
+                : $"Assets/Temp/{projectFolder}/Atlas/SpriteAtlas/Base";
         }
 
         private string GetStandardPrefabFolder()
@@ -1056,7 +1065,130 @@ namespace PhotoshopToUnity.EditorImporter
             AssetDatabase.CreateFolder(parent, Path.GetFileName(assetPath));
         }
 
+        private static string ResolveSpriteAtlasFolder(string imageImportFolder)
+        {
+            var normalized = PathUtility.NormalizeAssetKey(imageImportFolder).TrimEnd('/');
+            const string marker = "/SpriteAtlas";
+            var markerIndex = normalized.IndexOf(marker, System.StringComparison.OrdinalIgnoreCase);
+            return markerIndex >= 0
+                ? normalized.Substring(0, markerIndex + marker.Length)
+                : normalized;
+        }
+
         private static void CreateOrUpdateSpriteAtlas(string atlasFolder)
+        {
+            atlasFolder = PathUtility.NormalizeAssetKey(atlasFolder).TrimEnd('/');
+            EnsureAssetFolder(atlasFolder);
+
+            var atlasParent = Path.GetDirectoryName(atlasFolder)?.Replace('\\', '/');
+            if (string.IsNullOrEmpty(atlasParent))
+                return;
+
+            var atlasPath = $"{atlasParent}/{Path.GetFileName(atlasFolder)}.spriteatlasv2";
+            var atlas = SpriteAtlasAsset.Load(atlasPath);
+            if (atlas == null)
+            {
+                // Save an empty atlas first. Adding the packable folder before importer
+                // settings exist makes Unity attempt a default 2048 px pack immediately,
+                // which fails for otherwise valid 4096 px source sprites.
+                atlas = new SpriteAtlasAsset();
+                SpriteAtlasAsset.Save(atlas, atlasPath);
+                AssetDatabase.ImportAsset(atlasPath, ImportAssetOptions.ForceUpdate);
+            }
+
+            var atlasImporter = AssetImporter.GetAtPath(atlasPath) as SpriteAtlasImporter;
+            if (atlasImporter == null)
+                return;
+
+            var maxTextureSize = DetermineRequiredAtlasMaxTextureSize(atlasFolder);
+            var packing = atlasImporter.packingSettings;
+            packing.enableRotation = false;
+            packing.enableTightPacking = false;
+            packing.padding = 4;
+
+            var texture = atlasImporter.textureSettings;
+            texture.readable = false;
+            texture.generateMipMaps = false;
+            texture.sRGB = true;
+            texture.filterMode = FilterMode.Bilinear;
+
+            atlasImporter.includeInBuild = true;
+            atlasImporter.packingSettings = packing;
+            atlasImporter.textureSettings = texture;
+            atlasImporter.SetPlatformSettings(new TextureImporterPlatformSettings
+            {
+                name = "DefaultTexturePlatform",
+                overridden = true,
+                maxTextureSize = maxTextureSize,
+                format = TextureImporterFormat.Automatic,
+            });
+            atlasImporter.SetPlatformSettings(CreateAtlasPlatformSettings("Android", maxTextureSize));
+            atlasImporter.SetPlatformSettings(CreateAtlasPlatformSettings("iPhone", maxTextureSize));
+            atlasImporter.SaveAndReimport();
+
+            atlas = new SpriteAtlasAsset();
+            var folderObject = AssetDatabase.LoadAssetAtPath<Object>(atlasFolder);
+            if (folderObject != null)
+                atlas.Add(new[] { folderObject });
+            SpriteAtlasAsset.Save(atlas, atlasPath);
+            AssetDatabase.ImportAsset(atlasPath, ImportAssetOptions.ForceUpdate);
+
+            var runtimeAtlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
+            if (runtimeAtlas != null)
+                SpriteAtlasUtility.PackAtlases(new[] { runtimeAtlas }, EditorUserBuildSettings.activeBuildTarget);
+
+            AssetDatabase.SaveAssets();
+        }
+
+        private static int DetermineRequiredAtlasMaxTextureSize(string atlasFolder)
+        {
+            var largestDimension = 0;
+            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { atlasFolder }))
+            {
+                var assetPath = AssetDatabase.GUIDToAssetPath(guid);
+                var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+                if (importer == null)
+                    continue;
+
+                importer.GetSourceTextureWidthAndHeight(out var width, out var height);
+                largestDimension = Mathf.Max(largestDimension, width, height);
+            }
+
+            if (largestDimension <= 2048)
+                return 2048;
+            if (largestDimension <= 4096)
+                return 4096;
+            return 8192;
+        }
+
+        private static void DetachSpriteAtlasFolderForImageImport(string atlasFolder)
+        {
+            atlasFolder = PathUtility.NormalizeAssetKey(atlasFolder).TrimEnd('/');
+            var atlasParent = Path.GetDirectoryName(atlasFolder)?.Replace('\\', '/');
+            if (string.IsNullOrEmpty(atlasParent))
+                return;
+
+            var atlasPath = $"{atlasParent}/{Path.GetFileName(atlasFolder)}.spriteatlasv2";
+            if (SpriteAtlasAsset.Load(atlasPath) == null)
+                return;
+
+            SpriteAtlasAsset.Save(new SpriteAtlasAsset(), atlasPath);
+            AssetDatabase.ImportAsset(atlasPath, ImportAssetOptions.ForceUpdate);
+        }
+
+        private static TextureImporterPlatformSettings CreateAtlasPlatformSettings(string platformName, int maxTextureSize)
+        {
+            return new TextureImporterPlatformSettings
+            {
+                name = platformName,
+                overridden = true,
+                maxTextureSize = maxTextureSize,
+                format = TextureImporterFormat.ASTC_6x6,
+                compressionQuality = (int)TextureCompressionQuality.Best,
+            };
+        }
+
+        private static void CreateOrUpdateLegacySpriteAtlas(string atlasFolder)
         {
             var atlasPath = $"{atlasFolder}/SpriteAtlas.spriteatlas";
             var atlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);

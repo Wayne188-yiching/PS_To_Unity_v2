@@ -86,15 +86,19 @@ namespace PhotoshopToUnity.EditorImporter
             var isLayoutGroup = node.NormalizedType == "group" && !string.IsNullOrWhiteSpace(node.layoutType);
             // OPTIMIZATION_PLAN_zh.html#phase4-5-q1：scroll group 一定有自己的 rect（= viewport 可視範圍）。
             var isScrollGroup = node.NormalizedType == "group" && node.HasScrollRect;
+            var isClippedGroup = node.NormalizedType == "group" && node.clipToBounds;
 
             // 響應式模式下，一般 group 不再展開成 canvas 尺寸的透明容器，
             // 改用自身 PS bounds 建 Rect，子節點 anchor 才能相對 group 邊緣生效
-            var isSizedGroup = context.useResponsiveAnchor
+            // LayoutGroup children must keep their exported PSD bounds so Unity can
+            // arrange their actual sizes instead of stacking parent-sized containers.
+            var parentHasLayout = parent != null && parent.GetComponent<LayoutGroup>() != null;
+            var isSizedGroup = (context.useResponsiveAnchor || parentHasLayout)
                                && !isLayoutGroup
                                && node.NormalizedType == "group"
                                && node.width > 0f
                                && node.height > 0f;
-            var hasOwnRect = isVisualNode || isLayoutGroup || isSizedGroup || isScrollGroup;
+            var hasOwnRect = isVisualNode || isLayoutGroup || isSizedGroup || isScrollGroup || isClippedGroup;
 
             if (hasOwnRect)
             {
@@ -130,6 +134,8 @@ namespace PhotoshopToUnity.EditorImporter
                     }
                     if (isLayoutGroup)
                         ApplyLayoutGroup(gameObject, node);
+                    if (isClippedGroup)
+                        gameObject.AddComponent<RectMask2D>();
                     if (node.hasCanvasGroup)
                         ApplyCanvasGroup(gameObject);
                     break;
@@ -249,7 +255,10 @@ namespace PhotoshopToUnity.EditorImporter
             var image = gameObject.GetComponent<Image>();
             image.raycastTarget = false;
             image.sprite = context.skinResolver?.Resolve(node);
-            image.type = Image.Type.Simple;
+            var hasSpriteBorder = image.sprite != null && image.sprite.border.sqrMagnitude > 0f;
+            image.type = node.RequestsSlicedImage || hasSpriteBorder
+                ? Image.Type.Sliced
+                : Image.Type.Simple;
             image.preserveAspect = false;
 
             // v2.10：BTN_ 自動掛的 Button 要能點到，必須有接收 raycast 的 targetGraphic。
@@ -314,11 +323,32 @@ namespace PhotoshopToUnity.EditorImporter
             viewportImage.color = new Color(1f, 1f, 1f, 0f);
             viewportImage.raycastTarget = true; // ScrollRect 需要 raycast 目標才拖得動（本工具其他 Image 皆 false）
             viewportGo.GetComponent<CanvasRenderer>().cullTransparentMesh = true;
+            // Bottom-only feather using two native RectMask2D layers:
+            // - outer Viewport keeps the original hard rectangle;
+            // - inner mask keeps the same bottom edge but extends its top edge above
+            //   the viewport, so its symmetric Y softness is visible only at bottom.
+            var contentParent = viewportRect;
+            var bottomSoftness = Mathf.Max(0, Mathf.RoundToInt(node.scrollSoftnessY));
+            if (bottomSoftness > 0)
+            {
+                var softMaskGo = new GameObject("SoftMaskBottom", typeof(RectTransform), typeof(RectMask2D));
+                var softMaskRect = softMaskGo.GetComponent<RectTransform>();
+                softMaskRect.SetParent(viewportRect, false);
+                softMaskRect.anchorMin = Vector2.zero;
+                softMaskRect.anchorMax = Vector2.one;
+                softMaskRect.pivot = new Vector2(0.5f, 0.5f);
+                softMaskRect.offsetMin = Vector2.zero;
+                softMaskRect.offsetMax = new Vector2(0f, bottomSoftness * 2f);
+                softMaskRect.localScale = Vector3.one;
+                softMaskRect.localRotation = Quaternion.identity;
+                softMaskGo.GetComponent<RectMask2D>().softness = new Vector2Int(0, bottomSoftness);
+                contentParent = softMaskRect;
+            }
 
             // ── Content ──────────────────────────────────────────────
             var contentGo = new GameObject("Content", typeof(RectTransform));
             var contentRect = contentGo.GetComponent<RectTransform>();
-            contentRect.SetParent(viewportRect, false);
+            contentRect.SetParent(contentParent, false);
 
             Vector2 anchor;
             Vector2 pivot;
@@ -350,7 +380,9 @@ namespace PhotoshopToUnity.EditorImporter
             var pivotPsY = node.contentY + node.contentHeight * (1f - pivot.y);
             var anchorPsX = node.x + node.width * anchor.x;
             var anchorPsY = node.y + node.height * (1f - anchor.y);
-            contentRect.anchoredPosition = new Vector2(pivotPsX - anchorPsX, anchorPsY - pivotPsY);
+            contentRect.anchoredPosition = new Vector2(
+                pivotPsX - anchorPsX,
+                anchorPsY - pivotPsY - bottomSoftness * 2f * anchor.y);
 
             // ── ScrollRect 參數（#phase4-5-q5，全 hardcode）──────────
             scrollRect.viewport = viewportRect;

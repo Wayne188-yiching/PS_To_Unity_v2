@@ -43,6 +43,11 @@ namespace PhotoshopToUnity.EditorImporter
         public Vector2 anchorMax = new Vector2(0, 1);
         public Vector2 pivot = new Vector2(0, 1);
         public string imagePath;
+        public string imageType;
+        public float spriteBorderLeft;
+        public float spriteBorderTop;
+        public float spriteBorderRight;
+        public float spriteBorderBottom;
         public string skinKey;
         public string text;
         public string fontToken;
@@ -72,6 +77,7 @@ namespace PhotoshopToUnity.EditorImporter
         public bool contentSizeFitter;
         // Phase 4：JSX 偵測 [CG] / [CANVASGROUP] 標籤時填 true（root GameObject 由 Unity 端 hardcode 掛 CanvasGroup，不看此欄）。
         public bool hasCanvasGroup;
+        public bool clipToBounds;
         // Phase 4 Grid：僅在 layoutType == "grid" 時有效。startCorner / childAlignment 由 Unity 端固定為 UpperLeft，不進 JSON（OPTIMIZATION_PLAN_zh.html#phase4-decisions Q12-d）。
         public int gridConstraintCount;
         public string gridStartAxis;    // "horizontal" | "vertical"
@@ -87,9 +93,19 @@ namespace PhotoshopToUnity.EditorImporter
         public float contentY;
         public float contentWidth;
         public float contentHeight;
+        public float scrollSoftnessY;
         public List<PhotoshopUiNode> children = new List<PhotoshopUiNode>();
 
         public bool HasScrollRect => !string.IsNullOrWhiteSpace(scrollDirection);
+
+        public bool RequestsSlicedImage =>
+            string.Equals(imageType, "sliced", StringComparison.OrdinalIgnoreCase);
+
+        public Vector4 SpriteBorder => new Vector4(
+            Mathf.Max(0f, spriteBorderLeft),
+            Mathf.Max(0f, spriteBorderBottom),
+            Mathf.Max(0f, spriteBorderRight),
+            Mathf.Max(0f, spriteBorderTop));
 
         public string NormalizedType => string.IsNullOrWhiteSpace(type) ? string.Empty : type.Trim().ToLowerInvariant();
     }

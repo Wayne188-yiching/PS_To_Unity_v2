@@ -40,10 +40,10 @@ namespace PhotoshopToUnity.EditorImporter
                 return result;
             }
 
-            var imagePaths = new HashSet<string>();
-            CollectImagePaths(layout.nodes, imagePaths);
+            var imageNodes = new Dictionary<string, PhotoshopUiNode>(StringComparer.OrdinalIgnoreCase);
+            CollectImageNodes(layout.nodes, imageNodes);
 
-            if (imagePaths.Count == 0)
+            if (imageNodes.Count == 0)
             {
                 return result;
             }
@@ -57,9 +57,9 @@ namespace PhotoshopToUnity.EditorImporter
 
             Directory.CreateDirectory(PathUtility.ToAbsolutePath(importFolder));
 
-            foreach (var imagePath in imagePaths)
+            foreach (var pair in imageNodes)
             {
-                ImportOneImage(sourceRootPath, importFolder, imagePath, result);
+                ImportOneImage(sourceRootPath, importFolder, pair.Key, pair.Value, result);
             }
 
             AssetDatabase.Refresh();
@@ -119,9 +119,9 @@ namespace PhotoshopToUnity.EditorImporter
                 return;
             }
 
-            // 第二輪：把 sprites 字典內所有指到重複 asset 的 entry 重指到 canonical sprite，
-            // 然後實體刪除重複的 PNG asset。
-            var deletedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // 第二輪：把 sprites 字典內所有指到重複 asset 的 entry 重指到 canonical sprite。
+            // 原始 PNG 保留，Atlas 只接收 canonical Sprite，確保可重複匯入。
+            var dedupedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var canonicalSpriteCache = new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
             var spriteKeys = new List<string>(result.sprites.Keys);
 
@@ -152,13 +152,15 @@ namespace PhotoshopToUnity.EditorImporter
 
                 result.sprites[key] = canonicalSprite;
 
-                if (deletedPaths.Add(assetPath))
+                if (dedupedPaths.Add(assetPath))
                 {
                     var absPath = PathUtility.ToAbsolutePath(assetPath);
                     try
                     {
                         var fileLength = File.Exists(absPath) ? new FileInfo(absPath).Length : 0L;
-                        if (AssetDatabase.DeleteAsset(assetPath))
+                        // Retain the alias PNG so the same layout JSON remains importable.
+                        // The atlas receives only canonical Sprite references downstream.
+                        if (File.Exists(absPath))
                         {
                             result.dedupedSpriteCount++;
                             result.dedupedSpriteBytes += fileLength;
@@ -221,7 +223,9 @@ namespace PhotoshopToUnity.EditorImporter
             }
         }
 
-        private static void CollectImagePaths(List<PhotoshopUiNode> nodes, HashSet<string> imagePaths)
+        private static void CollectImageNodes(
+            List<PhotoshopUiNode> nodes,
+            Dictionary<string, PhotoshopUiNode> imageNodes)
         {
             if (nodes == null)
             {
@@ -240,15 +244,24 @@ namespace PhotoshopToUnity.EditorImporter
                     var key = PathUtility.NormalizeAssetKey(node.imagePath);
                     if (!string.IsNullOrEmpty(key))
                     {
-                        imagePaths.Add(key);
+                        if (!imageNodes.TryGetValue(key, out var existing) ||
+                            (!existing.RequestsSlicedImage && node.RequestsSlicedImage))
+                        {
+                            imageNodes[key] = node;
+                        }
                     }
                 }
 
-                CollectImagePaths(node.children, imagePaths);
+                CollectImageNodes(node.children, imageNodes);
             }
         }
 
-        private static void ImportOneImage(string sourceRoot, string importFolder, string imagePath, ImageImportResult result)
+        private static void ImportOneImage(
+            string sourceRoot,
+            string importFolder,
+            string imagePath,
+            PhotoshopUiNode node,
+            ImageImportResult result)
         {
             if (Path.IsPathRooted(imagePath))
             {
@@ -304,6 +317,20 @@ namespace PhotoshopToUnity.EditorImporter
                 importer.alphaIsTransparency = true;
                 importer.mipmapEnabled = false;
                 importer.isReadable = false;
+                importer.GetSourceTextureWidthAndHeight(out var sourceWidth, out var sourceHeight);
+                importer.maxTextureSize = Mathf.Clamp(
+                    Mathf.NextPowerOfTwo(Mathf.Max(sourceWidth, sourceHeight)),
+                    2048,
+                    8192);
+                importer.textureCompression = TextureImporterCompression.Uncompressed;
+
+                // Explicit Photoshop metadata owns the border. When no [SLICED] tag is
+                // present, leave an artist-authored Sprite Editor border untouched.
+                if (node != null && node.RequestsSlicedImage)
+                {
+                    importer.spriteBorder = ClampSpriteBorder(importer, node.SpriteBorder);
+                }
+
                 importer.SaveAndReimport();
             }
 
@@ -315,6 +342,32 @@ namespace PhotoshopToUnity.EditorImporter
             }
 
             result.sprites[PathUtility.NormalizeAssetKey(imagePath)] = sprite;
+        }
+
+        private static Vector4 ClampSpriteBorder(TextureImporter importer, Vector4 border)
+        {
+            importer.GetSourceTextureWidthAndHeight(out var width, out var height);
+            border.x = Mathf.Max(0f, border.x);
+            border.y = Mathf.Max(0f, border.y);
+            border.z = Mathf.Max(0f, border.z);
+            border.w = Mathf.Max(0f, border.w);
+            ClampBorderPair(ref border.x, ref border.z, width);
+            ClampBorderPair(ref border.y, ref border.w, height);
+            return border;
+        }
+
+        private static void ClampBorderPair(ref float first, ref float second, int availablePixels)
+        {
+            var available = Mathf.Max(0f, availablePixels);
+            var total = first + second;
+            if (total <= available || total <= 0f)
+            {
+                return;
+            }
+
+            var scale = available / total;
+            first *= scale;
+            second *= scale;
         }
 
         private static string ResolveSourceImagePath(string sourceRoot, string imagePath)

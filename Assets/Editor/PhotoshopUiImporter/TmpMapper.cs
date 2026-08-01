@@ -48,7 +48,9 @@ namespace PhotoshopToUnity.EditorImporter
                 return;
             }
 
-            target.text = node.text ?? string.Empty;
+            // Photoshop stores paragraph breaks as carriage returns, while TMP
+            // expects line feeds. Normalize both Windows and Photoshop newlines.
+            target.text = (node.text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
             target.raycastTarget = false;
             target.enableAutoSizing = false;
             target.enableWordWrapping = false;
@@ -176,12 +178,15 @@ namespace PhotoshopToUnity.EditorImporter
             if (material.HasProperty(ShaderUtilities.ID_OutlineWidth))
             {
                 material.SetFloat(ShaderUtilities.ID_OutlineWidth, targetWidth);
+                material.EnableKeyword("OUTLINE_ON");
             }
 
             // 實測（校正板 bbox 量測）：TMP outline 以字緣為中心向內外各擴 targetWidth，
             // 內側會吃掉字面；PS 描邊是「外部」語意（字面不動、全部朝外）。
             // 把字面同步外推 targetWidth（= strokePx 換算值的一半），描邊內緣剛好
             // 落回原字緣 → 字面不變、描邊全朝外，與 PS 一致。
+            ShaderUtilities.UpdateShaderRatios(material);
+
             if (material.HasProperty(ShaderUtilities.ID_FaceDilate))
             {
                 material.SetFloat(ShaderUtilities.ID_FaceDilate, targetWidth);
