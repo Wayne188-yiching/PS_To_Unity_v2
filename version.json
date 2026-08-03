@@ -1,6 +1,6 @@
 {
-    "version":  "2.12.10",
-    "phase":  "Nine-slice and SpriteAtlas automation",
+    "version":  "2.12.11",
+    "phase":  "Merge: nine-slice/SpriteAtlas automation (main) + font-asset dedup/MERGE-export/PNG-dedup perf (codex branch)",
     "updated":  "2026-08-02",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [

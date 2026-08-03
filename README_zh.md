@@ -2,7 +2,9 @@
 
 將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。
 
-**目前版本：v2.12.10**
+**目前版本：v2.12.11**
+
+> PNG 像素去重會先依檔案大小與圖片尺寸篩選候選者；只有可能重複的圖片才會讀取完整檔案計算雜湊，而且每個候選檔案最多只計算一次。這項最佳化不會改動版面 JSON、PNG 像素或 Unity 圖片引用結果。
 
 ---
 
@@ -28,9 +30,11 @@
 6. 指定「預設 TMP Font Asset」（UI 含文字時必填）。所有字型預設都會保留為 TMP；多字型 PSD 可另指定「字型對應表 TmpFontMap」（fontToken 關鍵字 → Font Asset）。只有明確勾選「白名單外字型改為 PNG」或使用 `[PNG]` 標記時，文字才會轉成圖片。
 7. 點「Validate」確認，再點「Generate Prefab」完成。
 
-> 開啟 PS 匯出工具視窗時不會預掃 PSD 或讀取目前選取圖層；圖層與選取狀態只會在按下「匯出」後讀取，因此大型 PSD 也能快速顯示工具視窗。
+> 開啟 PS 匯出工具視窗時不會預掃 PSD；圖層與選取狀態只在使用者互動時才讀取（例如勾選「把目前選取的文字圖層強制輸出為 PNG」），因此大型 PSD 也能快速顯示工具視窗。
 
-> 圖層命名會觸發哪些 Unity 端行為（`[GRID]`、`[CG]`、`[SCROLL_V]`/`[SCROLL_H]`、`BTN_`…），見 PS 匯出對話框的「命名規則說明」按鈕。
+> 圖層命名會觸發哪些 Unity 端行為（`[GRID]`、`[CG]`、`[SCROLL_V]`/`[SCROLL_H]`、`BTN_`…），見 PS 匯出對話框的「命名規則說明」按鈕；此按鈕會關閉匯出主視窗，並在瀏覽器開啟可搜尋的本機速查頁，可放在 Photoshop 旁邊，邊看邊修改圖層名稱。
+
+> 群組名稱加入 `[MERGE]`，會將目前可見內容（含文字、效果、遮色片）烘成一張 PNG，Unity 只建立一個 Image 節點。子項需要互動、動畫、換皮或改字時不要使用。工具會逐組取得可見合成像素，存檔後立即釋放暫存層；操作上仍只需按一次 Export。
 >
 > 群組標 `[SCROLL_V]` / `[SCROLL_H]` 會在 Unity 自動組出 ScrollView > Viewport > Content 三層（ScrollRect + RectMask2D）。群組內圖層的遮色片視為「runtime 裁切預覽」——子圖層一律匯出完整圖；群組自身的遮色片（若有）定義可視窗範圍。可與 `[GRID]`/`[V]`/`[H]` 組合，排版元件會掛在 Content 上。
 > 捲動群組可再加 `[SOFTMASK_BOTTOM=64]`，Unity 會用雙層原生 `RectMask2D` 只柔化底邊 64 像素，不需要額外 runtime 套件；`[SOFTMASK_Y=64]` 保留為相容別名。

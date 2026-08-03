@@ -48,8 +48,8 @@ namespace PhotoshopToUnity.EditorImporter
                 return;
             }
 
-            // Photoshop stores paragraph breaks as carriage returns, while TMP
-            // expects line feeds. Normalize both Windows and Photoshop newlines.
+            // Photoshop stores paragraph breaks as bare CR characters, while TMP
+            // expects LF/CRLF. Normalize both Windows and Photoshop newlines.
             target.text = (node.text ?? string.Empty).Replace("\r\n", "\n").Replace('\r', '\n');
             target.raycastTarget = false;
             target.enableAutoSizing = false;
