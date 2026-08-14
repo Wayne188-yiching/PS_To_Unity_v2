@@ -59,7 +59,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.12.11";
+        private const string ToolVersion = "2.12.12";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -1704,6 +1704,7 @@ namespace PhotoshopToUnity.EditorImporter
                 // Step 1: 取得遠端版本號 + 檔案清單（manifest）
                 string remoteVersion = null;
                 string[] fileNames = null;
+                string manifestText = null;
                 using (var wc = new System.Net.WebClient())
                 {
                     // 不設 Encoding 時 WebClient 用系統 ANSI 解碼，中文註解會變亂碼——必須指定 UTF-8。
@@ -1730,6 +1731,7 @@ namespace PhotoshopToUnity.EditorImporter
                         if (names.Count > 0)
                         {
                             fileNames = names.ToArray();
+                            manifestText = manifest;
                         }
                     }
                     catch (System.Exception)
@@ -1796,6 +1798,13 @@ namespace PhotoshopToUnity.EditorImporter
                 foreach (var pair in downloaded)
                 {
                     File.WriteAllText(Path.Combine(localDir, pair.Key), pair.Value, Encoding.UTF8);
+                }
+
+                // manifest 本身不在下載清單裡（清單只收 .cs，避免更新器被誘導寫入任意檔案），
+                // 但本地留一份舊的容易讓人誤判清單內容——用剛抓到的內容覆蓋。
+                if (manifestText != null)
+                {
+                    File.WriteAllText(Path.Combine(localDir, manifestFileName), manifestText, Encoding.UTF8);
                 }
 
                 AssetDatabase.Refresh();

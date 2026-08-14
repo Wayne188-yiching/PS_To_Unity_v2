@@ -19,22 +19,34 @@
     }
 
     if (!ensureFolder(installFolder) || !canWriteToFolder(installFolder)) {
+        alert(
+            "Photoshop's Scripts folder is not writable:\n" + installFolder.fsName + "\n\n" +
+            "Recommended: close Photoshop, right-click the Photoshop shortcut >\n" +
+            "Run as administrator, then run this installer once more.\n\n" +
+            "Or press OK to pick another Photoshop installation's Presets/Scripts folder."
+        );
         var selected = Folder.selectDialog("Choose Photoshop Presets/Scripts folder for PS_To_Unity_v2 launcher");
         if (!selected) {
-            alert("Install cancelled. Photoshop Scripts folder was not writable.");
+            alert("Install cancelled. Nothing was written.");
             return;
         }
         installFolder = new Folder(selected.fsName);
         if (!ensureFolder(installFolder) || !canWriteToFolder(installFolder)) {
-            alert("Cannot write to install folder:\n" + installFolder.fsName + "\n\nTry running Photoshop as administrator once, then run this installer again.");
+            alert(cannotWriteMessage(installFolder, "the launcher"));
             return;
         }
     }
 
-    writeConfig(installFolder, sourceFolder, repoRoot);
+    if (!writeConfig(installFolder, sourceFolder, repoRoot)) {
+        alert(cannotWriteMessage(installFolder, "PS_To_Unity_v2.config.jsxinc"));
+        return;
+    }
     removeOldLaunchers(installFolder);
     var cleanedCount = removeStrayToolCopies(installFolder, sourceFolder);
-    writeLauncher(installFolder, "PS To Unity v2.jsx", "PhotoshopToolboxHub.jsx", "PS To Unity v2");
+    if (!writeLauncher(installFolder, "PS To Unity v2.jsx", "PhotoshopToolboxHub.jsx", "PS To Unity v2")) {
+        alert(cannotWriteMessage(installFolder, "PS To Unity v2.jsx"));
+        return;
+    }
 
     var cleanupNote = cleanedCount > 0
         ? "\n\nRemoved " + cleanedCount + " stray tool cop" + (cleanedCount === 1 ? "y" : "ies") +
@@ -54,12 +66,20 @@ function photoshopScriptsFolder() {
     return new Folder(app.path.fsName + "/Presets/Scripts");
 }
 
+function cannotWriteMessage(installFolder, fileName) {
+    return "Install failed: could not write " + fileName + " to\n" +
+        installFolder.fsName + "\n\n" +
+        "This folder is usually read-only for standard users.\n" +
+        "Close Photoshop, right-click the Photoshop shortcut > Run as administrator,\n" +
+        "then run this installer once more. Afterwards you can use Photoshop normally.";
+}
+
 function writeConfig(installFolder, sourceFolder, repoRoot) {
     var file = new File(installFolder.fsName + "/PS_To_Unity_v2.config.jsxinc");
     var lines = [];
     lines.push("var PS_TO_UNITY_V2_SOURCE_FOLDER = " + quoteJsString(normalizePath(sourceFolder.fsName)) + ";");
     lines.push("var PS_TO_UNITY_V2_REPO_ROOT = " + quoteJsString(normalizePath(repoRoot.fsName)) + ";");
-    writeTextFile(file, lines.join("\n"));
+    return writeTextFile(file, lines.join("\n"));
 }
 
 function removeOldLaunchers(installFolder) {
@@ -150,7 +170,7 @@ function writeLauncher(installFolder, launcherName, sourceScriptName, title) {
     lines.push("    }");
     lines.push("    $.evalFile(sourceScript);");
     lines.push("})();");
-    writeTextFile(file, lines.join("\n"));
+    return writeTextFile(file, lines.join("\n"));
 }
 
 function ensureFolder(folder) {
@@ -160,33 +180,52 @@ function ensureFolder(folder) {
     return true;
 }
 
+// ExtendScript's File.open/write/close/remove return false on failure instead
+// of throwing, so a try/catch around them never fires. Every call must be
+// checked by return value, and the result verified on disk. Otherwise a
+// read-only Presets/Scripts (the default under Program Files without admin)
+// looks like a successful install.
+// Keep this file pure ASCII: Photoshop reads BOM-less .jsx with the system
+// codepage, so a stray non-ASCII character breaks parsing on non-Latin locales.
 function canWriteToFolder(folder) {
     var probe = new File(folder.fsName + "/.ps_to_unity_write_test.tmp");
+    var ok = false;
     try {
-        probe.open("w", "TEXT");
-        probe.write("ok");
-        probe.close();
-        probe.remove();
-        return true;
+        if (probe.open("w", "TEXT")) {
+            var written = probe.write("ok");
+            probe.close();
+            ok = written && probe.exists && probe.length > 0;
+        }
+    } catch (e) {
+        ok = false;
+    }
+    try {
+        if (probe.exists) {
+            probe.remove();
+        }
+    } catch (ignored) {
+    }
+    return ok;
+}
+
+// Returns true only when the file is on disk with content afterwards.
+function writeTextFile(file, content) {
+    try {
+        file.encoding = "UTF-8";
+        if (!file.open("w", "TEXT")) {
+            return false;
+        }
+        file.lineFeed = "\n";
+        var written = file.write(content);
+        file.close();
+        return written && file.exists && file.length > 0;
     } catch (e) {
         try {
-            probe.close();
+            file.close();
         } catch (ignored) {
-        }
-        try {
-            probe.remove();
-        } catch (ignored2) {
         }
         return false;
     }
-}
-
-function writeTextFile(file, content) {
-    file.encoding = "UTF-8";
-    file.open("w", "TEXT");
-    file.lineFeed = "\n";
-    file.write(content);
-    file.close();
 }
 
 function quoteJsString(value) {

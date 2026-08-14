@@ -377,6 +377,88 @@
       color: var(--muted);
     }
 
+    /* 折疊區：進階／參考內容預設收起，避免新手一次看到太多 */
+    details {
+      border: 1px solid var(--line);
+      border-left: 3px solid rgba(0, 229, 255, 0.55);
+      border-radius: 8px;
+      background: rgba(15, 21, 36, 0.82);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    details > summary {
+      cursor: pointer;
+      padding: 12px 18px;
+      font-weight: 700;
+      color: #e2f8ff;
+      list-style: none;
+      user-select: none;
+      transition: background 160ms ease, color 160ms ease;
+    }
+
+    details > summary::-webkit-details-marker { display: none; }
+
+    details > summary::before {
+      content: "▸";
+      display: inline-block;
+      width: 16px;
+      color: var(--accent);
+      text-shadow: 0 0 6px rgba(0, 229, 255, 0.6);
+    }
+
+    details[open] > summary::before { content: "▾"; }
+    details > summary:hover { background: rgba(0, 229, 255, 0.07); color: #ffffff; }
+    details[open] > summary { border-bottom: 1px solid var(--line); }
+
+    .details-body { padding: 14px 18px 2px; }
+    .details-body > :last-child { margin-bottom: 12px; }
+
+    summary .hint {
+      display: block;
+      font-weight: 400;
+      font-size: 13px;
+      color: var(--muted);
+      margin-left: 16px;
+      margin-top: 2px;
+    }
+
+    /* 白話說明：用日常語言解釋上一段在講什麼 */
+    .plain {
+      border-left: 3px solid var(--magenta);
+      background: var(--magenta-soft);
+      padding: 12px 18px;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 14px;
+      font-size: 15px;
+    }
+
+    .plain strong { color: #ffb3ee; }
+
+    .flow {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 18px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(15, 21, 36, 0.9);
+      box-shadow: var(--shadow-cyan);
+      margin-bottom: 14px;
+      font-size: 14px;
+    }
+
+    .flow .box {
+      padding: 8px 14px;
+      border: 1px solid rgba(0, 229, 255, 0.5);
+      border-radius: 6px;
+      background: rgba(0, 229, 255, 0.07);
+      color: #d9f6ff;
+    }
+
+    .flow .arrow { color: var(--magenta); font-weight: 700; }
+
     ::selection {
       background: rgba(255, 0, 200, 0.45);
       color: #ffffff;
@@ -441,209 +523,341 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.12.11</span></h1>
-    <p class="lead">將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。</p>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.12.12</span></h1>
+    <p class="lead">在 Photoshop 排好的遊戲介面，一鍵搬進 Unity。圖自動切好、文字還能繼續改、位置自動對齊。</p>
   </header>
 
   <nav>
-    <a href="#install">安裝</a>
-    <a href="#workflow">主流程</a>
-    <a href="#ps-dialog">PS 匯出對話框</a>
-    <a href="#naming">圖層命名規則</a>
-    <a href="#layout-group">Layout Group 自動排版</a>
-    <a href="#unity-window">Unity 匯入工具</a>
-    <a href="#folders">專案資料夾結構</a>
-    <a href="#text">文字與材質</a>
-    <a href="#reskin">換皮系統</a>
-    <a href="#update">版本更新</a>
-    <a href="#faq">常見問題</a>
+    <a href="#what">1. 這是什麼</a>
+    <a href="#install">2. 安裝</a>
+    <a href="#firstrun">3. 跟著做一遍</a>
+    <a href="#naming">4. 圖層命名</a>
+    <a href="#advanced">5. 進階功能</a>
+    <a href="#update">6. 更新工具</a>
+    <a href="#faq">7. 常見問題</a>
     <a href="#changelog">版本紀錄</a>
   </nav>
 
+  <div class="callout info">
+    <strong>這份說明怎麼看</strong>
+    <ul style="margin:8px 0 0">
+      <li><strong>第一次用</strong>：看 1、2、3 節就夠了，大概十分鐘就能跑完一次。</li>
+      <li><strong>卡住了</strong>：直接跳到 <a href="#faq">常見問題</a>。</li>
+      <li><strong>想調細節</strong>：第 5 節全部是折疊的，需要哪個點開哪個，不用整份看完。</li>
+    </ul>
+  </div>
+
   <!-- ══════════════════════════════════════════════════════════════ -->
-  <h2 id="install">安裝</h2>
+  <h2 id="what">1. 這個工具在做什麼？</h2>
+
+  <div class="plain">
+    美術在 Photoshop 把一張介面排好之後，接下來本來要有人在 Unity 裡<strong>一張一張切圖、一個一個把位置擺回去</strong>，一個複雜頁面可以花掉大半天。這個工具就是把這段手工活自動化：PSD 丟進去，Unity 能直接用的介面出來。
+  </div>
+
+  <p>它幫你做三件事：</p>
+  <table>
+    <tr><th>Photoshop 裡的東西</th><th>到 Unity 變成什麼</th></tr>
+    <tr><td>一般圖層（按鈕、背景、圖示…）</td><td>一張 PNG 圖片，並且擺在正確位置</td></tr>
+    <tr><td>文字圖層</td><td>還能繼續改字的文字元件，<strong>不是</strong>壓死的圖片</td></tr>
+    <tr><td>圖層的位置、大小、對齊方式</td><td>自動換算成 Unity 的座標與對齊設定</td></tr>
+  </table>
+
+  <p>整個流程長這樣：</p>
+  <div class="flow">
+    <span class="box">你的 PSD</span><span class="arrow">→</span>
+    <span class="box">在 PS 按匯出</span><span class="arrow">→</span>
+    <span class="box">一包圖片 ＋ 一個 JSON</span><span class="arrow">→</span>
+    <span class="box">在 Unity 按匯入</span><span class="arrow">→</span>
+    <span class="box">做好的介面</span>
+  </div>
+
+  <p>所以你會用到<strong>兩端的工具</strong>：Photoshop 裡一個、Unity 裡一個。下一節先把它們裝起來。</p>
+
+  <details>
+    <summary>看到不懂的名詞？點開有小抄<span class="hint">Prefab、Sprite、TMP、Atlas、Anchor 是什麼</span></summary>
+    <div class="details-body">
+      <table>
+        <tr><th>名詞</th><th>白話解釋</th></tr>
+        <tr><td>Prefab</td><td>Unity 的「做好的成品」。這個工具最後產出的就是它——一個可以直接拖進場景用的介面。</td></tr>
+        <tr><td>Sprite</td><td>Unity 裡「拿來當畫面用的圖片」。你的每個 PS 圖層匯出後就是一張 Sprite。</td></tr>
+        <tr><td>TMP（TextMeshPro）</td><td>Unity 的文字元件。文字圖層會變成它，所以之後還能改字、改顏色。</td></tr>
+        <tr><td>Atlas（圖集）</td><td>把很多小圖打包成一張大圖，讓遊戲跑得更順。工具會自動幫你建好。</td></tr>
+        <tr><td>Anchor（錨點）</td><td>決定這個元素「黏在畫面的哪裡」。例如黏右上角的話，換成寬螢幕時它會跟著跑到右上角。</td></tr>
+        <tr><td>Package（包）</td><td>PS 匯出的成果，就是「一個裝滿 PNG 的資料夾 ＋ 一個 JSON 檔」。Unity 端要選的就是這包。</td></tr>
+        <tr><td>Layout JSON</td><td>記錄「哪張圖放哪裡、多大、什麼文字」的清單檔。Unity 靠它把畫面還原出來。</td></tr>
+      </table>
+    </div>
+  </details>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <h2 id="install">2. 安裝（只要做一次）</h2>
+
+  <div class="plain">
+    兩邊都要裝，但<strong>都只要做一次</strong>。之後工具有新版，是用工具裡的按鈕更新，不用再重裝一遍。
+  </div>
 
   <h3><span class="tag tag-ps">PS</span>　Photoshop 端</h3>
-  <p>兩種執行方式擇一：</p>
+
+  <div class="callout ok">
+    <strong>你不需要手動複製任何檔案。</strong>把倉庫資料夾（<code>PS_To_Unity_v2</code>）放在硬碟上一個<strong>之後不會再搬動</strong>的位置，然後跑一次安裝器就好，複製的事情安裝器會做。
+  </div>
+
   <div class="panel">
-    <strong>方式 A（推薦）：執行一次安裝器，選單只留一個入口 <span class="tag tag-new">v2.6.1</span></strong>
+    <strong>步驟</strong>
     <ol style="margin:8px 0 4px; padding-left:20px">
-      <li>Photoshop 執行 <code>File &gt; Scripts &gt; Browse…</code>，選擇<strong>倉庫裡的</strong> <code>PhotoshopExporter/InstallPhotoshopPlugin.jsx</code>。</li>
-      <li>重啟 Photoshop。</li>
+      <li>把倉庫資料夾放到固定位置（例如 <code>D:\Tools\PS_To_Unity_v2</code>）。</li>
+      <li>打開 Photoshop，點選單 <code>檔案 &gt; 指令碼 &gt; 瀏覽…</code>。</li>
+      <li>選倉庫裡的 <code>PhotoshopExporter\InstallPhotoshopPlugin.jsx</code>，跳出成功訊息即可。</li>
+      <li>關掉 Photoshop 再重開。</li>
     </ol>
-    <p style="margin:4px 0 0">之後選單只有一個 <code>File &gt; Scripts &gt; PS To Unity v2</code>，開啟後是工具面板，所有工具（匯出、自動命名、Spine、校準板、Debug 工具、更新）都從面板進入。工具本體留在倉庫資料夾，更新後不需重新安裝。</p>
+    <p style="margin:4px 0 0">重開後選單會多出一個 <code>檔案 &gt; 指令碼 &gt; PS To Unity v2</code>，點下去是一個工具面板，所有功能（匯出、自動命名、Spine、校準板、更新）都從這裡進。</p>
   </div>
-  <div class="panel">
-    <strong>方式 B：每次手動瀏覽</strong>
-    <p style="margin:8px 0 0">在 Photoshop 執行 <code>File &gt; Scripts &gt; Browse…</code>，選擇 <code>PhotoshopExporter/PhotoshopUiPackageExporter.jsx</code>（或任一工具）。</p>
-  </div>
-  <div class="callout warn">
-    <strong>不要把整個 <code>PhotoshopExporter/</code> 資料夾複製進 <code>Presets\Scripts\</code></strong>——那會讓每支腳本各佔一個選單項（舊版說明的做法）。若你之前這樣裝過，重新執行一次方式 A 的安裝器即可：<span class="tag tag-new">v2.6.1</span> 起安裝器會自動清掉散落在 Scripts 資料夾裡的工具複本（只刪本工具的已知檔名，不動其他腳本）。
+
+  <div class="callout red">
+    <strong>Windows 常見卡關：安裝器要用系統管理員身分跑一次</strong>
+    <p style="margin:6px 0 0">如果 Photoshop 裝在 <code>C:\Program Files\</code>（多數人都是），一般身分寫不進去，安裝會失敗。做法：關掉 Photoshop → 對 Photoshop 捷徑按右鍵 →「以系統管理員身分執行」→ 照上面步驟跑一次安裝器 → 關掉，之後用平常方式開就好。<strong>只有安裝這一次需要。</strong></p>
+    <p style="margin:6px 0 0">想確認有沒有真的裝好，去看 <code>C:\Program Files\Adobe\Adobe Photoshop &lt;版本&gt;\Presets\Scripts\</code> 裡面有沒有 <code>PS To Unity v2.jsx</code>。有就是成功了。</p>
   </div>
 
   <h3><span class="tag tag-unity">Unity</span>　Unity 端</h3>
-  <p>將整個 <code>Assets/Editor/PhotoshopUiImporter/</code> 資料夾複製到 Unity 專案的 <code>Assets/Editor/</code> 底下，Unity 會自動編譯。</p>
-  <p>完成後從選單開啟：</p>
+  <p>把整個 <code>Assets/Editor/PhotoshopUiImporter/</code> 資料夾複製到你的 Unity 專案的 <code>Assets/Editor/</code> 底下，Unity 會自己編譯。完成後從選單開啟：</p>
   <pre><code>Tools &gt; Photoshop UI Importer &gt; Importer_v2</code></pre>
 
   <div class="callout info">
-    <strong>前置需求</strong>：Unity 專案需安裝 <strong>TextMeshPro</strong>（Package Manager 搜尋 TextMeshPro 安裝即可）。
+    <strong>開始前先確認</strong>：Unity 專案要先裝 <strong>TextMeshPro</strong>（Package Manager 搜尋 TextMeshPro 安裝即可），不然文字沒辦法產生。
   </div>
 
+  <div class="callout ok">
+    <strong>複製資料夾只有第一次要做</strong>，而且是每個 Unity 專案各做一次。之後工具出新版，在 Importer_v2 視窗標題列點「<strong>從 GitHub 更新工具</strong>」就會自己抓新版覆蓋，不用重新複製、也不用重新下載倉庫。
+  </div>
+
+  <details>
+    <summary>安裝器到底做了什麼？（想知道再看）<span class="hint">為什麼不能直接把整個資料夾複製進 Scripts</span></summary>
+    <div class="details-body">
+      <p>安裝器只在 Photoshop 的 <code>Presets\Scripts\</code> 放<strong>兩個小檔案</strong>：一個叫 <code>PS To Unity v2.jsx</code> 的啟動器，和一個記住倉庫位置的設定檔。工具本體全部留在倉庫資料夾裡。</p>
+      <p>所以：<strong>更新工具不用重裝</strong>，只有<strong>搬動倉庫位置</strong>時要再跑一次安裝器（因為設定檔記的路徑失效了）。</p>
+      <div class="callout warn">
+        <strong>舊版說明的裝法請改掉（只影響 v2.6.1 之前裝過的人）</strong>
+        <p style="margin:6px 0 0">舊版說明要你把整個 <code>PhotoshopExporter/</code> 資料夾複製進 <code>Presets\Scripts\</code>，那會讓每支腳本各佔一個選單項，而且工具更新後選單裡的還是舊複本。現在不需要、也不應該這樣做。</p>
+        <p style="margin:6px 0 0">若你之前這樣裝過，重新跑一次安裝器就好：<span class="tag tag-new">v2.6.1</span> 起安裝器會自動清掉散落在 Scripts 資料夾裡的工具複本（只刪本工具的已知檔名，不動其他腳本）。注意安裝器要從<strong>倉庫</strong>執行，從 Scripts 資料夾裡的複本執行會被擋下。</p>
+      </div>
+      <p>另外還有一種用法：完全不安裝，每次都用 <code>檔案 &gt; 指令碼 &gt; 瀏覽…</code> 直接選 <code>PhotoshopUiPackageExporter.jsx</code>。選單裡不會有入口，適合只偶爾用一次的情況。</p>
+    </div>
+  </details>
+
   <!-- ══════════════════════════════════════════════════════════════ -->
-  <h2 id="workflow">主流程</h2>
+  <h2 id="firstrun">3. 第一次上手：跟著做一遍</h2>
+
+  <div class="plain">
+    下面六步走完，你就會得到一個可以用的 Unity 介面。第一次建議<strong>拿一個簡單的頁面</strong>試，不要一開始就挑最複雜的那張。
+  </div>
 
   <div class="step-grid">
     <div class="step-card">
       <div class="step-num">1</div>
       <strong>整理 PSD</strong>
-      <p>確認圖層為英文命名。如需批次改名，執行 <code>PhotoshopLayerAutoNamer.jsx</code>。</p>
+      <p>圖層名稱改成英文。懶得一個一個改的話，用工具面板裡的「自動命名」批次處理。</p>
     </div>
     <div class="step-card">
       <div class="step-num">2</div>
-      <strong>PS 匯出</strong>
-      <p>執行 <code>PhotoshopUiPackageExporter.jsx</code>，指定 PNG 資料夾與 Layout JSON 路徑，點 Export。</p>
+      <strong>在 PS 匯出</strong>
+      <p>開工具面板 → UI Package Exporter，指定「PNG 要放哪」和「JSON 要放哪」，按 Export。</p>
     </div>
     <div class="step-card">
       <div class="step-num">3</div>
-      <strong>Unity 套用 Package</strong>
-      <p>在 Importer_v2 選擇 Package 資料夾，點「套用 Package」，工具自動找 JSON 與圖片。</p>
+      <strong>Unity 讀進來</strong>
+      <p>開 Importer_v2，選剛剛那包資料夾，按「套用 Package」，工具會自己找到 JSON 和圖片。</p>
     </div>
     <div class="step-card">
       <div class="step-num">4</div>
       <strong>建立專案資料夾</strong>
-      <p>填寫「專案資料夾名稱」，點「<strong>建立專案資料夾</strong>」，自動建立子目錄結構並生成 SpriteAtlas。</p>
+      <p>填一個專案名稱，按「建立專案資料夾」，該有的子資料夾和圖集會自動建好。</p>
     </div>
     <div class="step-card">
       <div class="step-num">5</div>
-      <strong>指定字型與材質</strong>
-      <p>至少指定「預設 TMP Font Asset」。有現成字框材質庫時，可填入「TMP 材質球資料夾」。</p>
+      <strong>指定字型</strong>
+      <p>至少要選一個「預設 TMP Font Asset」，不然有文字的頁面沒辦法產生。</p>
     </div>
     <div class="step-card">
       <div class="step-num">6</div>
-      <strong>Generate Prefab</strong>
-      <p>點「Validate」確認資料，再點「Generate Prefab」完成輸出。</p>
+      <strong>產生成品</strong>
+      <p>先按「Validate」確認資料沒問題，再按「Generate Prefab」，完成。</p>
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════ -->
-  <h2 id="ps-dialog">PS 匯出對話框</h2>
-
   <div class="callout ok">
-    <strong>邊看規則邊命名</strong>：按下「命名規則說明」後，匯出主視窗會先關閉，再於瀏覽器開啟本機速查頁。您可以把速查放在 Photoshop 旁邊、使用瀏覽器搜尋，並直接操作圖層面板修改名稱；完成後重新執行匯出工具即可。
+    <strong>兩個第一次最容易踩的地雷</strong>
+    <ul style="margin:6px 0 0">
+      <li><strong>JSON 不要放在 PNG 資料夾裡面</strong>，要放在它外面，不然會跟圖片混在一起。</li>
+      <li><strong>頁面有文字就一定要指定字型</strong>，否則按 Generate 會被擋下來。</li>
+    </ul>
+  </div>
+
+  <details>
+    <summary>PS 匯出視窗每個欄位在幹嘛<span class="hint">預設值大多不用動，這裡是完整說明</span></summary>
+    <div class="details-body">
+      <div class="callout ok">
+        <strong>邊看規則邊命名</strong>：按下「命名規則說明」後，匯出主視窗會先關閉，再於瀏覽器開啟本機速查頁。你可以把速查放在 Photoshop 旁邊、用瀏覽器搜尋，並直接操作圖層面板修改名稱；完成後重新執行匯出工具即可。
+      </div>
+      <table>
+        <tr><th>欄位／選項</th><th>說明</th></tr>
+        <tr><td><code>PNG output folder</code></td><td>PNG 圖片輸出目的地。</td></tr>
+        <tr><td><code>Layout JSON file</code></td><td>JSON 檔案路徑與名稱，<strong>必須放在 PNG 資料夾外面</strong>，避免和圖片混在一起。</td></tr>
+        <tr><td>Unity Atlas output</td><td>啟用後，所選 PNG 資料夾視為 Package 根目錄，圖片自動寫入 <code>Atlas/SpriteAtlas/{語言}</code>。語言選項：<code>Base</code>（美術圖）、<code>CHS</code>、<code>CHT</code>、<code>EN</code>（文字圖）。</td></tr>
+        <tr><td>Ignore hidden layers</td><td>勾選時跳過隱藏圖層（預設開啟）。</td></tr>
+        <tr><td>Skip IGNORE_ / REF_ layers</td><td>跳過參考用圖層（預設開啟）。</td></tr>
+        <tr><td>Use export cache</td><td>PSD 已儲存且圖層未變動時，跳過重複輸出（預設開啟）。</td></tr>
+        <tr><td>Use fast layer duplicate</td><td>盡量使用快速 duplicate 路徑，失敗才改用較慢的 merge-copy（預設開啟）。</td></tr>
+        <tr><td>Default text layers</td><td>文字圖層預設輸出為 TMP 節點（建議）或 PNG 圖片。</td></tr>
+        <tr><td>Export selected text as PNG</td><td>進階選項，<strong>預設不勾選</strong>。在 PS 中先選取特定文字圖層再執行腳本，這些圖層會強制輸出為 PNG，其餘仍按預設。</td></tr>
+        <tr><td>Auto-export non-Source-Han fonts as PNG <span class="tag tag-new">v2.4</span></td><td><strong>預設勾選</strong>。工具自動判斷文字圖層字型：思源系列（思源黑體/宋體、源泉圓體、Noto CJK 等）以 TMP 節點輸出；其他字型強制輸出為 PNG，避免 Unity 缺少字型導致無法正確顯示。</td></tr>
+      </table>
+      <div class="callout ok">
+        <strong>匯出快取</strong>：PSD 已儲存、圖層未變動、PNG 存在且簽名一致時，直接跳過該圖層。第一次匯出後再次執行速度明顯加快。快取儲存在 PNG 資料夾內的 <code>.ps_to_unity_export_cache.tsv</code>，PSD 有未儲存變更時自動忽略。
+      </div>
+    </div>
+  </details>
+
+  <details>
+    <summary>Unity Importer_v2 視窗每個欄位在幹嘛<span class="hint">四個區塊的完整說明</span></summary>
+    <div class="details-body">
+      <p>開啟路徑：<code>Tools &gt; Photoshop UI Importer &gt; Importer_v2</code></p>
+
+      <h3>1. Photoshop UI Package</h3>
+      <p>選擇 Photoshop 匯出的 Package 根資料夾，點「<strong>套用 Package</strong>」。工具自動掃描找出 layout JSON（優先找 <code>layout.json</code>，其次找 <code>*_layout.json</code>）以及 PNG 圖片資料夾。按「只驗證資料」可在不生成 Prefab 的情況下確認資料正確。</p>
+
+      <h3>2. Unity 生成位置</h3>
+      <p>填寫「<strong>專案資料夾名稱</strong>」（例如 <code>Setting_Page</code>），有兩個按鈕可用：</p>
+      <ul>
+        <li>「<strong>建立專案資料夾</strong>」（新專案建議用）：自動建立完整子目錄結構、生成 SpriteAtlas，並填入輸出路徑。</li>
+        <li>「<strong>套用標準輸出路徑</strong>」（既有資料夾用）：只填入 Atlas 與 Prefab 路徑，不建立資料夾。</li>
+      </ul>
+      <p>圖片來源若已在 Unity 專案 <code>Assets</code> 底下，工具直接使用來源路徑，不重複複製。「<strong>參考解析度</strong>」預設自動跟隨 Layout JSON 中的 Canvas 尺寸。</p>
+
+      <h3>3. 文字、材質與換皮</h3>
+      <table>
+        <tr><th>欄位</th><th>用途</th></tr>
+        <tr><td>預設 TMP Font Asset</td><td>所有文字節點的 fallback 字型。UI 含文字時必填。</td></tr>
+        <tr><td>預設 TMP 材質球</td><td>文字的 fallback 材質。Stroke 效果自動衍生的材質也以此為基底，建議填寫。</td></tr>
+        <tr><td>TMP 材質球資料夾（選填）</td><td>指定一個存放現成字框材質球的資料夾。Generate 時優先從此資料夾比對，找到相近的直接重用，找不到才自動新建。設定後視窗會即時顯示找到幾顆。</td></tr>
+        <tr><td>Skin Map（選填）</td><td>將特定 Sprite 名稱替換為換皮版本。</td></tr>
+      </table>
+
+      <h3>4. 執行</h3>
+      <ul>
+        <li><strong>Validate</strong>：讀取 Layout JSON，驗證節點數量與資料格式。</li>
+        <li><strong>預覽（Dry-run）</strong>：顯示節點數、是否含文字、圖片資料夾狀態與預計輸出路徑，不執行任何操作。</li>
+        <li><strong>Generate Prefab</strong>：匯入圖片、生成 Prefab，完成後在 Project 視窗自動選取並 ping 出 Prefab。</li>
+      </ul>
+    </div>
+  </details>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <h2 id="naming">4. 圖層命名：先記這幾個就好</h2>
+
+  <div class="plain">
+    這個工具靠<strong>圖層名稱</strong>來判斷你的意圖。在名稱裡加幾個標記，Unity 那邊就會自動做對應處理——不加也能用，只是有些事要自己補。下面五個是日常最常用的，其他的等真的需要再查。
   </div>
 
   <table>
-    <tr><th>欄位／選項</th><th>說明</th></tr>
-    <tr><td><code>PNG output folder</code></td><td>PNG 圖片輸出目的地。</td></tr>
-    <tr><td><code>Layout JSON file</code></td><td>JSON 檔案路徑與名稱，<strong>必須放在 PNG 資料夾外面</strong>，避免和圖片混在一起。</td></tr>
-    <tr><td>Unity Atlas output</td><td>啟用後，所選 PNG 資料夾視為 Package 根目錄，圖片自動寫入 <code>Atlas/SpriteAtlas/{語言}</code>。語言選項：<code>Base</code>（美術圖）、<code>CHS</code>、<code>CHT</code>、<code>EN</code>（文字圖）。</td></tr>
-    <tr><td>Ignore hidden layers</td><td>勾選時跳過隱藏圖層（預設開啟）。</td></tr>
-    <tr><td>Skip IGNORE_ / REF_ layers</td><td>跳過參考用圖層（預設開啟）。</td></tr>
-    <tr><td>Use export cache</td><td>PSD 已儲存且圖層未變動時，跳過重複輸出（預設開啟）。</td></tr>
-    <tr><td>Use fast layer duplicate</td><td>盡量使用快速 duplicate 路徑，失敗才改用較慢的 merge-copy（預設開啟）。</td></tr>
-    <tr><td>Default text layers</td><td>文字圖層預設輸出為 TMP 節點（建議）或 PNG 圖片。</td></tr>
-    <tr><td>Export selected text as PNG</td><td>進階選項，<strong>預設不勾選</strong>。在 PS 中先選取特定文字圖層再執行腳本，這些圖層會強制輸出為 PNG，其餘仍按預設。</td></tr>
-    <tr><td>Auto-export non-Source-Han fonts as PNG <span class="tag tag-new">v2.4</span></td><td><strong>預設勾選</strong>。工具自動判斷文字圖層字型：思源系列（思源黑體/宋體、源泉圓體、Noto CJK 等）以 TMP 節點輸出；其他字型強制輸出為 PNG，避免 Unity 缺少字型導致無法正確顯示。</td></tr>
+    <tr><th>在圖層名稱裡加</th><th>效果</th><th>什麼時候用</th></tr>
+    <tr><td><code>IGNORE_</code></td><td>這層完全不匯出</td><td>參考線、草稿、暫時不要的東西</td></tr>
+    <tr><td><code>BTN_</code></td><td>Unity 自動幫它加上按鈕元件</td><td>這張圖是按鈕</td></tr>
+    <tr><td><code>[SLICED=32]</code></td><td>設成九宮格，拉大不會變形</td><td>對話框底、按鈕底這種會被拉伸的圖</td></tr>
+    <tr><td><code>[H]</code> 或 <code>[V]</code>（加在群組上）</td><td>群組內容自動排成一排／一列</td><td>並排的按鈕列、上下排列的選單</td></tr>
+    <tr><td><code>ANCHOR_TR</code>（或 TL／BL／BR…）</td><td>固定黏在畫面的某個角落</td><td>右上角的關閉鈕、左上的返回鍵</td></tr>
   </table>
 
   <div class="callout ok">
-    <strong>匯出快取</strong>：PSD 已儲存、圖層未變動、PNG 存在且簽名一致時，直接跳過該圖層。第一次匯出後再次執行速度明顯加快。快取儲存在 PNG 資料夾內的 <code>.ps_to_unity_export_cache.tsv</code>，PSD 有未儲存變更時自動忽略。
+    <strong>沒加標記也沒關係</strong>：工具會照圖層在畫面裡的位置自動推斷對齊方式，位置一樣會對。標記只是讓你在需要時能明確指定。
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════ -->
-  <h2 id="naming">圖層命名規則</h2>
+  <details>
+    <summary>完整標記總表<span class="hint">Anchor／Pivot、特殊前綴、文字輸出控制</span></summary>
+    <div class="details-body">
+      <h3>Anchor / Pivot 標記</h3>
+      <p>在圖層名稱中加入標記（不分大小寫），Unity 匯入時自動套用對應的 RectTransform Anchor 與 Pivot：</p>
+      <table>
+        <tr><th>標記</th><th>Anchor 效果</th></tr>
+        <tr><td><code>ANCHOR_TL</code> / <code>ANCHOR_TOP_LEFT</code></td><td>左上角固定</td></tr>
+        <tr><td><code>ANCHOR_TR</code> / <code>ANCHOR_TOP_RIGHT</code></td><td>右上角固定</td></tr>
+        <tr><td><code>ANCHOR_BL</code> / <code>ANCHOR_BOTTOM_LEFT</code></td><td>左下角固定</td></tr>
+        <tr><td><code>ANCHOR_BR</code> / <code>ANCHOR_BOTTOM_RIGHT</code></td><td>右下角固定</td></tr>
+        <tr><td><code>ANCHOR_C</code> / <code>ANCHOR_CENTER</code></td><td>中心固定</td></tr>
+        <tr><td><code>ANCHOR_ML</code> / <code>ANCHOR_LEFT</code></td><td>左中固定</td></tr>
+        <tr><td><code>ANCHOR_MR</code> / <code>ANCHOR_RIGHT</code></td><td>右中固定</td></tr>
+        <tr><td><code>ANCHOR_TC</code> / <code>ANCHOR_TOP</code></td><td>上中固定</td></tr>
+        <tr><td><code>ANCHOR_BC</code> / <code>ANCHOR_BOTTOM</code></td><td>下中固定</td></tr>
+        <tr><td><code>STRETCH_X</code> / <code>STRETCH_HORIZONTAL</code></td><td>水平延展</td></tr>
+        <tr><td><code>STRETCH_Y</code> / <code>STRETCH_VERTICAL</code></td><td>垂直延展</td></tr>
+        <tr><td><code>STRETCH_FULL</code> / <code>STRETCH_BOTH</code></td><td>全方向延展</td></tr>
+      </table>
+      <p>未加任何標記時，工具根據元素在父容器中的相對位置自動推斷 Anchor（靠左 / 靠右 / 置中 / 延展等）。</p>
 
-  <h3>Anchor / Pivot 標記</h3>
-  <p>在圖層名稱中加入標記（不分大小寫），Unity 匯入時自動套用對應的 RectTransform Anchor 與 Pivot：</p>
-  <table>
-    <tr><th>標記</th><th>Anchor 效果</th></tr>
-    <tr><td><code>ANCHOR_TL</code> / <code>ANCHOR_TOP_LEFT</code></td><td>左上角固定</td></tr>
-    <tr><td><code>ANCHOR_TR</code> / <code>ANCHOR_TOP_RIGHT</code></td><td>右上角固定</td></tr>
-    <tr><td><code>ANCHOR_BL</code> / <code>ANCHOR_BOTTOM_LEFT</code></td><td>左下角固定</td></tr>
-    <tr><td><code>ANCHOR_BR</code> / <code>ANCHOR_BOTTOM_RIGHT</code></td><td>右下角固定</td></tr>
-    <tr><td><code>ANCHOR_C</code> / <code>ANCHOR_CENTER</code></td><td>中心固定</td></tr>
-    <tr><td><code>ANCHOR_ML</code> / <code>ANCHOR_LEFT</code></td><td>左中固定</td></tr>
-    <tr><td><code>ANCHOR_MR</code> / <code>ANCHOR_RIGHT</code></td><td>右中固定</td></tr>
-    <tr><td><code>ANCHOR_TC</code> / <code>ANCHOR_TOP</code></td><td>上中固定</td></tr>
-    <tr><td><code>ANCHOR_BC</code> / <code>ANCHOR_BOTTOM</code></td><td>下中固定</td></tr>
-    <tr><td><code>STRETCH_X</code> / <code>STRETCH_HORIZONTAL</code></td><td>水平延展</td></tr>
-    <tr><td><code>STRETCH_Y</code> / <code>STRETCH_VERTICAL</code></td><td>垂直延展</td></tr>
-    <tr><td><code>STRETCH_FULL</code> / <code>STRETCH_BOTH</code></td><td>全方向延展</td></tr>
-  </table>
-  <p>未加任何標記時，工具根據元素在父容器中的相對位置自動推斷 Anchor（靠左 / 靠右 / 置中 / 延展等）。</p>
+      <p>Pivot 可另行指定（可與 Anchor 標記組合）：</p>
+      <table>
+        <tr><th>標記</th><th>效果</th></tr>
+        <tr><td><code>PIVOT_TL</code></td><td>左上角 pivot</td></tr>
+        <tr><td><code>PIVOT_C</code> / <code>PIVOT_CENTER</code></td><td>中心 pivot</td></tr>
+        <tr><td><code>PIVOT_BL</code></td><td>左下角 pivot（其他方向以此類推）</td></tr>
+      </table>
 
-  <p>Pivot 可另行指定（可與 Anchor 標記組合）：</p>
-  <table>
-    <tr><th>標記</th><th>效果</th></tr>
-    <tr><td><code>PIVOT_TL</code></td><td>左上角 pivot</td></tr>
-    <tr><td><code>PIVOT_C</code> / <code>PIVOT_CENTER</code></td><td>中心 pivot</td></tr>
-    <tr><td><code>PIVOT_BL</code></td><td>左下角 pivot（其他方向以此類推）</td></tr>
-  </table>
+      <h3>特殊前綴與標記</h3>
+      <table>
+        <tr><th>前綴 / 標記</th><th>作用</th></tr>
+        <tr><td><code>IGNORE_</code> 或 <code>[ignore]</code></td><td>匯出時完全跳過此圖層。</td></tr>
+        <tr><td><code>REF_</code></td><td>參考用圖層，匯出時跳過。</td></tr>
+        <tr><td><code>IMG_</code></td><td>圖片前綴（前綴本身會從 PNG 檔名中移除）。</td></tr>
+        <tr><td><code>TXT_</code></td><td>文字前綴（前綴本身會從節點名稱中移除）。</td></tr>
+        <tr><td><code>BTN_</code> <span class="tag tag-new">v2.4.3</span></td><td>圖片節點以 <code>BTN_</code> 開頭時（不分大小寫），Unity 匯入後自動在該 GameObject 加上 <code>Button</code> 元件，省去手動加掛步驟。</td></tr>
+        <tr><td><code>[SLICED=32]</code> / <code>[SLICED=左,上,右,下]</code> <span class="tag tag-new">v2.12.4</span></td><td>圖片匯出時把九宮格 Border 寫入 JSON；Unity 自動套用 Sprite Border，並把生成的 Image Type 設為 <code>Sliced</code>。可用別名 <code>[9SLICE=…]</code>、<code>[9S=…]</code>。</td></tr>
+        <tr><td><code>[SOFTMASK_BOTTOM=64]</code> <span class="tag tag-new">v2.12.5</span></td><td>搭配 <code>[SCROLL_V]</code> / <code>[SCROLL_H]</code> 使用；Unity 以雙層原生 <code>RectMask2D</code> 只柔化捲動視窗底邊，不增加 runtime 套件。<code>[SOFTMASK_Y=64]</code> 保留為相容別名。</td></tr>
+        <tr><td><code>[MERGE]</code> <span class="tag tag-new">v2.12.4</span></td><td>加在群組名稱中，將群組目前可見的內容合成一張 PNG；Unity 端只建立一個 Image 節點，不保留子階層。文字、圖層效果與遮色片會一併烘入圖片。若同時存在 <code>[H]</code>、<code>[V]</code>、<code>[GRID]</code>、<code>[CG]</code> 或 Scroll 標籤，以 <code>[MERGE]</code> 為優先。</td></tr>
+      </table>
 
-  <h3>特殊前綴與標記</h3>
-  <table>
-    <tr><th>前綴 / 標記</th><th>作用</th></tr>
-    <tr><td><code>IGNORE_</code> 或 <code>[ignore]</code></td><td>匯出時完全跳過此圖層。</td></tr>
-    <tr><td><code>REF_</code></td><td>參考用圖層，匯出時跳過。</td></tr>
-    <tr><td><code>IMG_</code></td><td>圖片前綴（前綴本身會從 PNG 檔名中移除）。</td></tr>
-    <tr><td><code>TXT_</code></td><td>文字前綴（前綴本身會從節點名稱中移除）。</td></tr>
-    <tr><td><code>BTN_</code> <span class="tag tag-new">v2.4.3</span></td><td>圖片節點以 <code>BTN_</code> 開頭時（不分大小寫），Unity 匯入後自動在該 GameObject 加上 <code>Button</code> 元件，省去手動加掛步驟。</td></tr>
-    <tr><td><code>[SLICED=32]</code> / <code>[SLICED=左,上,右,下]</code> <span class="tag tag-new">v2.12.4</span></td><td>圖片匯出時把九宮格 Border 寫入 JSON；Unity 自動套用 Sprite Border，並把生成的 Image Type 設為 <code>Sliced</code>。可用別名 <code>[9SLICE=…]</code>、<code>[9S=…]</code>。</td></tr>
-    <tr><td><code>[SOFTMASK_BOTTOM=64]</code> <span class="tag tag-new">v2.12.5</span></td><td>搭配 <code>[SCROLL_V]</code> / <code>[SCROLL_H]</code> 使用；Unity 以雙層原生 <code>RectMask2D</code> 只柔化捲動視窗底邊，不增加 runtime 套件。<code>[SOFTMASK_Y=64]</code> 保留為相容別名。</td></tr>
-    <tr><td><code>[MERGE]</code> <span class="tag tag-new">v2.12.4</span></td><td>加在群組名稱中，將群組目前可見的內容合成一張 PNG；Unity 端只建立一個 Image 節點，不保留子階層。文字、圖層效果與遮色片會一併烘入圖片。若同時存在 <code>[H]</code>、<code>[V]</code>、<code>[GRID]</code>、<code>[CG]</code> 或 Scroll 標籤，以 <code>[MERGE]</code> 為優先。</td></tr>
-  </table>
+      <h3>文字圖層輸出控制</h3>
+      <p>個別圖層可在名稱中指定輸出方式，覆蓋對話框的預設設定：</p>
+      <table>
+        <tr><th>名稱中含</th><th>效果</th></tr>
+        <tr><td><code>[PNG]</code> <code>[IMAGE]</code> <code>[IMG]</code> <code>TXTIMG_</code></td><td>強制輸出為 PNG 圖片</td></tr>
+        <tr><td><code>[TMP]</code> <code>[TEXT]</code> <code>TMP_</code> <code>TXT_</code></td><td>強制保留為 TMP 節點</td></tr>
+      </table>
+    </div>
+  </details>
 
-  <h3>九宮格圖片自動化</h3>
-  <pre><code>IMG_panel_[SLICED=32]
+  <details>
+    <summary>九宮格圖片怎麼設<span class="hint">[SLICED] 的數字怎麼填</span></summary>
+    <div class="details-body">
+      <pre><code>IMG_panel_[SLICED=32]
 IMG_dialog_[SLICED=24,40,24,32]</code></pre>
-  <p>單一數值代表左、上、右、下都使用相同像素；四個數值的順序固定為「左、上、右、下」。Border 以匯出 PNG 的像素為單位。若圖層未加標記，Unity 不會覆蓋 Sprite Editor 內原有的 Border；只要 Sprite 已有非零 Border，產生 Prefab 時仍會自動改用 <code>Image.Type.Sliced</code>。</p>
-
-  <div class="callout warn">
-    <strong>[MERGE] 適用情境</strong>：適合不需要在 Unity 個別操作的背景裝飾、固定組合圖示或複雜視覺效果。若子項需要按鈕事件、換字、動畫、換皮或獨立縮放，請保留原群組階層，不要使用 <code>[MERGE]</code>。工具會一次隔離並合成一個群組，存檔後立即釋放暫存像素層；操作上仍只需按一次 Export。
-  </div>
-
-  <h3>文字圖層輸出控制</h3>
-  <p>個別圖層可在名稱中指定輸出方式，覆蓋對話框的預設設定：</p>
-  <table>
-    <tr><th>名稱中含</th><th>效果</th></tr>
-    <tr><td><code>[PNG]</code> <code>[IMAGE]</code> <code>[IMG]</code> <code>TXTIMG_</code></td><td>強制輸出為 PNG 圖片</td></tr>
-    <tr><td><code>[TMP]</code> <code>[TEXT]</code> <code>TMP_</code> <code>TXT_</code></td><td>強制保留為 TMP 節點</td></tr>
-  </table>
-
-  <h3>材質球標記（文字圖層）</h3>
-  <p>在文字圖層名稱加上材質標記，指定 Unity 要套用的 TMP 材質球：</p>
-  <pre><code>TXT_title_[MAT:title_yellow_outline]
-TXT_score_[MAT:reward_white_red_outline]</code></pre>
-  <p>Unity 端 <strong>Skin Map</strong> 可將 materialToken 對應到不同的 TMP Material Preset。若圖層有 Layer Style 的 Stroke 效果，工具會自動產生 materialToken，無需手動標記。</p>
-
-  <h3>假厚度標記（文字圖層）</h3>
-  <p>在文字圖層名稱加入 <code>[THICK:N]</code>，N 為向下偏移的像素數，Unity 會自動疊兩層 TMP 模擬立體感：</p>
-  <pre><code>TXT_title_[THICK:3]
-TXT_score_[THICK:2]</code></pre>
-  <p>上層為原始文字，下層為顏色加深（× 0.55）的陰影層，偏移量對應 PS 設計稿像素。同時支援 X 軸偏移：<code>[THICK:2:1]</code>（格式：<code>[THICK:offsetY:offsetX]</code>）。</p>
-  <div class="callout ok"><strong>v2.4 起</strong> PS 端 JSX 已自動解析 <code>[THICK:N]</code> 與 <code>[THICK:N:M]</code>，名稱中加標記即可，不需手動編輯 JSON。</div>
+      <p>單一數值代表左、上、右、下都使用相同像素；四個數值的順序固定為「左、上、右、下」。Border 以匯出 PNG 的像素為單位。若圖層未加標記，Unity 不會覆蓋 Sprite Editor 內原有的 Border；只要 Sprite 已有非零 Border，產生 Prefab 時仍會自動改用 <code>Image.Type.Sliced</code>。</p>
+    </div>
+  </details>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
-  <h2 id="layout-group">Layout Group 自動排版 <span class="tag tag-new">v2.4</span></h2>
+  <h2 id="advanced">5. 進階功能（需要時再點開）</h2>
 
-  <p>圖層群組可透過明確命名標記轉為 Unity 的 <code>HorizontalLayoutGroup</code> 或 <code>VerticalLayoutGroup</code>，並自動套上 <code>ContentSizeFitter</code>。未標記的普通群組會完整保留 Photoshop 座標，不再猜測排版方向。</p>
-  <div class="callout warn">
-    <strong>v2.4.2 起停用自動去重</strong>：先前依「相同寬高」判斷重複圖會誤判（譬如同寬度但不同字的文字、同尺寸但不同 icon），故 v2.4.2 起每個圖層各自輸出獨立 PNG。若需要圖片共用，請在 PS 將圖層名稱統一。
+  <div class="plain">
+    這一整節都是折疊的。你<strong>不需要</strong>現在看，等真的遇到「我想讓這排按鈕自動排列」「這個字的外框要跟設計稿一樣厚」這類需求時，再點開對應的那一塊就好。
   </div>
 
-  <h3>偵測規則</h3>
-  <p><strong>v2.10.1 起只接受明確命名標記</strong>，避免一般群組因子層剛好同 X/Y 而被錯誤重排：</p>
-  <table>
-    <tr><th>方式</th><th>條件</th><th>結果</th></tr>
-    <tr><td>命名標記</td><td>群組名稱含 <code>[H]</code> 或 <code>[HLAYOUT]</code>（不分大小寫）</td><td>強制水平 layout</td></tr>
-    <tr><td>命名標記</td><td>群組名稱含 <code>[V]</code> 或 <code>[VLAYOUT]</code>（不分大小寫）</td><td>強制垂直 layout</td></tr>
-    <tr><td>無標記</td><td>任何一般群組</td><td>普通群組，不加 Layout Component，保留 PS 座標</td></tr>
-  </table>
+  <details>
+    <summary>讓群組自動排列（Layout Group）<span class="hint">一排按鈕、一列選單想要自動等距</span></summary>
+    <div class="details-body">
+      <p>圖層群組可透過明確命名標記轉為 Unity 的 <code>HorizontalLayoutGroup</code> 或 <code>VerticalLayoutGroup</code>，並自動套上 <code>ContentSizeFitter</code>。未標記的普通群組會完整保留 Photoshop 座標，不再猜測排版方向。</p>
 
-  <h3>實際 PSD 圖層命名範例</h3>
-  <p><strong>情境 A：標記強制（不依賴位置）</strong></p>
-  <pre><code>Settings_Page/
+      <h3>偵測規則</h3>
+      <p><strong>v2.10.1 起只接受明確命名標記</strong>，避免一般群組因子層剛好同 X/Y 而被錯誤重排：</p>
+      <table>
+        <tr><th>方式</th><th>條件</th><th>結果</th></tr>
+        <tr><td>命名標記</td><td>群組名稱含 <code>[H]</code> 或 <code>[HLAYOUT]</code>（不分大小寫）</td><td>強制水平 layout</td></tr>
+        <tr><td>命名標記</td><td>群組名稱含 <code>[V]</code> 或 <code>[VLAYOUT]</code>（不分大小寫）</td><td>強制垂直 layout</td></tr>
+        <tr><td>無標記</td><td>任何一般群組</td><td>普通群組，不加 Layout Component，保留 PS 座標</td></tr>
+      </table>
+
+      <h3>實際 PSD 圖層命名範例</h3>
+      <p><strong>情境 A：標記強制（不依賴位置）</strong></p>
+      <pre><code>Settings_Page/
 ├── BtnBar_[H]/              ← 強制水平
 │   ├── Btn_Home.png
 │   ├── Btn_Settings.png
@@ -653,32 +867,148 @@ TXT_score_[THICK:2]</code></pre>
     ├── Menu_Help.png
     └── Menu_Quit.png</code></pre>
 
-  <p><strong>情境 B：結合其他標記（多標記共存）</strong></p>
-  <pre><code>TopBar_[H][ANCHOR_TC]/       ← 水平 layout + 上方置中錨點
+      <p><strong>情境 B：結合其他標記（多標記共存）</strong></p>
+      <pre><code>TopBar_[H][ANCHOR_TC]/       ← 水平 layout + 上方置中錨點
 ├── Coin.png
 ├── Diamond.png
 └── Ticket.png</code></pre>
 
-  <h3>Spacing / Padding 自動計算</h3>
-  <ul>
-    <li><strong>Spacing</strong>：依子層排序後，計算相鄰子層的像素間距，取中位數作為 spacing。</li>
-    <li><strong>Padding</strong>：群組邊界與最外層子層邊界的距離，分別套用到 Left / Right / Top / Bottom。</li>
-    <li>所有值由 PS 設計稿座標自動算出，不需手動輸入。</li>
-  </ul>
+      <h3>Spacing / Padding 自動計算</h3>
+      <ul>
+        <li><strong>Spacing</strong>：依子層排序後，計算相鄰子層的像素間距，取中位數作為 spacing。</li>
+        <li><strong>Padding</strong>：群組邊界與最外層子層邊界的距離，分別套用到 Left / Right / Top / Bottom。</li>
+        <li>所有值由 PS 設計稿座標自動算出，不需手動輸入。</li>
+      </ul>
 
-  <h3>重複圖去重（v2.4.2 已停用）</h3>
-  <p>v2.4.0 ~ v2.4.1 曾以「相同 width × height」為判斷依據自動共用 imagePath。但實務上此判斷不準確：</p>
-  <ul>
-    <li>同寬度但不同字的文字節點被誤判為同一張圖。</li>
-    <li>共用後也會干擾 Layout Spacing 中位數計算，造成排版錯誤。</li>
-  </ul>
-  <p><strong>v2.4.2 起取消自動去重</strong>，每個圖層各自輸出一張 PNG。若多個圖層真的指向同一張圖，請將圖層名稱命名一致（如 <code>btn_bg</code> + 副本），工具會以 <code>btn_bg_002</code>、<code>btn_bg_003</code> 的方式分別匯出，仍可由設計師後續手動合併或在 Unity 端用相同 Sprite。</p>
+      <div class="callout warn">
+        <strong>v2.4.2 起停用自動去重</strong>：先前依「相同寬高」判斷重複圖會誤判（譬如同寬度但不同字的文字、同尺寸但不同 icon），而且共用後還會干擾 Layout Spacing 的中位數計算、造成排版錯誤，故 v2.4.2 起每個圖層各自輸出獨立 PNG。若需要圖片共用，請在 PS 將圖層名稱統一（如 <code>btn_bg</code> ＋ 副本），工具會以 <code>btn_bg_002</code>、<code>btn_bg_003</code> 的方式分別匯出，仍可由設計師後續手動合併或在 Unity 端用相同 Sprite。
+      </div>
+    </div>
+  </details>
 
-  <!-- ══════════════════════════════════════════════════════════════ -->
-  <h2 id="folders">專案資料夾結構</h2>
+  <details>
+    <summary>把一個群組壓成單張圖（[MERGE]）<span class="hint">背景裝飾、複雜特效不想在 Unity 拆成幾十層</span></summary>
+    <div class="details-body">
+      <p>在群組名稱加上 <code>[MERGE]</code>，工具會把群組目前可見的內容（含文字、圖層效果與遮色片）合成一張 PNG，Unity 端只建立一個 Image 節點，不保留子階層。</p>
+      <div class="callout warn">
+        <strong>什麼時候該用</strong>：適合不需要在 Unity 個別操作的背景裝飾、固定組合圖示或複雜視覺效果。<strong>什麼時候不要用</strong>：若子項需要按鈕事件、換字、動畫、換皮或獨立縮放，請保留原群組階層。工具會一次隔離並合成一個群組，存檔後立即釋放暫存像素層；操作上仍只需按一次 Export。
+      </div>
+    </div>
+  </details>
 
-  <p>點「<strong>建立專案資料夾</strong>」後，工具在 <code>Assets/Temp/{專案名稱}/</code> 下自動建立以下結構，並同步建立 SpriteAtlas asset：</p>
-  <pre><code>Assets/Temp/{專案名稱}/
+  <details>
+    <summary>文字的材質球與描邊<span class="hint">想讓 Unity 的字框跟 PS 設計稿一樣</span></summary>
+    <div class="details-body">
+      <h3>TMP 文字節點自動流程</h3>
+      <ol>
+        <li>PS 文字圖層的 <strong>Layer Style → Stroke</strong> 效果，匯出 JSON 時寫出 <code>outlineColor</code>、<code>outlineWidth</code> 與自動 <code>materialToken</code>。</li>
+        <li>PS 文字圖層的 <strong>Layer Style → Color Overlay</strong> 效果，填色顏色寫入 <code>color</code> 欄位，Unity 端套用至 TMP 頂點色。</li>
+        <li>Unity Generate 時，依序執行材質球解析：
+          <ol style="margin:6px 0 0; padding-left:20px">
+            <li>若設定了「TMP 材質球資料夾」，先掃描資料夾內所有材質球，以 Outline 顏色（RGB 各差 &lt; 8%）為第一條件過濾，再從符合色條件的材質球中選 Thickness 最接近的直接重用，<strong>不新增</strong>。<span class="tag tag-new">v2.4.3</span> 改為顏色優先比對，確保不同字號的同色外框都能穩定找到同一顆材質球。</li>
+            <li>未找到匹配 → 從預設材質球複製一份，套用 <code>_OutlineColor</code> / <code>_OutlineWidth</code>，儲存至 <code>Assets/Temp/{名稱}/Font/GeneratedMaterials/</code>。</li>
+            <li>無 Stroke 資料的文字節點直接套用預設材質球，不做任何處理。</li>
+          </ol>
+        </li>
+      </ol>
+      <div class="callout ok">
+        <strong>材質球重用邏輯</strong>：同一頁面若多個文字用了接近的字框顏色，工具會自動共用同一顆材質球，避免 GeneratedMaterials 資料夾膨脹。
+      </div>
+
+      <h3>描邊寬度換算 <span class="tag tag-new">v2.6</span></h3>
+      <p>PS 描邊 px 換算為 TMP <code>_OutlineWidth</code>（0~1）的公式：</p>
+      <pre><code>_OutlineWidth = strokePx × samplingPointSize ÷ (atlasPadding + 1) ÷ fontSize</code></pre>
+      <ul>
+        <li><code>samplingPointSize</code> 與 <code>atlasPadding</code> 自動從你指定的 TMP Font Asset 讀取，換字型不需改任何設定。</li>
+        <li>v2.6.0 修正：分母改用 <code>atlasPadding + 1</code>（TMP 的 gradientScale），修正先前描邊系統性偏厚約 20% 的問題。</li>
+      </ul>
+      <div class="callout warn">
+        <strong>描邊超限警告 <span class="tag tag-new">v2.6</span></strong>：SDF 描邊有物理上限（受 atlasPadding 限制）。換算結果超過 1.0 時，Generate 完成後狀態列會顯示超限筆數，Console 列出各節點的描邊 px、目前上限與<strong>建議的 atlasPadding</strong>。依建議值重建 Font Asset（Window → TextMeshPro → Font Asset Creator，調高 Padding）後重新 Generate 即可。
+      </div>
+
+      <h3>描邊厚度補償係數 <span class="tag tag-new">v2.6.2</span></h3>
+      <p>Importer_v2 視窗的「3. 文字、材質與換皮」區提供一條 <strong>描邊厚度補償係數</strong> 滑桿（範圍 0.3 ~ 1.5，預設 1.0），值會即時存入 EditorPrefs 跨 session 保留。</p>
+      <div class="callout ok">
+        <strong>正常情況下保持 1.0 不需動</strong>。Phase 1 校準實測：當 Unity TMP 用的字型與字重<strong>與 PS 設計稿完全一致</strong>（例如 PS 用 SourceHanSansTC-Bold、Unity 也烘同名 SDF）時，物理公式直接命中，補償係數 = 1.000 描邊厚度就跟 PS 重合。
+      </div>
+      <p><strong>什麼情況才需要動補償係數？</strong></p>
+      <ul>
+        <li><strong>換用非思源系列字型</strong>（例如圓體、明體、其他廠商 SDF）：不同字型的 antialias falloff 寬度不同，可能視覺上比 PS 偏厚或偏細，這時用校準板回推合適值。</li>
+        <li>PS 與 Unity <strong>故意</strong>用不同字型／字重（例如設計稿用 Bold、實際 UI 用 Regular）：補償係數可微調描邊讓比例好看。</li>
+      </ul>
+      <p><strong>校正方法</strong>（必要時）：</p>
+      <ol>
+        <li>PS 端執行「Create Calibration PSD」生成 <code>CalibrationBoard.psd</code>，存檔後用 UI Package Exporter 匯出。</li>
+        <li>Unity Generate 校準板，把 PS 截圖（100% 縮放）丟進 Scene 疊在生成的 UI 上、50% 透明度比對。</li>
+        <li>Unity 描邊比 PS 偏厚 → 補償係數調低；偏細 → 調高。二分法逼近直到肉眼難辨差異。</li>
+        <li>確定後不需再動，所有後續 Generate 自動套用。</li>
+      </ol>
+      <p>係數作用點是公式末端的純倍乘，<strong>不影響超限警告的判斷</strong>（仍以原始物理寬度為準）。</p>
+
+      <h3>手動指定材質球</h3>
+      <pre><code>PS 圖層名稱：TXT_title_[MAT:title_yellow_outline]
+            TXT_score_[MAT:reward_white_red_outline]</code></pre>
+      <p>在圖層名稱加上 <code>[MAT:名稱]</code> 標記，Unity 端會優先以此 token 為鍵，從材質球資料夾或 GeneratedMaterials 中尋找對應材質。Unity 端的 <strong>Skin Map</strong> 也可把 materialToken 對應到不同的 TMP Material Preset。若圖層有 Layer Style 的 Stroke 效果，工具會自動產生 materialToken，無需手動標記。</p>
+
+      <h3>假厚度標記</h3>
+      <p>在文字圖層名稱加入 <code>[THICK:N]</code>，N 為向下偏移的像素數，Unity 會自動疊兩層 TMP 模擬立體感：</p>
+      <pre><code>TXT_title_[THICK:3]
+TXT_score_[THICK:2]</code></pre>
+      <p>上層為原始文字，下層為顏色加深（× 0.55）的陰影層，偏移量對應 PS 設計稿像素。同時支援 X 軸偏移：<code>[THICK:2:1]</code>（格式：<code>[THICK:offsetY:offsetX]</code>）。</p>
+      <div class="callout ok"><strong>v2.4 起</strong> PS 端 JSX 已自動解析 <code>[THICK:N]</code> 與 <code>[THICK:N:M]</code>，名稱中加標記即可，不需手動編輯 JSON。</div>
+    </div>
+  </details>
+
+  <details>
+    <summary>換皮系統：一套新美術套到多個頁面<span class="hint">節慶版本、不同主題共用同一套介面</span></summary>
+    <div class="details-body">
+      <p>換皮系統提供兩種模式，視情況搭配使用：</p>
+
+      <h3>模式 A：同名 PNG 覆蓋（舊版，單資料夾）</h3>
+      <p>指定「美術來源資料夾」與「Unity 目標資料夾」，分兩段執行 <span class="tag tag-new">v2.5.1</span>：</p>
+      <ol>
+        <li>點「<strong>掃描換皮（預覽，不會修改檔案）</strong>」：工具比對兩個資料夾，列出「將覆蓋 N 張 / 缺少 M 張」與完整檔名清單，此時不修改任何檔案。</li>
+        <li>確認清單無誤後點「<strong>確認覆蓋 N 張 PNG</strong>」，並在確認對話框按「確定覆蓋」，工具才把新 PNG 覆蓋到 Unity 目標資料夾裡同名的舊 PNG。</li>
+      </ol>
+      <p>適合單一資料夾、檔名相同的換皮情境。找不到對應檔名的圖片會列成待辦清單。掃描後若更改任一資料夾路徑，舊掃描結果會自動作廢，需重新掃描。</p>
+      <div class="callout warn">此模式只能覆蓋「同名檔案」，若新舊圖檔名不同，或 Sprite 分散在多個 Atlas 裡，請改用 SkinTheme 批次換皮。</div>
+
+      <h3>模式 B：SkinTheme 批次換皮（推薦）</h3>
+      <p>適合「一套新美術，套用到 10～20 個 Prefab」的情境。以「舊 Sprite → 新 Sprite」為單位定義對應表，工具掃描指定資料夾下所有 Prefab，自動替換符合的 <code>Image.sprite</code> 參照，<strong>完全不動任何 Script / Button / Animator / RectTransform</strong>。</p>
+
+      <h3>SkinTheme 使用流程</h3>
+      <ol>
+        <li>在 Project 視窗目標位置 右鍵 → <code>Create → Photoshop UI Importer → Skin Theme</code>，建立 <code>SkinTheme.asset</code>。</li>
+        <li>在 Inspector 填入：
+          <ul>
+            <li><strong>Target Prefab Folder Asset</strong>：將含有目標 Prefab 的資料夾從 Project 視窗<strong>拖入</strong>此欄位。</li>
+            <li><strong>Entries</strong>：每一列填入「舊 Sprite（現在 Prefab 用的）」與「新 Sprite（新美術）」，可加多列。</li>
+            <li><strong>Excluded Prefabs</strong>（選填）：不想被換皮的 Prefab 加入此清單。</li>
+          </ul>
+        </li>
+        <li>在 Importer_v2 面板 → 換皮工具 → 選 SkinTheme → 點「<strong>套用換皮到所有 Prefab</strong>」。</li>
+        <li>確認 Dialog 後工具逐一掃描 Prefab，結果顯示「X 個 Prefab 更新，共替換 Y 個 Sprite」。</li>
+      </ol>
+
+      <div class="callout warn">
+        <strong>注意</strong>：套用換皮會直接修改 <code>.prefab</code> 檔案，操作前建議先用 Git commit 備份，或確認可復原。
+      </div>
+
+      <table>
+        <tr><th>比較項目</th><th>模式 A（同名覆蓋）</th><th>模式 B（SkinTheme）</th></tr>
+        <tr><td>適用情境</td><td>單資料夾、同檔名換圖</td><td>多 Prefab、不同檔名批次換皮</td></tr>
+        <tr><td>設定成本</td><td>低（只選資料夾）</td><td>中（建 SkinTheme 一次，之後一鍵）</td></tr>
+        <tr><td>影響範圍</td><td>指定資料夾內的 PNG 檔</td><td>指定資料夾內所有 Prefab 的 Sprite 參照</td></tr>
+        <tr><td>是否會動 Script / Button</td><td>否（只覆蓋 PNG 檔）</td><td>否（只改 Image.sprite）</td></tr>
+      </table>
+    </div>
+  </details>
+
+  <details>
+    <summary>工具幫你建的資料夾長什麼樣<span class="hint">按「建立專案資料夾」之後會生出什麼</span></summary>
+    <div class="details-body">
+      <p>點「<strong>建立專案資料夾</strong>」後，工具在 <code>Assets/Temp/{專案名稱}/</code> 下自動建立以下結構，並同步建立 SpriteAtlas asset：</p>
+      <pre><code>Assets/Temp/{專案名稱}/
 ├── Animation/
 ├── Atlas/
 │   ├── SpriteAtlas.spriteatlasv2     ← 自動建立、更新並立即 Pack
@@ -695,220 +1025,103 @@ TXT_score_[THICK:2]</code></pre>
 ├── Spine/
 └── TimeLine/</code></pre>
 
-  <div class="callout ok">
-    <strong>SpriteAtlas 自動設定 <span class="tag tag-new">v2.4.3</span></strong>：建立後 SpriteAtlas 自動套用專案標準設定——
-    Packing（無旋轉、無緊密排列、Padding 4）、
-    Texture（sRGB、Bilinear、無 Mip Maps）、
-    Default 以及 Android / iOS 平台（ASTC 6×6、Best）的最大尺寸會依來源圖自動選擇 2048／4096／8192。
-    生成 Prefab 時會以唯一 Sprite 引用更新 Objects for Packing，全部 TextureImporter 完成後只 Pack 一次，不需再手動點「Pack Preview」。像素相同的別名 PNG 仍會保留，確保同一 Package 可重複匯入。
-  </div>
+      <div class="callout ok">
+        <strong>SpriteAtlas 自動設定 <span class="tag tag-new">v2.4.3</span></strong>：建立後 SpriteAtlas 自動套用專案標準設定——
+        Packing（無旋轉、無緊密排列、Padding 4）、
+        Texture（sRGB、Bilinear、無 Mip Maps）、
+        Default 以及 Android / iOS 平台（ASTC 6×6、Best）的最大尺寸會依來源圖自動選擇 2048／4096／8192。
+        生成 Prefab 時會以唯一 Sprite 引用更新 Objects for Packing，全部 TextureImporter 完成後只 Pack 一次，不需再手動點「Pack Preview」。像素相同的別名 PNG 仍會保留，確保同一 Package 可重複匯入。
+      </div>
+    </div>
+  </details>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
-  <h2 id="unity-window">Unity 匯入工具（Importer_v2）</h2>
+  <h2 id="update">6. 更新工具</h2>
 
-  <p>開啟路徑：<code>Tools &gt; Photoshop UI Importer &gt; Importer_v2</code></p>
-
-  <h3>1. Photoshop UI Package</h3>
-  <p>選擇 Photoshop 匯出的 Package 根資料夾，點「<strong>套用 Package</strong>」。工具自動掃描找出 layout JSON（優先找 <code>layout.json</code>，其次找 <code>*_layout.json</code>）以及 PNG 圖片資料夾。按「只驗證資料」可在不生成 Prefab 的情況下確認資料正確。</p>
-
-  <h3>2. Unity 生成位置</h3>
-  <p>填寫「<strong>專案資料夾名稱</strong>」（例如 <code>Setting_Page</code>），有兩個按鈕可用：</p>
-  <ul>
-    <li>「<strong>建立專案資料夾</strong>」（新專案建議用）：自動建立完整子目錄結構、生成 SpriteAtlas，並填入輸出路徑。詳見 <a href="#folders">專案資料夾結構</a>。</li>
-    <li>「<strong>套用標準輸出路徑</strong>」（既有資料夾用）：只填入 Atlas 與 Prefab 路徑，不建立資料夾。</li>
-  </ul>
-  <p>圖片來源若已在 Unity 專案 <code>Assets</code> 底下，工具直接使用來源路徑，不重複複製。「<strong>參考解析度</strong>」預設自動跟隨 Layout JSON 中的 Canvas 尺寸。</p>
-
-  <h3>3. 文字、材質與換皮</h3>
-  <table>
-    <tr><th>欄位</th><th>用途</th></tr>
-    <tr><td>預設 TMP Font Asset</td><td>所有文字節點的 fallback 字型。UI 含文字時必填。</td></tr>
-    <tr><td>預設 TMP 材質球</td><td>文字的 fallback 材質。Stroke 效果自動衍生的材質也以此為基底，建議填寫。</td></tr>
-    <tr><td>TMP 材質球資料夾（選填）</td><td>指定一個存放現成字框材質球的資料夾。Generate 時優先從此資料夾比對，找到相近的直接重用，找不到才自動新建。設定後視窗會即時顯示找到幾顆。</td></tr>
-    <tr><td>Skin Map（選填）</td><td>將特定 Sprite 名稱替換為換皮版本。</td></tr>
-  </table>
-
-  <div class="callout info">
-    <strong>換皮工具（舊版）</strong>：可指定美術來源資料夾與 Unity 目標資料夾。<span class="tag tag-new">v2.5.1</span> 起改為兩段式：先「掃描換皮（預覽）」列出將覆蓋與缺少的清單（不修改任何檔案），確認清單後再按「確認覆蓋」並通過確認對話框，才會真正覆蓋同名 PNG。找不到對應美術的檔名會列出成待辦清單。<br>
-    <strong>SkinTheme 批次換皮（v2.5）</strong>：可跨多個 Prefab 批次替換 Sprite 參照，詳見 <a href="#reskin">換皮系統</a>。
-  </div>
-
-  <h3>4. 執行</h3>
-  <ul>
-    <li><strong>Validate</strong>：讀取 Layout JSON，驗證節點數量與資料格式。</li>
-    <li><strong>預覽（Dry-run）</strong>：顯示節點數、是否含文字、圖片資料夾狀態與預計輸出路徑，不執行任何操作。</li>
-    <li><strong>Generate Prefab</strong>：匯入圖片、生成 Prefab，完成後在 Project 視窗自動選取並 ping 出 Prefab。</li>
-  </ul>
-
-  <!-- ══════════════════════════════════════════════════════════════ -->
-  <h2 id="text">文字與材質球</h2>
-
-  <h3>TMP 文字節點自動流程</h3>
-  <ol>
-    <li>PS 文字圖層的 <strong>Layer Style → Stroke</strong> 效果，匯出 JSON 時寫出 <code>outlineColor</code>、<code>outlineWidth</code> 與自動 <code>materialToken</code>。</li>
-    <li>PS 文字圖層的 <strong>Layer Style → Color Overlay</strong> 效果，填色顏色寫入 <code>color</code> 欄位，Unity 端套用至 TMP 頂點色。</li>
-    <li>Unity Generate 時，依序執行材質球解析：
-      <ol style="margin:6px 0 0; padding-left:20px">
-        <li>若設定了「TMP 材質球資料夾」，先掃描資料夾內所有材質球，以 Outline 顏色（RGB 各差 &lt; 8%）為第一條件過濾，再從符合色條件的材質球中選 Thickness 最接近的直接重用，<strong>不新增</strong>。<span class="tag tag-new">v2.4.3</span> 改為顏色優先比對，確保不同字號的同色外框都能穩定找到同一顆材質球。</li>
-        <li>未找到匹配 → 從預設材質球複製一份，套用 <code>_OutlineColor</code> / <code>_OutlineWidth</code>，儲存至 <code>Assets/Temp/{名稱}/Font/GeneratedMaterials/</code>。</li>
-        <li>無 Stroke 資料的文字節點直接套用預設材質球，不做任何處理。</li>
-      </ol>
-    </li>
-  </ol>
-
-  <div class="callout ok">
-    <strong>材質球重用邏輯</strong>：同一頁面若多個文字用了接近的字框顏色，工具會自動共用同一顆材質球，避免 GeneratedMaterials 資料夾膨脹。
-  </div>
-
-  <h3>描邊寬度換算 <span class="tag tag-new">v2.6</span></h3>
-  <p>PS 描邊 px 換算為 TMP <code>_OutlineWidth</code>（0~1）的公式：</p>
-  <pre><code>_OutlineWidth = strokePx × samplingPointSize ÷ (atlasPadding + 1) ÷ fontSize</code></pre>
-  <ul>
-    <li><code>samplingPointSize</code> 與 <code>atlasPadding</code> 自動從你指定的 TMP Font Asset 讀取，換字型不需改任何設定。</li>
-    <li>v2.6.0 修正：分母改用 <code>atlasPadding + 1</code>（TMP 的 gradientScale），修正先前描邊系統性偏厚約 20% 的問題。</li>
-  </ul>
-  <div class="callout warn">
-    <strong>描邊超限警告 <span class="tag tag-new">v2.6</span></strong>：SDF 描邊有物理上限（受 atlasPadding 限制）。換算結果超過 1.0 時，Generate 完成後狀態列會顯示超限筆數，Console 列出各節點的描邊 px、目前上限與<strong>建議的 atlasPadding</strong>。依建議值重建 Font Asset（Window → TextMeshPro → Font Asset Creator，調高 Padding）後重新 Generate 即可。
-  </div>
-
-  <h3>描邊厚度補償係數 <span class="tag tag-new">v2.6.2</span></h3>
-  <p>Importer_v2 視窗的「3. 文字、材質與換皮」區提供一條 <strong>描邊厚度補償係數</strong> 滑桿（範圍 0.3 ~ 1.5，預設 1.0），值會即時存入 EditorPrefs 跨 session 保留。</p>
-  <div class="callout ok">
-    <strong>正常情況下保持 1.0 不需動</strong>。Phase 1 校準實測：當 Unity TMP 用的字型與字重<strong>與 PS 設計稿完全一致</strong>（例如 PS 用 SourceHanSansTC-Bold、Unity 也烘同名 SDF）時，物理公式 <code>W = strokePx × sampling / (2 × atlasPadding × fontSize)</code> 直接命中，補償係數 = 1.000 描邊厚度就跟 PS 重合。
-  </div>
-  <p><strong>什麼情況才需要動補償係數？</strong></p>
-  <ul>
-    <li><strong>換用非思源系列字型</strong>（例如圓體、明體、其他廠商 SDF）：不同字型的 antialias falloff 寬度不同，可能視覺上比 PS 偏厚或偏細，這時用校準板回推合適值。</li>
-    <li>PS 與 Unity <strong>故意</strong>用不同字型／字重（例如設計稿用 Bold、實際 UI 用 Regular）：補償係數可微調描邊讓比例好看。</li>
-  </ul>
-  <p><strong>校正方法</strong>（必要時）：</p>
-  <ol>
-    <li>PS 端執行「Create Calibration PSD」生成 <code>CalibrationBoard.psd</code>，存檔後用 UI Package Exporter 匯出。</li>
-    <li>Unity Generate 校準板，把 PS 截圖（100% 縮放）丟進 Scene 疊在生成的 UI 上、50% 透明度比對。</li>
-    <li>Unity 描邊比 PS 偏厚 → 補償係數調低；偏細 → 調高。二分法逼近直到肉眼難辨差異。</li>
-    <li>確定後不需再動，所有後續 Generate 自動套用。</li>
-  </ol>
-  <p>係數作用點是公式末端的純倍乘，<strong>不影響超限警告的判斷</strong>（仍以原始物理寬度為準）。</p>
-
-  <h3>手動指定材質球</h3>
-  <pre><code>PS 圖層名稱：TXT_title_[MAT:title_yellow_outline]
-            TXT_score_[MAT:reward_white_red_outline]</code></pre>
-  <p>在圖層名稱加上 <code>[MAT:名稱]</code> 標記，Unity 端會優先以此 token 為鍵，從材質球資料夾或 GeneratedMaterials 中尋找對應材質。</p>
-
-  <!-- ══════════════════════════════════════════════════════════════ -->
-  <h2 id="reskin">換皮系統 <span class="tag tag-new">v2.5</span></h2>
-
-  <p>換皮系統提供兩種模式，視情況搭配使用：</p>
-
-  <h3>模式 A：同名 PNG 覆蓋（舊版，單資料夾）</h3>
-  <p>指定「美術來源資料夾」與「Unity 目標資料夾」，分兩段執行 <span class="tag tag-new">v2.5.1</span>：</p>
-  <ol>
-    <li>點「<strong>掃描換皮（預覽，不會修改檔案）</strong>」：工具比對兩個資料夾，列出「將覆蓋 N 張 / 缺少 M 張」與完整檔名清單，此時不修改任何檔案。</li>
-    <li>確認清單無誤後點「<strong>確認覆蓋 N 張 PNG</strong>」，並在確認對話框按「確定覆蓋」，工具才把新 PNG 覆蓋到 Unity 目標資料夾裡同名的舊 PNG。</li>
-  </ol>
-  <p>適合單一資料夾、檔名相同的換皮情境。找不到對應檔名的圖片會列成待辦清單。掃描後若更改任一資料夾路徑，舊掃描結果會自動作廢，需重新掃描。</p>
-  <div class="callout warn">此模式只能覆蓋「同名檔案」，若新舊圖檔名不同，或 Sprite 分散在多個 Atlas 裡，請改用 SkinTheme 批次換皮。</div>
-
-  <h3>模式 B：SkinTheme 批次換皮（推薦）</h3>
-  <p>適合「一套新美術，套用到 10～20 個 Prefab」的情境。以「舊 Sprite → 新 Sprite」為單位定義對應表，工具掃描指定資料夾下所有 Prefab，自動替換符合的 <code>Image.sprite</code> 參照，<strong>完全不動任何 Script / Button / Animator / RectTransform</strong>。</p>
-
-  <h3>SkinTheme 使用流程</h3>
-  <ol>
-    <li>在 Project 視窗目標位置 右鍵 → <code>Create → Photoshop UI Importer → Skin Theme</code>，建立 <code>SkinTheme.asset</code>。</li>
-    <li>在 Inspector 填入：
-      <ul>
-        <li><strong>Target Prefab Folder Asset</strong>：將含有目標 Prefab 的資料夾從 Project 視窗<strong>拖入</strong>此欄位。</li>
-        <li><strong>Entries</strong>：每一列填入「舊 Sprite（現在 Prefab 用的）」與「新 Sprite（新美術）」，可加多列。</li>
-        <li><strong>Excluded Prefabs</strong>（選填）：不想被換皮的 Prefab 加入此清單。</li>
-      </ul>
-    </li>
-    <li>在 Importer_v2 面板 → 換皮工具 → 選 SkinTheme → 點「<strong>套用換皮到所有 Prefab</strong>」。</li>
-    <li>確認 Dialog 後工具逐一掃描 Prefab，結果顯示「X 個 Prefab 更新，共替換 Y 個 Sprite」。</li>
-  </ol>
-
-  <div class="callout warn">
-    <strong>注意</strong>：套用換皮會直接修改 <code>.prefab</code> 檔案，操作前建議先用 Git commit 備份，或確認可復原。
-  </div>
-
-  <table>
-    <tr><th>比較項目</th><th>模式 A（同名覆蓋）</th><th>模式 B（SkinTheme）</th></tr>
-    <tr><td>適用情境</td><td>單資料夾、同檔名換圖</td><td>多 Prefab、不同檔名批次換皮</td></tr>
-    <tr><td>設定成本</td><td>低（只選資料夾）</td><td>中（建 SkinTheme 一次，之後一鍵）</td></tr>
-    <tr><td>影響範圍</td><td>指定資料夾內的 PNG 檔</td><td>指定資料夾內所有 Prefab 的 Sprite 參照</td></tr>
-    <tr><td>是否會動 Script / Button</td><td>否（只覆蓋 PNG 檔）</td><td>否（只改 Image.sprite）</td></tr>
-  </table>
-
-  <!-- ══════════════════════════════════════════════════════════════ -->
-  <h2 id="update">版本更新</h2>
-
-  <div class="panel">
-    <h3 style="margin-top:0"><span class="tag tag-ps">PS</span>　PS 端更新</h3>
-    <p>執行 <code>PhotoshopUiPackageExporter.jsx</code>，對話框右上角點 <strong>Check for Updates</strong>。工具會連線 GitHub 比對版本號，確認後自動下載最新 JSX 並覆蓋當前檔案，下次執行即為新版。<br>
-    <span class="tag tag-new">v2.5.1</span> 起更新檢查在對話框內執行、<strong>不再關閉匯出對話框</strong>，已填好的路徑與選項全部保留；只有在實際下載安裝新版時才會關閉（新版需重新執行腳本才會生效）。</p>
-    <ul>
-      <li>Windows：使用 PowerShell WebClient 下載。</li>
-      <li>Mac：使用 curl 下載。</li>
-    </ul>
+  <div class="plain">
+    兩邊都是<strong>在工具裡按一個鈕</strong>就會自己抓新版，不用重新下載、不用重新安裝。
   </div>
 
   <div class="panel">
-    <h3 style="margin-top:0"><span class="tag tag-unity">Unity</span>　Unity 端更新</h3>
-    <p>在 Importer_v2 視窗標題列點 <strong>從 GitHub 更新工具</strong>。工具直接從 <code>raw.githubusercontent.com</code> 下載所有已知 <code>.cs</code> 檔（不呼叫 GitHub API，不受速率限制），顯示版本對比後，確認即自動覆蓋本地，Unity 自動重新編譯。</p>
+    <h3 style="margin-top:0"><span class="tag tag-ps">PS</span>　Photoshop 端</h3>
+    <p>開啟 UI Package Exporter，對話框右上角點 <strong>Check for Updates</strong>。工具會連線 GitHub 比對版本號，確認後自動下載最新 JSX 並覆蓋當前檔案，下次執行即為新版。</p>
+    <p><span class="tag tag-new">v2.5.1</span> 起更新檢查在對話框內執行、<strong>不再關閉匯出對話框</strong>，已填好的路徑與選項全部保留；只有在實際下載安裝新版時才會關閉（新版需重新執行腳本才會生效）。Windows 用 PowerShell 下載，Mac 用 curl。</p>
+  </div>
+
+  <div class="panel">
+    <h3 style="margin-top:0"><span class="tag tag-unity">Unity</span>　Unity 端</h3>
+    <p>在 Importer_v2 視窗標題列點 <strong>從 GitHub 更新工具</strong>。工具直接從 <code>raw.githubusercontent.com</code> 下載，不呼叫 GitHub API、不受速率限制；顯示「GitHub 版本 / 本地版本」對比後，確認即自動覆蓋本地，Unity 自動重新編譯。<strong>不需要重新複製 <code>PhotoshopUiImporter/</code> 資料夾。</strong></p>
+    <p><span class="tag tag-new">v2.12.1</span> 下載清單改由倉庫的 <code>update_manifest.txt</code> 決定（出版時自動重生成），新版新增的檔案會一併下載，不會漏檔；manifest 抓不到時退回內建後備清單。</p>
     <div class="callout warn">更新後腳本內容會立即覆蓋，Unity 編譯完成前工具暫時無法使用，屬正常現象。</div>
   </div>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
-  <h2 id="faq">常見問題</h2>
+  <h2 id="faq">7. 常見問題</h2>
 
-  <h3>匯出後 PNG 有些圖沒有輸出？</h3>
-  <p>可能原因：圖層為 Clipping Mask、Adjustment Layer（色調、曲線等）、或 Ignore/REF 前綴圖層，這些均會被跳過。執行後的 alert 會顯示 skipped 數量。</p>
+  <h3>安裝器說 installed，但選單裡沒有「PS To Unity v2」？</h3>
+  <p>先確認有沒有<strong>把 Photoshop 關掉重開</strong>。這個選單只在啟動時掃描一次，裝完當下不會馬上出現。</p>
+  <p>重開後還是沒有，代表檔案根本沒寫進去。去 <code>C:\Program Files\Adobe\Adobe Photoshop &lt;版本&gt;\Presets\Scripts\</code> 看有沒有 <code>PS To Unity v2.jsx</code>。沒有的話就是權限被擋，請用<strong>系統管理員身分</strong>開一次 Photoshop 再跑安裝器（見<a href="#install">安裝</a>章節的紅框）。</p>
 
-  <h3>同一個圖層名稱重複出現，PNG 有 <code>_002</code> 後綴？</h3>
-  <p>工具會自動去重命名，重複出現的名稱加上三位數後綴（<code>layer_002</code>、<code>layer_003</code>…），這是正常行為。建議在 PSD 中保持圖層名稱唯一。</p>
+  <h3>匯出後有些圖沒有出來？</h3>
+  <p>這些圖層會被跳過：Clipping Mask、Adjustment Layer（色調、曲線等）、名稱有 <code>IGNORE_</code> / <code>REF_</code> 的圖層。匯出完的訊息會告訴你跳過了幾張。</p>
 
-  <h3>Generate Prefab 提示「請先指定預設 TMP Font Asset」？</h3>
-  <p>Layout 中含文字節點（type = text）時，至少要在 Unity 端指定一個 TMP Font Asset 作為 fallback，工具才能繼續。</p>
+  <h3>PNG 檔名後面多了 <code>_002</code>？</h3>
+  <p>正常的。有兩個圖層同名時，工具會自動加上三位數後綴（<code>layer_002</code>、<code>layer_003</code>…）避免蓋掉彼此。建議在 PSD 裡盡量讓圖層名稱不重複。</p>
 
-  <h3>匯入後圖片位置跑偏？</h3>
-  <p>確認「參考解析度」與 Canvas 尺寸一致，工具預設自動讀取 layout.json 中的 Canvas 設定，一般無需手動調整。若有自訂 Canvas Scaler，需確認 Match Width or Height 設定與 PS 設計稿一致。</p>
+  <h3>按 Generate Prefab 跳出「請先指定預設 TMP Font Asset」？</h3>
+  <p>頁面裡有文字，就一定要在 Unity 端指定一個字型當備援，工具才敢繼續。選一個你專案裡的 TMP Font Asset 即可。</p>
 
-  <h3>圖片來源已在 Assets 內，不想重複複製？</h3>
-  <p>直接選擇 Assets 內的資料夾作為 Package 資料夾，工具偵測到圖片已在專案內時，會直接使用原路徑，不重複複製。</p>
+  <h3>匯入後圖片位置跑掉？</h3>
+  <p>先確認「參考解析度」跟 Canvas 尺寸一致——工具預設會自動讀 layout.json 裡的設定，一般不用動。如果你的 Canvas Scaler 是自訂的，要確認 Match Width or Height 的設定跟 PS 設計稿一致。</p>
 
-  <h3>PS 端更新後腳本空白或損壞？</h3>
-  <p>可能是網路中斷或 PowerShell 執行被防毒軟體阻擋。請至 GitHub 手動下載最新 JSX：<br>
+  <h3>圖片已經在 Unity 專案裡了，不想再複製一份？</h3>
+  <p>直接選 Assets 底下的資料夾當 Package 資料夾。工具偵測到圖片已經在專案內時，會直接沿用原路徑，不會重複複製。</p>
+
+  <h3>PS 端更新後腳本變空白或壞掉？</h3>
+  <p>通常是網路中斷，或 PowerShell 被防毒軟體擋下。請到 GitHub 手動下載最新 JSX 覆蓋：<br>
   <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">https://github.com/Wayne188-yiching/PS_To_Unity_v2</a></p>
 
   <h3>Unity 端更新顯示「無法解析 GitHub 回應」？</h3>
-  <p>請確認電腦可連線至 <code>api.github.com</code>。部分企業網路會封鎖 API 呼叫，可手動從 GitHub 下載 zip 並覆蓋 <code>Assets/Editor/PhotoshopUiImporter/</code>。</p>
+  <p>確認電腦可以連到 <code>api.github.com</code>。部分公司網路會擋 API，這時可從 GitHub 下載 zip，手動覆蓋 <code>Assets/Editor/PhotoshopUiImporter/</code>。</p>
 
-  <h3>點「建立專案資料夾」後 SpriteAtlas 沒出現？</h3>
-  <p>確認已填寫「專案資料夾名稱」再按按鈕。建立後若 Project 視窗未更新，執行 <code>Assets → Refresh</code>（或按 Ctrl+R）即可看到 <code>SpriteAtlas.spriteatlas</code>。</p>
+  <h3>Unity 更新時出現 403 速率限制？</h3>
+  <p>v2.4.3 起已修正：更新不再呼叫 GitHub Contents API（舊版會撞到每小時 60 次上限），改為直接下載。若你用的是舊版工具遇到 403，先手動複製最新 <code>PhotoshopUiImporterWindow.cs</code> 到 Unity，再更新一次即可。</p>
 
-  <h3>Generate 後文字顏色不正確？</h3>
-  <p>工具讀取 PS <strong>Color Overlay</strong> 效果的顏色作為 TMP 頂點色。若文字使用的是 <strong>Gradient Overlay</strong>（漸層），目前版本僅支援純色，漸層上下色需等待後續版本支援。</p>
+  <h3>按了「建立專案資料夾」但沒看到 SpriteAtlas？</h3>
+  <p>先確認有填「專案資料夾名稱」再按按鈕。若 Project 視窗沒更新，執行 <code>Assets → Refresh</code>（或按 Ctrl+R）就會出現。</p>
 
-  <h3>材質球資料夾設定後，Generate 還是一直新建材質球？</h3>
-  <p>v2.4.3 起改為顏色優先比對：先以 RGB 各差 &lt; 8% 篩選候選材質球，再從候選中選 Thickness 最接近的。若庫中沒有任何材質球顏色符合（差異超出 8%），工具才會自動新建。可確認庫中材質球的 <code>_OutlineColor</code> 是否與 PS 設定的 Stroke 色相近。</p>
+  <h3>產生後文字顏色不對？</h3>
+  <p>工具讀的是 PS 的 <strong>Color Overlay</strong> 效果顏色。如果你的文字用的是 <strong>Gradient Overlay</strong>（漸層），目前版本只支援純色，漸層要等後續版本。</p>
 
-  <h3>SkinTheme 套用後，Prefab 的 Script / Button 還在嗎？</h3>
-  <p>是，SkinTheme 只修改 <code>Image.sprite</code> 參照，完全不動 Script 序列化欄位、Button onClick 事件、Animator、RectTransform 等任何其他元件。</p>
+  <h3>設了材質球資料夾，還是一直新建材質球？</h3>
+  <p>v2.4.3 起是顏色優先比對：先以 RGB 各差 &lt; 8% 篩選候選，再從候選中選 Thickness 最接近的。如果庫裡沒有任何一顆顏色夠接近（差異超過 8%），才會新建。可以檢查一下庫裡材質球的 <code>_OutlineColor</code> 跟 PS 的 Stroke 色差多少。</p>
 
-  <h3>Unity 更新時出現 403 速率限制錯誤？</h3>
-  <p>v2.4.3 起已修正：Unity 端更新不再呼叫 GitHub Contents API（舊版會觸發每小時 60 次的速率上限），改為直接從 <code>raw.githubusercontent.com</code> 下載已知清單，不受速率限制。若使用舊版工具遇到 403，請先手動複製最新 <code>PhotoshopUiImporterWindow.cs</code> 到 Unity，再執行一次更新即可。</p>
+  <h3>SkinTheme 換皮後，Prefab 上的 Script / Button 還在嗎？</h3>
+  <p>在。SkinTheme 只改 <code>Image.sprite</code> 這一個欄位，完全不動 Script 序列化欄位、Button onClick、Animator、RectTransform 等任何其他元件。</p>
 
-  <h3>文字在 PS 顯示 36pt，Unity 卻變成 29pt？<span class="tag tag-new">v2.4.1 已修正</span></h3>
-  <p>v2.4.0 之前使用 <code>textItem.size</code>，這個 API 拿到的是「設計時原始字體」，不含 Free Transform 縮放。若文字圖層被自由變形縮放過，PS 字元面板顯示的是「縮放後的有效字體」（impliedFontSize），兩者會不同。<br>
-  v2.4.1 起改用 ActionDescriptor 讀取 <code>impliedFontSize</code>，與 PS 字元面板顯示完全一致。</p>
+  <h3>PS 顯示 36pt，Unity 卻變成 29pt？<span class="tag tag-new">v2.4.1 已修正</span></h3>
+  <p>v2.4.0 之前讀的是「設計時原始字體」，不含自由變形的縮放。若文字圖層被縮放過，PS 字元面板顯示的是縮放後的有效字體，兩者就會對不上。v2.4.1 起改讀 <code>impliedFontSize</code>，與 PS 字元面板完全一致。</p>
 
   <h3>文字為什麼變成圖片？<span class="tag tag-new">v2.10.1</span></h3>
-  <p>所有字型預設都會輸出為 TMP。只有文字圖層名稱含 <code>[PNG]</code> / <code>TXTIMG_</code> 等圖片標記、被選為「目前選取的文字圖層為 PNG」，或使用者明確勾選「白名單外字型改為 PNG」時才會烘成圖片。多字型 PSD 請在 Unity 使用 <code>TmpFontMap</code> 將 <code>fontToken</code> 對應到正確的 TMP Font Asset。</p>
+  <p>預設所有字型都會輸出成可編輯文字。只有這三種情況會變圖片：圖層名稱含 <code>[PNG]</code> / <code>TXTIMG_</code> 等標記、你在匯出前選取了該文字圖層並勾了對應選項、或你勾了「白名單外字型改為 PNG」。多字型的 PSD 請在 Unity 用 <code>TmpFontMap</code> 把 <code>fontToken</code> 對應到正確字型。</p>
 
-  <h3>如何建立 Layout Group？<span class="tag tag-new">v2.10.1</span></h3>
-  <p>請在群組名稱加入 <code>[H]</code>、<code>[V]</code> 或 <code>[GRID]</code>。v2.10.1 起不再依子層 X/Y 自動猜測，避免 Unity 重排未標記的設計稿群組。</p>
+  <h3>怎麼讓群組自動排列？<span class="tag tag-new">v2.10.1</span></h3>
+  <p>在群組名稱加 <code>[H]</code>、<code>[V]</code> 或 <code>[GRID]</code>。v2.10.1 起不再依子層位置自動猜測，避免沒標記的設計稿群組被重排。</p>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
+
+  <details>
+    <summary>展開完整版本紀錄<span class="hint">每個版本改了什麼，想追來龍去脈再看</span></summary>
+    <div class="details-body">
+<h3>v2.12.12（2026-08-14）— 修正安裝器靜默失敗，說明書全面改寫</h3>
+  <ul>
+    <li><strong>P0：安裝器會謊報成功</strong>。<code>canWriteToFolder()</code> 用 try/catch 判斷寫入權限，但 ExtendScript 的 <code>File.open()</code> / <code>write()</code> / <code>remove()</code> 失敗時是<strong>回傳 <code>false</code> 而非丟例外</strong>，catch 永遠不會觸發 → 一律回報可寫入 → 跳過改選資料夾的分支 → 兩個檔案都沒寫進去，卻照樣跳出「installed」。Photoshop 裝在 <code>C:\Program Files\</code> 的使用者（多數人）因此完全裝不起來，且沒有任何錯誤訊息可循。</li>
+    <li><strong>修正</strong>：所有 File 操作改為檢查回傳值，並以「檔案存在且 length &gt; 0」在磁碟上驗證結果；<code>writeConfig()</code> / <code>writeLauncher()</code> 回傳成功與否，任一步失敗即中止並顯示明確錯誤與「以系統管理員身分執行」的解法。權限不足時先跳說明再開資料夾選擇器，不再無預警彈出選擇框。</li>
+    <li><strong>踩雷紀錄：.jsx 必須維持純 ASCII</strong>。修正過程中在註解裡打了一個 em dash（<code>—</code>），成為全檔唯一的非 ASCII 位元組；沒有 BOM 時 Photoshop 以系統編碼（繁中為 CP950）讀取 .jsx，該序列解碼失敗導致剖析中斷，Photoshop 只顯示「JavaScript 程式碼遺失」而不給行號。已改回 ASCII 標點並在檔案內加註警告。日後編輯 <code>PhotoshopExporter/*.jsx</code> 請只用 ASCII 標點。</li>
+    <li><strong>Unity 更新器</strong>：更新成功後把剛抓到的 <code>update_manifest.txt</code> 一併寫回本地。manifest 本身不進下載清單（解析器只收 <code>.cs</code>，避免更新器被誘導寫入任意副檔名的檔案），但本地留著舊的一份容易讓人誤判清單內容。</li>
+    <li><strong>GUIDE_zh 全面改寫</strong>：改為「這是什麼 → 安裝 → 跟著做一遍 → 命名 → 進階 → 更新 → FAQ」七節遞進結構；每節前加白話說明，新增名詞小抄（Prefab / Sprite / TMP / Atlas / Anchor），命名規則只保留最常用的五個在外層，其餘參考內容全部收進折疊區。技術內容一項未刪，只是改變呈現層次。</li>
+  </ul>
 
   <h3>v2.12.11（2026-08-03）— 合併兩條獨立開發線</h3>
   <div class="callout warn">
@@ -1146,10 +1359,12 @@ TXT_score_[THICK:2]</code></pre>
 
   <h3>v2.5.0 以前</h3>
   <p class="muted-note" style="font-size:13px; color:var(--muted)">v2.5：SkinTheme 批次換皮。v2.4.x：Layout Group 自動排版、BTN_ 自動掛 Button、SpriteAtlas 自動設定、材質球顏色優先比對、字級 pt→px 修正、更新流程改走 raw.githubusercontent.com。詳見各章節中的版本標籤。</p>
+    </div>
+  </details>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.12.11 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.12.12 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 
