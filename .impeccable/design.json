@@ -1,0 +1,281 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-17T02:07:26.8289274+08:00",
+  "title": "Design System: Photoshop To Unity V2",
+  "extensions": {
+    "colorMeta": {
+      "base-60": {
+        "role": "neutral",
+        "displayName": "深墨工作台",
+        "canonical": "#07131a",
+        "tonalRamp": [
+          "oklch(15% 0.025 235)",
+          "oklch(25% 0.025 235)",
+          "oklch(35% 0.025 235)",
+          "oklch(45% 0.025 235)",
+          "oklch(60% 0.025 235)",
+          "oklch(72% 0.025 235)",
+          "oklch(84% 0.025 235)",
+          "oklch(95% 0.025 235)"
+        ]
+      },
+      "surface-30": {
+        "role": "neutral",
+        "displayName": "深藍資訊面",
+        "canonical": "#12314a",
+        "tonalRamp": [
+          "oklch(15% 0.055 240)",
+          "oklch(25% 0.055 240)",
+          "oklch(35% 0.055 240)",
+          "oklch(45% 0.055 240)",
+          "oklch(60% 0.055 240)",
+          "oklch(72% 0.055 240)",
+          "oklch(84% 0.055 240)",
+          "oklch(95% 0.055 240)"
+        ]
+      },
+      "accent-10": {
+        "role": "primary",
+        "displayName": "薄荷訊號",
+        "canonical": "#2ee6b2",
+        "tonalRamp": [
+          "oklch(15% 0.10 168)",
+          "oklch(25% 0.10 168)",
+          "oklch(35% 0.10 168)",
+          "oklch(45% 0.10 168)",
+          "oklch(60% 0.10 168)",
+          "oklch(72% 0.10 168)",
+          "oklch(84% 0.10 168)",
+          "oklch(95% 0.10 168)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "高亮墨白",
+        "canonical": "#f2f8f7",
+        "tonalRamp": [
+          "oklch(15% 0.008 180)",
+          "oklch(25% 0.008 180)",
+          "oklch(35% 0.008 180)",
+          "oklch(45% 0.008 180)",
+          "oklch(60% 0.008 180)",
+          "oklch(72% 0.008 180)",
+          "oklch(84% 0.008 180)",
+          "oklch(95% 0.008 180)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "冷灰說明字",
+        "canonical": "#a8bec3",
+        "tonalRamp": [
+          "oklch(15% 0.025 205)",
+          "oklch(25% 0.025 205)",
+          "oklch(35% 0.025 205)",
+          "oklch(45% 0.025 205)",
+          "oklch(60% 0.025 205)",
+          "oklch(72% 0.025 205)",
+          "oklch(84% 0.025 205)",
+          "oklch(95% 0.025 205)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "冷灰結構線",
+        "canonical": "rgba(168, 190, 195, .22)",
+        "tonalRamp": [
+          "oklch(15% 0.025 205 / .22)",
+          "oklch(25% 0.025 205 / .22)",
+          "oklch(35% 0.025 205 / .22)",
+          "oklch(45% 0.025 205 / .22)",
+          "oklch(60% 0.025 205 / .22)",
+          "oklch(72% 0.025 205 / .22)",
+          "oklch(84% 0.025 205 / .22)",
+          "oklch(95% 0.025 205 / .22)"
+        ]
+      },
+      "soft-accent": {
+        "role": "primary",
+        "displayName": "薄荷低語",
+        "canonical": "rgba(46, 230, 178, .10)",
+        "tonalRamp": [
+          "oklch(15% 0.10 168 / .10)",
+          "oklch(25% 0.10 168 / .10)",
+          "oklch(35% 0.10 168 / .10)",
+          "oklch(45% 0.10 168 / .10)",
+          "oklch(60% 0.10 168 / .10)",
+          "oklch(72% 0.10 168 / .10)",
+          "oklch(84% 0.10 168 / .10)",
+          "oklch(95% 0.10 168 / .10)"
+        ]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "深色面板",
+        "canonical": "#0b1e2a",
+        "tonalRamp": [
+          "oklch(15% 0.035 235)",
+          "oklch(25% 0.035 235)",
+          "oklch(35% 0.035 235)",
+          "oklch(45% 0.035 235)",
+          "oklch(60% 0.035 235)",
+          "oklch(72% 0.035 235)",
+          "oklch(84% 0.035 235)",
+          "oklch(95% 0.035 235)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "單一主價值主張；緊縮、高重量、短行。"
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "章節標題與主要轉折。"
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "卡片、步驟與視窗內標題。"
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "一般敘述與長行閱讀。"
+      },
+      "report-text": {
+        "displayName": "Report Text",
+        "purpose": "投影時觀眾必須理解的映射、流程、結果與護欄內容。"
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "導覽、版本、狀態與緊湊控制項。"
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "bridge-pulse",
+        "value": "2.8s ease-in-out infinite",
+        "purpose": "只讓轉譯橋接節點輕微縮放；非通用裝飾動態。"
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce",
+        "purpose": "停用所有 animation 與 transition，並把平滑捲動改為立即定位。"
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact",
+        "value": "680px"
+      },
+      {
+        "name": "medium",
+        "value": "940px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "單一主要行動使用的薄荷訊號按鈕。",
+      "html": "<a class=\"ds-btn-primary\" href=\"#\">繼續</a>",
+      "css": ".ds-btn-primary { min-height: 46px; padding: 10px 18px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; color: var(--base-60, #07131a); background: var(--accent-10, #2ee6b2); border: 1px solid var(--accent-10, #2ee6b2); border-radius: 10px; font: 800 16px/1.4 \"Report CJK\", \"Microsoft JhengHei\", sans-serif; text-decoration: none; cursor: pointer; } .ds-btn-primary:hover { border-color: var(--accent-10, #2ee6b2); } .ds-btn-primary:focus-visible { outline: 3px solid var(--accent-10, #2ee6b2); outline-offset: 4px; } .ds-btn-primary:active { filter: brightness(.94); }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "與主要行動並列的透明次要按鈕。",
+      "html": "<a class=\"ds-btn-secondary\" href=\"#\">更多資訊</a>",
+      "css": ".ds-btn-secondary { min-height: 46px; padding: 10px 18px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; color: var(--ink, #f2f8f7); background: transparent; border: 1px solid var(--line, rgba(168, 190, 195, .22)); border-radius: 10px; font: 800 16px/1.4 \"Report CJK\", \"Microsoft JhengHei\", sans-serif; text-decoration: none; cursor: pointer; } .ds-btn-secondary:hover { border-color: var(--accent-10, #2ee6b2); } .ds-btn-secondary:focus-visible { outline: 3px solid var(--accent-10, #2ee6b2); outline-offset: 4px; } .ds-btn-secondary:active { background: var(--soft-accent, rgba(46, 230, 178, .10)); }"
+    },
+    {
+      "name": "Capability Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "用於能力與技術標籤的低對比晶片。",
+      "html": "<span class=\"ds-chip\">圖層解析</span>",
+      "css": ".ds-chip { padding: 7px 10px; display: inline-flex; align-items: center; color: var(--ink, #f2f8f7); background: rgba(7, 19, 26, .36); border: 1px solid var(--line, rgba(168, 190, 195, .22)); border-radius: 8px; font: 700 18px/1.4 \"Report CJK\", \"Microsoft JhengHei\", sans-serif; } .ds-chip:hover { border-color: var(--accent-10, #2ee6b2); } .ds-chip:focus-visible { outline: 3px solid var(--accent-10, #2ee6b2); outline-offset: 4px; }"
+    },
+    {
+      "name": "Navigation Item",
+      "kind": "nav",
+      "refersTo": "navigation-item",
+      "description": "黏附導覽中的預設、滑入與目前項目狀態。",
+      "html": "<nav class=\"ds-nav\" aria-label=\"章節\"><a href=\"#\">概覽</a><a href=\"#\" aria-current=\"true\">流程</a></nav>",
+      "css": ".ds-nav { padding: 8px; display: flex; gap: 6px; background: rgba(7, 19, 26, .96); border-bottom: 1px solid var(--line, rgba(168, 190, 195, .22)); } .ds-nav a { padding: 8px 10px; color: var(--muted, #a8bec3); border-radius: 8px; font: 700 16px/1.4 \"Report CJK\", \"Microsoft JhengHei\", sans-serif; text-decoration: none; } .ds-nav a:hover, .ds-nav a[aria-current=\"true\"] { color: var(--accent-10, #2ee6b2); background: var(--soft-accent, rgba(46, 230, 178, .10)); } .ds-nav a:focus-visible { outline: 3px solid var(--accent-10, #2ee6b2); outline-offset: 4px; }"
+    },
+    {
+      "name": "Mapping Row",
+      "kind": "custom",
+      "refersTo": "mapping-row",
+      "description": "把來源語意與目標元件放在同一掃讀路徑的映射列。",
+      "html": "<div class=\"ds-mapping-row\"><svg viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><path d=\"M5 5h14M12 5v14M8 19h8\" stroke-width=\"1.7\" stroke-linecap=\"round\"/></svg><div><strong>文字圖層</strong><small>可編輯文字元件</small></div></div>",
+      "css": ".ds-mapping-row { min-height: 76px; padding: 16px 20px; display: flex; align-items: center; gap: 14px; color: var(--ink, #f2f8f7); border-block: 1px solid var(--line, rgba(168, 190, 195, .22)); font-family: \"Report CJK\", \"Microsoft JhengHei\", sans-serif; } .ds-mapping-row svg { width: 26px; min-width: 26px; stroke: var(--accent-10, #2ee6b2); } .ds-mapping-row strong { font-size: 18px; } .ds-mapping-row small { display: block; color: var(--muted, #a8bec3); font-size: 18px; } .ds-mapping-row:focus-within { outline: 3px solid var(--accent-10, #2ee6b2); outline-offset: 4px; }"
+    },
+    {
+      "name": "App Window",
+      "kind": "custom",
+      "refersTo": "app-window",
+      "description": "以工具標題列和階層列呈現 Photoshop 或 Unity 內容。",
+      "html": "<section class=\"ds-app-window\"><header><span>PHOTOSHOP</span><span class=\"ds-window-dots\" aria-hidden=\"true\"><i></i><i></i><i></i></span></header><div class=\"ds-layer\"><svg viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><path d=\"M4 7h7l2 2h7v10H4z\" stroke-width=\"1.7\"/></svg><strong>UI_Group</strong><small>群組</small></div><div class=\"ds-layer ds-layer-indent\"><svg viewBox=\"0 0 24 24\" fill=\"none\" aria-hidden=\"true\"><path d=\"M5 5h14M12 5v14\" stroke-width=\"1.7\"/></svg><span>Title</span><small>文字</small></div></section>",
+      "css": ".ds-app-window { overflow: hidden; color: var(--ink, #f2f8f7); background: var(--panel, #0b1e2a); border: 1px solid var(--line, rgba(168, 190, 195, .22)); border-radius: 14px; font-family: \"Report CJK\", \"Microsoft JhengHei\", sans-serif; } .ds-app-window header { min-height: 50px; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; color: var(--muted, #a8bec3); background: var(--surface-30, #12314a); font-size: 18px; font-weight: 800; } .ds-window-dots { display: flex; gap: 5px; } .ds-window-dots i { width: 6px; height: 6px; background: var(--muted, #a8bec3); border-radius: 50%; opacity: .52; } .ds-layer { min-height: 48px; margin: 0 16px; padding: 9px 10px; display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 9px; border-bottom: 1px solid var(--line, rgba(168, 190, 195, .22)); font-size: 18px; } .ds-layer:last-child { border-bottom: 0; } .ds-layer svg { width: 19px; stroke: var(--accent-10, #2ee6b2); } .ds-layer small { color: var(--muted, #a8bec3); } .ds-layer-indent { padding-left: 25px; } .ds-app-window:focus-within { outline: 3px solid var(--accent-10, #2ee6b2); outline-offset: 4px; }"
+    },
+    {
+      "name": "Prefab Tree",
+      "kind": "custom",
+      "refersTo": "prefab-tree",
+      "description": "以縮排節點和元件型別呈現可編輯 Unity 階層。",
+      "html": "<section class=\"ds-prefab-tree\"><header><strong>Panel.prefab</strong><span>DEMO</span></header><div class=\"ds-tree-row\" style=\"--depth:0\"><strong>Canvas</strong><code>RectTransform</code></div><div class=\"ds-tree-row\" style=\"--depth:1\"><span>Title</span><code>TextMeshProUGUI</code></div><div class=\"ds-tree-row\" style=\"--depth:1\"><span>Content</span><code>Layout</code></div></section>",
+      "css": ".ds-prefab-tree { padding: clamp(28px, 5vw, 58px); color: var(--ink, #f2f8f7); background: var(--base-60, #07131a); border: 1px solid var(--line, rgba(168, 190, 195, .22)); border-radius: 14px; font-family: \"Report CJK\", \"Microsoft JhengHei\", sans-serif; } .ds-prefab-tree header { padding-bottom: 20px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line, rgba(168, 190, 195, .22)); } .ds-prefab-tree header strong { font-size: 20px; } .ds-prefab-tree header span { padding: 5px 9px; color: var(--base-60, #07131a); background: var(--accent-10, #2ee6b2); border-radius: 7px; font-size: 16px; font-weight: 900; } .ds-tree-row { min-height: 45px; padding: 9px 0 9px calc(var(--depth) * 24px); display: flex; align-items: center; gap: 10px; color: var(--muted, #a8bec3); font-size: 18px; } .ds-tree-row::before { content: \"\"; width: 14px; height: 14px; border: 1px solid var(--accent-10, #2ee6b2); border-radius: 3px; } .ds-tree-row strong { color: var(--ink, #f2f8f7); } .ds-tree-row code { margin-left: auto; color: var(--accent-10, #2ee6b2); font-size: 18px; } .ds-prefab-tree:focus-within { outline: 3px solid var(--accent-10, #2ee6b2); outline-offset: 4px; } @media (max-width: 680px) { .ds-tree-row code { display: none; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "深墨語意工作台",
+    "overview": "這個視覺世界像一張專注、可信任的製作工作台：深墨承接主要閱讀場，深藍切出資訊面，薄荷綠只在轉譯路徑、狀態與關鍵行動發出訊號。它延續專業創作工具的暗色介面氣質，但以高對比、短文案與清楚的資料結構，讓非技術觀眾也能讀懂。\n\n圖層、節點、連線、階層與狀態標記是可重用的產品語彙；它們讓「設計內容被理解後重建」變得可見。特定報告的成果軌跡章節順序、第一視窗左右構圖、逐句文案與 43 → 26 實例只是該表面的敘事，不是未來畫面的固定模板。",
+    "keyCharacteristics": [
+      "嚴格的深墨／深藍／薄荷綠 60／30／10 色彩權重。",
+      "嵌入式 Report CJK 可變字重，確保離線繁體中文一致呈現。",
+      "以色面、細線與結構建立平坦深度，不靠浮誇陰影。",
+      "圖層列、映射列、應用程式視窗與 Prefab 樹承載產品識別。",
+      "投影可讀的關鍵文字與完整的鍵盤、減少動態支援。"
+    ],
+    "rules": [
+      {
+        "name": "The 60／30／10 Rule",
+        "body": "深墨約占 60%、深藍約占 30%、薄荷綠不超過約 10%；薄荷綠的稀少性就是層級。",
+        "section": "colors"
+      },
+      {
+        "name": "The One Signal Rule",
+        "body": "不加入第二個高彩度強調色；警示或狀態先靠文案、圖示與既有明暗層次表達。",
+        "section": "colors"
+      },
+      {
+        "name": "The Projection Floor Rule",
+        "body": "觀眾必須理解的報告內容不得小於 18px；16px 僅供導覽與輔助標記，14px 僅限品牌符號。",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Workbench Rule",
+        "body": "靜止表面保持平坦；先用色面、邊線與間距表達層級，不為一般卡片增加陰影。",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do 以 60／30／10 維持深墨主場、深藍資訊面與稀少薄荷訊號。",
+      "Do 讓所有觀眾必讀的映射、流程、結果與護欄文字至少 18px。",
+      "Do 用圖層、節點、連線、映射列與 Prefab 階層把抽象轉譯變成可掃讀的結構。",
+      "Do 保留 940px 與 680px 的響應式轉換、清楚的 :focus-visible 外框及 prefers-reduced-motion 降級。"
+    ],
+    "donts": [
+      "Don't 加入第二個高彩度強調色、霓虹漸層或大面積薄荷裝飾。",
+      "Don't 用陰影堆出一般卡片層級；平面色階、一像素邊線與間距才是預設方法。",
+      "Don't 把特定報告的章節順序、第一視窗構圖、完整文案或 43 → 26 證據套用到其他表面。",
+      "Don't 為了桌面對稱而在手機保留難以閱讀的並排映射或程式型別尾欄。"
+    ]
+  }
+}
