@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.12.12";
+var SCRIPT_VERSION = "2.13.0";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 // OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。
@@ -16,6 +16,9 @@ var KNOWN_BRACKET_TAG_PATTERNS = [
     /\[(?:GRID|GLAYOUT)\]/ig,                                                   // GridLayoutGroup（#phase4-decisions Q8）
     /\[(?:CG|CANVASGROUP)\]/ig,                                                 // CanvasGroup（#phase4-decisions Q8）
     /\[(?:SCROLL_V|SCROLL_H)\]/ig,                                              // ScrollRect（#phase4-5-q1）
+    /\[(?:SCROLLBAR_V|SCROLLBAR_H)\]/ig,                                        // Scrollbar nested in a ScrollRect group
+    /\[(?:TRACK|HANDLE)\]/ig,                                                    // Scrollbar visual roles
+    /\[MASK\]/ig,                                                               // 形狀遮罩來源，由父群組吃掉成 Image + Mask
     /\[(?:SOFTMASK_BOTTOM|SOFTMASK_Y|FADE_BOTTOM)\s*(?::|=)\s*\d+(?:\.\d+)?\s*\]/ig, // Bottom-only ScrollRect fade
     /\[MERGE\]/ig,                                                             // 群組合併成單張 PNG
     /\[THICK\s*:\s*-?\d+(?:\.\d+)?\s*(?::\s*-?\d+(?:\.\d+)?)?\s*\]/ig           // 假厚度文字
@@ -212,7 +215,16 @@ function buildNamingHelpText() {
         + "                        兩者可同標 = 雙向捲動。群組自身的遮色片 = 可視窗範圍；\n"
         + "                        群組內圖層的遮色片會自動忽略、匯出完整圖，裁切交給 Unity 端）\n"
         + "                        可與 [V]/[H]/[GRID] 組合：排版元件會掛在 Content 上\n"
+        + "[SCROLLBAR_V] / [SCROLLBAR_H]\n"
+        + "                        放在對應 [SCROLL_V]/[SCROLL_H] 群組的直接子群組；\n"
+        + "                        子圖層用英文命名並分別加 [TRACK]、[HANDLE]。\n"
+        + "                        Unity 自動掛 Scrollbar、建立 SlidingArea 並接回 ScrollRect\n"
         + "[SOFTMASK_BOTTOM=64]    Scroll Viewport 底邊柔化像素（需搭配 [SCROLL_V]/[SCROLL_H]）\n"
+        + "[MASK]                   形狀遮罩。標在群組的「直接子圖層」上，該層形狀成為整個群組的\n"
+        + "                        裁切遮罩（Unity 掛 Image + Mask，showMaskGraphic 關閉＝純裁切）。\n"
+        + "                        遮罩層本身不會生成節點。群組 rect 會跟著遮罩圖的範圍。\n"
+        + "                        非矩形（圓角／圓形／不規則）才需要；純矩形用 PS 圖層遮罩即可，\n"
+        + "                        工具會自動掛更省的 RectMask2D。不支援用在 [SCROLL_*] 上。\n"
         + "[THICK:下偏移:右偏移]    假厚度文字（Unity 產出上下兩層 TMP）\n"
         + "\n"
         + "── 前綴 ──\n"
@@ -706,6 +718,7 @@ function exportUiPackage(sourceDoc, options) {
         var dedupStats = dedupPngsByHash(pendingImages, imageFolder, context);
         writeExportCacheIfDirty(context);
         refreshGroupBounds(nodes, context);
+        warnOrphanMaskLayers(nodes, context);
 
         var layout = buildLayoutJson(sourceDoc, nodes, context.warnings);
         writeTextFile(layoutJsonFile, layout);
@@ -858,6 +871,24 @@ function collectNodes(container, parentVisible, context, pendingImages, parentBo
     return nodes;
 }
 
+// 只有「群組的直接子層」才會被收編成該群組的形狀遮罩。放在最外層、或放在已被 scroll
+// 佔用的群組裡的 [MASK]，不會有人吃掉它——Unity 端會直接跳過該節點而不生成任何東西，
+// 等於整層憑空消失。這裡在寫出 JSON 前掃一遍，把沒被收編的標記報出來。
+function warnOrphanMaskLayers(nodes, context) {
+    for (var i = 0; i < nodes.length; i++) {
+        var node = nodes[i];
+        if (!node) {
+            continue;
+        }
+        if (node.maskRole === "mask" && !node._maskConsumed) {
+            pushWarning(context, node.name || "", "MASK_ORPHAN",
+                "[MASK] 圖層沒有被任何群組收編（必須是某個群組的直接子層），Unity 端不會生成此節點。" +
+                "請把它移進要套用遮罩的群組內。");
+        }
+        warnOrphanMaskLayers(node.children || [], context);
+    }
+}
+
 function appendNodes(target, source) {
     for (var i = 0; i < source.length; i++) {
         target.push(source[i]);
@@ -876,6 +907,45 @@ function createGroupNode(layerSet, children, context, parentBounds, bounds) {
     var clipToBounds = !isScrollNode && !isDirectScrollItem && layerHasEnabledMask(layerSet);
     // Auto-dedup disabled in v2.4.2: same width x height does not imply same content.
     // Function dedupeLayoutGroupImages retained for potential opt-in via layer tag in the future.
+
+    // [MASK] 子層收編：形狀遮罩優先於 PS 圖層遮罩的矩形裁切（clipToBounds → RectMask2D）。
+    // 群組 bounds 改用遮罩圖層的 bounds，Unity 端 Image 的 rect 必須與遮罩圖一致才裁得準。
+    var maskChild = null;
+    for (var maskIndex = 0; maskIndex < children.length; maskIndex++) {
+        var candidate = children[maskIndex];
+        if (!candidate || candidate.maskRole !== "mask") {
+            continue;
+        }
+        if (!maskChild) {
+            maskChild = candidate;
+        } else {
+            pushWarning(context, String(layerSet.name || ""), "MASK_DUPLICATE",
+                "群組內有多個 [MASK] 圖層，只會採用第一個（" + maskChild.name + "），其餘會被忽略。");
+        }
+    }
+
+    if (maskChild && (isScrollNode || isDirectScrollItem)) {
+        pushWarning(context, String(layerSet.name || ""), "MASK_IN_SCROLL_UNSUPPORTED",
+            "[MASK] 目前不支援用在 [SCROLL_*] 群組或其直接子項上（捲動已自行合成 Viewport 遮罩），此遮罩已忽略。");
+        maskChild = null;
+    }
+
+    if (maskChild) {
+        if (clipToBounds) {
+            pushWarning(context, String(layerSet.name || ""), "MASK_OVERRIDES_CLIP",
+                "此群組同時有 PS 圖層遮罩與 [MASK] 子層；已採用 [MASK] 的形狀遮罩（Image + Mask），忽略矩形裁切。");
+        }
+        clipToBounds = false;
+        maskChild._maskConsumed = true;
+        bounds = {
+            left: maskChild.x,
+            top: maskChild.y,
+            right: maskChild.x + maskChild.width,
+            bottom: maskChild.y + maskChild.height,
+            width: maskChild.width,
+            height: maskChild.height
+        };
+    }
 
     if (clipToBounds) {
         var maskBounds = readLayerBoundsNoEffects(layerSet);
@@ -897,7 +967,7 @@ function createGroupNode(layerSet, children, context, parentBounds, bounds) {
     // OPTIMIZATION_PLAN_zh.html#phase4-5-q10：uniqueNodeName 內部已走 stripKnownTags 全清理，
     // 這裡直接傳原始名即可（節點名不會殘留 [H]/[CG]/[GRID]/[SCROLL_*] 等標籤）。
     var node = {
-        name: uniqueNodeName(layerSet.name, context.counters),
+        name: uniqueNodeName(layerSet.name, context.counters, context),
         type: "group",
         x: bounds.left,
         y: bounds.top,
@@ -907,8 +977,14 @@ function createGroupNode(layerSet, children, context, parentBounds, bounds) {
         children: children
     };
 
+    applyScrollbarMetadata(node, layerSet.name);
+
     if (clipToBounds) {
         node.clipToBounds = true;
+    }
+
+    if (maskChild) {
+        node.maskMode = "sprite";
     }
 
     if (insideScroll) {
@@ -920,8 +996,34 @@ function createGroupNode(layerSet, children, context, parentBounds, bounds) {
     applyLayoutMetadata(node, bounds, parentBounds, layerSet.name);
     // OPTIMIZATION_PLAN_zh.html#phase4-5-q7：先算 scroll（會改寫 node 為 viewport rect + content 欄位），
     // grid 參數（padding / sort / constraint 方向）要以 content bounds 為基準。
-    var scrollContentBounds = applyScrollMetadata(node, layerSet, children, bounds, context);
-    applyLayoutGroupMetadata(node, layerSet, children, scrollContentBounds || bounds, context);
+    var scrollbarChildren = [];
+    var contentChildren = children;
+    if (isScrollNode) {
+        contentChildren = [];
+        for (var childIndex = 0; childIndex < children.length; childIndex++) {
+            if (children[childIndex] && children[childIndex].scrollbarDirection) {
+                scrollbarChildren.push(children[childIndex]);
+            } else {
+                contentChildren.push(children[childIndex]);
+            }
+        }
+        node.children = contentChildren;
+    }
+    var scrollContentBounds = applyScrollMetadata(node, layerSet, contentChildren, bounds, context);
+    // 遮罩圖層不是排版項目（Unity 端不會生成它），排除後再算 spacing / padding / grid 參數。
+    var layoutChildren = contentChildren;
+    if (maskChild) {
+        layoutChildren = [];
+        for (var layoutIndex = 0; layoutIndex < contentChildren.length; layoutIndex++) {
+            if (contentChildren[layoutIndex] !== maskChild) {
+                layoutChildren.push(contentChildren[layoutIndex]);
+            }
+        }
+    }
+    applyLayoutGroupMetadata(node, layerSet, layoutChildren, scrollContentBounds || bounds, context);
+    if (isScrollNode && scrollbarChildren.length > 0) {
+        node.children = (node.children || contentChildren).concat(scrollbarChildren);
+    }
     applyCanvasGroupMetadata(node, layerSet);
     node._parentBounds = parentBounds;
     node._rawName = layerSet.name;
@@ -1006,7 +1108,17 @@ function refreshGroupBounds(nodes, context) {
         // OPTIMIZATION_PLAN_zh.html#phase4-5-q2：scroll 群組——viewport（node.x/y/w/h）在收集期已定，
         // trim 不會移動遮色片幾何，保持不動；content 依 trim 後的 children 重新聯集（不 clamp）。
         if (node.scrollDirection) {
-            var refreshedContent = boundsFromChildren(node.children || [], doc, true);
+            var refreshedScrollbarChildren = [];
+            var refreshedContentChildren = [];
+            var refreshedChildren = node.children || [];
+            for (var refreshedIndex = 0; refreshedIndex < refreshedChildren.length; refreshedIndex++) {
+                if (refreshedChildren[refreshedIndex] && refreshedChildren[refreshedIndex].scrollbarDirection) {
+                    refreshedScrollbarChildren.push(refreshedChildren[refreshedIndex]);
+                } else {
+                    refreshedContentChildren.push(refreshedChildren[refreshedIndex]);
+                }
+            }
+            var refreshedContent = boundsFromChildren(refreshedContentChildren, doc, true);
             if (refreshedContent) {
                 node.contentX = refreshedContent.left;
                 node.contentY = refreshedContent.top;
@@ -1022,7 +1134,9 @@ function refreshGroupBounds(nodes, context) {
                 height: node.height
             };
             applyLayoutMetadata(node, viewportRect, node._parentBounds, node._rawName);
-            applyLayoutGroupMetadata(node, node._rawName, node.children || [], refreshedContent || viewportRect, context && context.doc ? context : null);
+            node.children = refreshedContentChildren;
+            applyLayoutGroupMetadata(node, node._rawName, refreshedContentChildren, refreshedContent || viewportRect, context && context.doc ? context : null);
+            node.children = (node.children || refreshedContentChildren).concat(refreshedScrollbarChildren);
             continue;
         }
 
@@ -1146,7 +1260,7 @@ function createImageNode(layer, context, parentBounds) {
         }
     }
 
-    var safeName = uniqueFileName(layer.name, context.counters);
+    var safeName = uniqueFileName(layer.name, context.counters, context);
     var fileName = safeName + ".png";
     // v2.10：BTN_ 前綴保留在節點名（Unity 端據此自動掛 Button），PNG 檔名維持去前綴不變（匯出快取相容）。
     var nodeName = startsWith(String(layer.name || "").toUpperCase(), "BTN_") ? "BTN_" + safeName : safeName;
@@ -1198,6 +1312,8 @@ function createImageNode(layer, context, parentBounds) {
     }
 
     applyLayoutMetadata(node, bounds, parentBounds, layer.name);
+    applyScrollbarMetadata(node, layer.name);
+    applyMaskMetadata(node, layer.name);
     return node;
 }
 
@@ -2235,7 +2351,7 @@ function createTextNode(layer, context, parentBounds) {
     var fakeThickness = readFakeThickness(layer.name);
 
     var node = {
-        name: uniqueNodeName(layer.name, context.counters),
+        name: uniqueNodeName(layer.name, context.counters, context),
         type: "text",
         x: bounds.left,
         y: bounds.top,
@@ -2280,7 +2396,7 @@ function createTextNode(layer, context, parentBounds) {
 function buildLayoutJson(doc, nodes, warnings) {
     var lines = [];
     lines.push("{");
-    lines.push('  "schemaVersion": "2.10",');
+    lines.push('  "schemaVersion": "2.11",');
     lines.push('  "canvas": {');
     lines.push('    "width": ' + jsonNumber(px(doc.width)) + ",");
     lines.push('    "height": ' + jsonNumber(px(doc.height)));
@@ -2383,6 +2499,20 @@ function nodeToJson(node, indent) {
         if (node.scrollSoftnessY > 0) {
             lines.push(childIndent + '"scrollSoftnessY": ' + jsonNumber(node.scrollSoftnessY) + ",");
         }
+    }
+    if (node.scrollbarDirection) {
+        lines.push(childIndent + '"scrollbarDirection": ' + quoteJson(node.scrollbarDirection) + ",");
+    }
+    if (node.scrollbarRole) {
+        lines.push(childIndent + '"scrollbarRole": ' + quoteJson(node.scrollbarRole) + ",");
+    }
+    // schema 2.11：形狀遮罩。maskMode 在群組上（Unity 掛 Image + Mask），
+    // maskRole 在被收編的遮罩圖層上（Unity 不生成該節點，只取它的 sprite）。
+    if (node.maskMode) {
+        lines.push(childIndent + '"maskMode": ' + quoteJson(node.maskMode) + ",");
+    }
+    if (node.maskRole) {
+        lines.push(childIndent + '"maskRole": ' + quoteJson(node.maskRole) + ",");
     }
 
     if (node.type === "image") {
@@ -2547,6 +2677,32 @@ function detectScrollDirection(rawName) {
 }
 
 // 讀圖層遮色片啟用狀態（user mask + vector mask）。
+function applyScrollbarMetadata(node, rawName) {
+    if (!node) return;
+    var name = String(rawName || "");
+    if (/\[SCROLLBAR_V\]/i.test(name)) {
+        node.scrollbarDirection = "vertical";
+    } else if (/\[SCROLLBAR_H\]/i.test(name)) {
+        node.scrollbarDirection = "horizontal";
+    }
+    if (/\[TRACK\]/i.test(name)) {
+        node.scrollbarRole = "track";
+    } else if (/\[HANDLE\]/i.test(name)) {
+        node.scrollbarRole = "handle";
+    }
+}
+
+// [MASK]：這一層是形狀遮罩的來源，本身不在 Unity 生成節點，而是被父群組吃掉成
+// Image + Mask（showMaskGraphic = false，純裁切）。走的是與 [TRACK]/[HANDLE] 相同的
+// 「子節點帶 role、父層收編」機制，因此圖片匯出完全沿用既有路徑，不需要點陣化 PS 圖層遮罩。
+// 群組加 [MERGE][MASK] 也可行——[MERGE] 會先把群組合成單一 image 節點再套用此 role。
+function applyMaskMetadata(node, rawName) {
+    if (!node) return;
+    if (/\[MASK\]/i.test(String(rawName || ""))) {
+        node.maskRole = "mask";
+    }
+}
+
 function readLayerMaskState(layer) {
     try {
         var desc = getLayerDescriptor(layer);
@@ -3502,10 +3658,17 @@ function normalizeFileSystemPath(path) {
         .toLowerCase();
 }
 
-function uniqueFileName(name, counters) {
+function uniqueFileName(name, counters, context) {
     var base = normalizeAsciiSlug(stripKnownTags(stripLayoutTokens(stripControlPrefix(name))));
     if (!base) {
+        // normalizeAsciiSlug 會刪掉所有非 [a-z0-9] 字元，因此純中文（或任何非拉丁文字）圖層名
+        // 會塌成空字串，靜默退化為 layer / layer_002 / layer_003。這些名字仍然唯一，
+        // 所以能通過 Unity 端 LayoutReader 的唯一性檢查 —— 結構合法但語意全毀，且毫無提示。
+        // 這裡發一則 warning 進 layout.json，讓忘記先跑 Layer Auto Namer 的情況在 Unity 端看得到。
         base = "layer";
+        pushWarning(context, String(name || ""), "NON_ASCII_LAYER_NAME",
+            "圖層名不含任何英數字，檔名已退化為「" + base + "」系列流水號，語意完全遺失。" +
+            "請先執行 Layer Auto Namer（PhotoshopLayerAutoNamer.jsx）把圖層名轉成英文再匯出。");
     }
 
     if (!counters[base]) {
@@ -3517,9 +3680,9 @@ function uniqueFileName(name, counters) {
     return base + "_" + pad3(counters[base]);
 }
 
-function uniqueNodeName(name, counters) {
+function uniqueNodeName(name, counters, context) {
     // v2.10：BTN_ 前綴保留在節點名（Unity 端據此自動掛 Button）；PNG 檔名仍走 uniqueFileName 去前綴。
-    var base = uniqueFileName(name, counters);
+    var base = uniqueFileName(name, counters, context);
     if (startsWith(String(name || "").toUpperCase(), "BTN_")) {
         return "BTN_" + base;
     }

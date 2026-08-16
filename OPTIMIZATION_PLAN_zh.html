@@ -593,11 +593,12 @@ SettingPage_layout Missing Prefab 與本工具無關，不要在未確認需求�
     <h4 class="q" id="phase4-5-q3">Q3 — Viewport Mask：固定 RectMask2D，不給選項</h4>
     <div class="panel">
       <p>C+ 只讀 mask 的 <strong>bounds</strong>（矩形語意），讀不到形狀，Mask+Image 也還原不了圓角；實務上圓角由面板框圖蓋出、列表裁切邊是直線；正式專案滑軌實測也全用 RectMask2D。圓角裁切需求進待辦池。</p>
+      <p><strong>v2.13.0 補充：</strong>「讀不到形狀」的前提已由 <code>[MASK]</code> 繞開——不去點陣化 PS 圖層遮罩，改讓美術把形狀留成群組內的一般圖層並標記，形狀就走既有圖片匯出路徑成為 mask sprite。此方案套用在<strong>一般群組</strong>；<code>[SCROLL_*]</code> 的 Viewport 仍維持本題結論固定 RectMask2D（Mask 走 stencil，每層多兩個 draw call，捲動內容逐項套用代價過高）。</p>
     </div>
 
-    <h4 class="q" id="phase4-5-q4">Q4 — Scrollbar：完全不做</h4>
+    <h4 class="q" id="phase4-5-q4">Q4 — Scrollbar：原決議不做；v2.13.0 已由真實需求覆寫</h4>
     <div class="panel">
-      <p>ScrollRect 無 Scrollbar 也能拖曳捲動（手遊慣例）；自動生成的 Unity 預設外觀必被美術棄用；PS 圖層對應規則歧義大。實測 <code>LobbyMain_MB_New</code> 3 條滑軌全部沒有 Scrollbar。美術畫的捲動條圖層照常以 image 匯入，程式手動接線。<code>[SCROLLBAR]</code> 標籤自動接線列入待辦池。</p>
+      <p>Phase 4.5 原本因缺少固定美術規則而不自動生成 Scrollbar。v2.13.0 依 <code>UIWindow_Acceptance.psd</code> 真實需求改為顯式規則：Scroll 群組的直接子群組標 <code>[SCROLLBAR_V]</code> / <code>[SCROLLBAR_H]</code>，直接圖片子圖層標 <code>[TRACK]</code> / <code>[HANDLE]</code>。Unity 僅在標籤完整時自動掛元件、建立 <code>SlidingArea</code> 並接線；未標記的 ScrollRect 行為維持不變。</p>
     </div>
 
     <h4 class="q" id="phase4-5-q5">Q5 — ScrollRect 參數與拖曳 raycast 目標（實測修正版）</h4>
@@ -991,9 +992,9 @@ commit → push → 交由使用者/Codex 在 Unity 專案實機驗收。</pre>
     <tr><td>Btn 自動掛元件</td><td><code>Btn_</code> 前綴自動加 Button（含 transition），延伸 Toggle 標記（ScrollView 已改由 Phase 4.5 統一處理）</td></tr>
     <tr><td>一鍵 Generate</td><td>套用 Package → 建資料夾 → 填路徑 → 檢查 → Generate 收成一鍵（Phase 2 後評估必要性）</td></tr>
     <tr><td>JSX 模組化</td><td>開發時拆檔、發佈時 build 合併單檔，維持現有單檔更新機制；主檔已 3000+ 行</td></tr>
-    <tr><td><code>[SCROLLBAR]</code> 標籤自動接線</td><td>Phase 4.5 Q4 決議不自動生成 Scrollbar；若日後美術固定畫 track/handle 圖層，再議標籤自動掛 Scrollbar 並接上 ScrollRect</td></tr>
+    <tr><td><code>[SCROLLBAR_V/H]</code> 標籤自動接線</td><td><strong>v2.13.0 已完成</strong>；搭配直接子圖層 <code>[TRACK]</code> / <code>[HANDLE]</code>，Unity 自動建立 SlidingArea、Scrollbar 並接上 ScrollRect。</td></tr>
     <tr><td>Scroll 固定表頭</td><td>Phase 4.5 Q1 決議全部 children 進 Content；「部分子層不捲動（表頭、裝飾框）」遇真實案例再議</td></tr>
-    <tr><td>Viewport 圓角/異形裁切</td><td>Phase 4.5 Q3 固定 RectMask2D（矩形）；圓角裁切需 Mask+Image 與 mask sprite 來源方案，遇真實需求再議</td></tr>
+    <tr><td>Viewport 圓角/異形裁切</td><td><strong>v2.13.0 已完成（群組層級）</strong>；<code>[MASK]</code> 標在群組直接子圖層上，該層即 mask sprite 來源，Unity 掛 Image + Mask（<code>showMaskGraphic=false</code>）。不需點陣化 PS 圖層遮罩——遮罩圖走既有一般圖片匯出路徑。<code>[SCROLL_*]</code> 群組仍固定 RectMask2D（Q3 不變），捲動視窗的圓角裁切保留在待辦池。</td></tr>
   </table>
 
   <!-- ══════════════════════════════════════════════════════ -->

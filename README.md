@@ -6,7 +6,7 @@ It exports a Photoshop UI as a UI Package, then rebuilds the layout in Unity as 
 
 ## Version
 
-v2.12.12
+v2.13.0
 
 ## Main Workflow
 
@@ -26,7 +26,7 @@ This keeps Spine export as a separate pipeline while sharing the same Photoshop 
 
 ### Export and import
 
-1. Run `PhotoshopExporter/PhotoshopLayerAutoNamer.jsx` in Photoshop if the PSD needs normalized English layer names.
+1. Run `PhotoshopExporter/PhotoshopLayerAutoNamer.jsx` in Photoshop. This is **required**, not optional, when layers are named in Chinese or any other non-Latin script: the exporter strips every non-ASCII character from layer names, so an unconverted name collapses to `layer.png` / `layer_002.png` and all meaning is lost. Since v2.13.0 the Auto Namer translates through `PhotoshopExporter/naming_glossary.tsv` (a version-controlled term list), leaves any layer it cannot fully resolve untouched, and writes the unknown terms to `naming_glossary_todo.tsv` so the glossary grows with use. Both the Auto Namer and the exporter warn when a non-ASCII name survives.
 2. Run `PhotoshopExporter/PhotoshopUiPackageExporter.jsx`.
 3. Export PNG files to a chosen image folder and write a custom-named layout JSON outside that image folder.
 4. In Unity, open `Tools > Photoshop UI Importer > Importer_v2`.
@@ -57,8 +57,10 @@ Unity Atlas output:
 - The export dialog's `命名規則說明` button closes the modal exporter and opens a searchable local reference page in the browser, so it can stay beside Photoshop while layers are renamed.
 - Add `[MERGE]` to a group name to bake its visible contents (including text, effects, and masks) into one PNG and one Unity Image node. Do not use it when child layers must remain interactive, animated, reskinnable, or editable. Since v2.12.5, MERGE groups are composited sequentially from visible pixels and their temporary raster layer is released immediately.
 - Tag a group `[SCROLL_V]` / `[SCROLL_H]` to auto-build a full ScrollView > Viewport > Content hierarchy in Unity (ScrollRect + RectMask2D). Layer masks inside the group are treated as the runtime-clipping preview: children export as full images, and the group's own mask (if any) defines the viewport window. Combine with `[GRID]`/`[V]`/`[H]` to mount the layout component on Content.
+- For a visible Photoshop-authored scrollbar, add a direct child group named in English with `[SCROLLBAR_V]` or `[SCROLLBAR_H]`. Its direct image children must carry `[TRACK]` and `[HANDLE]`. Unity creates a `Scrollbar`, preserves the Photoshop padding through a generated `SlidingArea`, and binds it to the parent `ScrollRect`.
 - Vertical and horizontal layout groups preserve negative spacing from Photoshop, so intentionally overlapping rows or columns keep their authored positions in Unity.
 - Add `[SOFTMASK_BOTTOM=64]` to a scroll group when the viewport should feather only its bottom edge by 64 pixels. Unity builds the effect from nested native `RectMask2D` components; no extra runtime package is required. `[SOFTMASK_Y=64]` remains an accepted alias.
+- Tag a direct child layer of a group with `[MASK]` to use its shape as a clipping mask for the whole group. Unity mounts `Image` + `Mask` (`showMaskGraphic` off, so the shape itself is not drawn) on the group and sizes the group to the mask layer's bounds; the mask layer produces no node of its own. Use it only for non-rectangular shapes — a plain rectangular Photoshop layer mask already becomes a cheaper `RectMask2D` automatically, and `Mask` costs two extra draw calls per level. Not supported on `[SCROLL_*]` groups, which build their own viewport mask.
 - Tag an image layer `[SLICED=32]` for a uniform nine-slice border, or `[SLICED=left,top,right,bottom]` for explicit borders. Unity writes the Sprite Editor border and sets the generated `Image` to `Sliced`. Existing manual Sprite Editor borders are preserved when the tag is absent.
 - Prefab generation automatically creates or updates `Atlas/SpriteAtlas.spriteatlasv2` and packs it once after all TextureImporters are ready. Atlas max size is selected from 2048/4096/8192 according to the largest source image. Pixel-identical Sprite references are packed only once while every exported PNG remains on disk, so the same package can be imported repeatedly.
 

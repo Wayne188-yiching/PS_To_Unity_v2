@@ -1,7 +1,7 @@
 {
-    "version":  "2.12.12",
-    "phase":  "Merge: nine-slice/SpriteAtlas automation (main) + font-asset dedup/MERGE-export/PNG-dedup perf (codex branch)",
-    "updated":  "2026-08-14",
+    "version":  "2.13.0",
+    "phase":  "Scrollbar automation, glossary-driven layer naming, shape masks (layout schema 2.11)",
+    "updated":  "2026-08-16",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [
                      {

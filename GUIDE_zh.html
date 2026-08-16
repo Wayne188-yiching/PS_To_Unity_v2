@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Photoshop → Unity UI 工具 v2.12 — 完整使用說明</title>
+  <title>Photoshop → Unity UI 工具 v2.13 — 完整使用說明</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
@@ -523,7 +523,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.12.12</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.13.0</span></h1>
     <p class="lead">在 Photoshop 排好的遊戲介面，一鍵搬進 Unity。圖自動切好、文字還能繼續改、位置自動對齊。</p>
   </header>
 
@@ -812,6 +812,8 @@
         <tr><td><code>BTN_</code> <span class="tag tag-new">v2.4.3</span></td><td>圖片節點以 <code>BTN_</code> 開頭時（不分大小寫），Unity 匯入後自動在該 GameObject 加上 <code>Button</code> 元件，省去手動加掛步驟。</td></tr>
         <tr><td><code>[SLICED=32]</code> / <code>[SLICED=左,上,右,下]</code> <span class="tag tag-new">v2.12.4</span></td><td>圖片匯出時把九宮格 Border 寫入 JSON；Unity 自動套用 Sprite Border，並把生成的 Image Type 設為 <code>Sliced</code>。可用別名 <code>[9SLICE=…]</code>、<code>[9S=…]</code>。</td></tr>
         <tr><td><code>[SOFTMASK_BOTTOM=64]</code> <span class="tag tag-new">v2.12.5</span></td><td>搭配 <code>[SCROLL_V]</code> / <code>[SCROLL_H]</code> 使用；Unity 以雙層原生 <code>RectMask2D</code> 只柔化捲動視窗底邊，不增加 runtime 套件。<code>[SOFTMASK_Y=64]</code> 保留為相容別名。</td></tr>
+        <tr><td><code>[MASK]</code> <span class="tag tag-new">v2.13.0</span></td><td>標在群組的<strong>直接子圖層</strong>上，該層形狀成為整個群組的裁切遮罩。Unity 掛 <code>Image</code> + <code>Mask</code>（<code>showMaskGraphic</code> 關閉＝形狀本身不顯示），群組 rect 跟著遮罩圖的範圍，遮罩層本身不生成節點。只有非矩形（圓角／圓形／不規則）才需要：純矩形的 PS 圖層遮罩會自動掛更省的 <code>RectMask2D</code>，而 <code>Mask</code> 每層多兩個 draw call。不支援用在 <code>[SCROLL_*]</code> 上。</td></tr>
+        <tr><td><code>[SCROLLBAR_V]</code> / <code>[SCROLLBAR_H]</code> <span class="tag tag-new">v2.13.0</span></td><td>作為對應 Scroll 群組的直接子群組；其直接圖片子圖層以英文命名並分別加 <code>[TRACK]</code>、<code>[HANDLE]</code>。Unity 自動掛上 <code>Scrollbar</code>、建立保留 PS 內距的 <code>SlidingArea</code>，並接回父層 <code>ScrollRect</code>。滑軌節點不會計入 Content bounds 或 Layout。</td></tr>
         <tr><td><code>[MERGE]</code> <span class="tag tag-new">v2.12.4</span></td><td>加在群組名稱中，將群組目前可見的內容合成一張 PNG；Unity 端只建立一個 Image 節點，不保留子階層。文字、圖層效果與遮色片會一併烘入圖片。若同時存在 <code>[H]</code>、<code>[V]</code>、<code>[GRID]</code>、<code>[CG]</code> 或 Scroll 標籤，以 <code>[MERGE]</code> 為優先。</td></tr>
       </table>
 
@@ -1114,6 +1116,39 @@ TXT_score_[THICK:2]</code></pre>
   <details>
     <summary>展開完整版本紀錄<span class="hint">每個版本改了什麼，想追來龍去脈再看</span></summary>
     <div class="details-body">
+<h3>v2.13.0（2026-08-16）— 滑軌自動接線、詞庫式圖層命名、形狀遮罩</h3>
+  <div class="callout warn">
+    版面 JSON <code>schemaVersion</code> 由 <code>2.10</code> 升到 <code>2.11</code>（新增 <code>maskMode</code> / <code>maskRole</code> 欄位）。舊版 Unity 匯入工具讀到 2.11 的 JSON 會顯示 <code>UNITY_TOOL_OUTDATED</code> 提示，請一併更新 Unity 端。
+  </div>
+
+  <h4>PS 可見滑軌自動接線</h4>
+  <ul>
+    <li>新增 <code>[SCROLLBAR_V]</code> / <code>[SCROLLBAR_H]</code>、<code>[TRACK]</code>、<code>[HANDLE]</code> 命名規則；滑軌群組不再混入 Scroll Content bounds。</li>
+    <li>Unity 自動生成並綁定 <code>Scrollbar</code>，以 <code>SlidingArea</code> 保留 PS 設計的左右／上下內距；Handle 尺寸依 viewport/content 比例更新且可拖曳。</li>
+    <li><code>UIWindow_Acceptance.psd</code> 真實驗收：Track 16×623、SlidingArea 12×611、Handle 12×557.834，Scrollbar 1→0 驅動 Content 65 px；Console 0 warning / 0 error。</li>
+  </ul>
+
+  <h4>詞庫式圖層命名（Layer Auto Namer 重寫）</h4>
+  <ul>
+    <li><strong>根因</strong>：匯出器的 <code>normalizeAsciiSlug()</code> 會刪掉圖層名裡所有非 <code>[a-z0-9]</code> 字元，因此純中文圖層名會塌成空字串、退化為 <code>layer.png</code> / <code>layer_002.png</code>。這些名字仍然唯一，能通過 Unity 端的節點名唯一性檢查 —— 結構合法但語意全毀，而且過去完全沒有任何提示。</li>
+    <li>舊版 Auto Namer 只有 13 條寫死規則（共 23 個中文詞），沒命中就掉到「依尺寸比例猜測」，把設計稿變成一堆 <code>IMG_art_02</code>、<code>IMG_icon_03</code>。</li>
+    <li>改為讀 <code>PhotoshopExporter/naming_glossary.tsv</code>（納入版控的中英對照表，預設 113 條）做<strong>最長匹配</strong>翻譯。載入時依長度排序，因此新增詞不必管順序。</li>
+    <li><strong>推不出來就不改名</strong>：未命中的圖層維持原名，未知詞寫進 <code>naming_glossary_todo.tsv</code>，補完再跑一次即可。詞庫隨使用逐次長出來，不需要一開始就建完。</li>
+    <li>套用前跳預覽表（原名／新名／rename·unchanged·SKIP），按 Apply 才寫入。</li>
+    <li><strong>所有 <code>[...]</code> 方括號標籤原樣保留</strong>。舊版只保留 <code>[MAT:…]</code>，其餘（<code>[SCROLL_V]</code>、<code>[SLICED=]</code>、<code>[MERGE]</code>…）在改名時全部被清掉且無提示。新版直接保留所有方括號區段，不去複製匯出器的標籤清單，避免第二份會漂移的來源。</li>
+    <li>編號規則：<strong>同父群組 + 同譯名 = 同族變體</strong>，產出 <code>ranking_ui_frame01</code>、<code>ranking_ui_frame01_1</code>、<code>ranking_ui_frame02</code>…。重跑具冪等性（不會把編號疊成 <code>frame0101</code>）。</li>
+    <li>兩端各加一道防線：Auto Namer 套用後回頭掃整份 PSD，仍帶非 ASCII 名的圖層會列出並說明後果；匯出器則在名稱塌陷時發 <code>NON_ASCII_LAYER_NAME</code> 警告進版面 JSON，Unity 端 Console 看得到。</li>
+    <li>附 <code>PhotoshopExporter/test_layer_auto_namer.js</code>，以 Node 直接載入實際 .jsx 原始碼驗證分詞、標籤保留、編號與匯出器守門（無重新實作）。</li>
+  </ul>
+
+  <h4>形狀遮罩 <code>[MASK]</code></h4>
+  <ul>
+    <li>群組的直接子圖層標 <code>[MASK]</code>，該層形狀成為整個群組的裁切遮罩；Unity 掛原生 <code>Image</code> + <code>Mask</code>（<code>showMaskGraphic = false</code>），不需要額外 runtime 套件。</li>
+    <li>沿用 <code>[SCROLLBAR_V]</code> + <code>[TRACK]</code>/<code>[HANDLE]</code> 的「子節點帶 role、父層收編」機制，因此<strong>不需要點陣化 PS 圖層遮罩</strong>，遮罩圖走既有的一般圖片匯出路徑。<code>[MERGE][MASK]</code> 組合亦可，複合形狀也能當遮罩。</li>
+    <li>此前 PS 群組遮罩只被用來算矩形 bounds（<code>clipToBounds</code> → <code>RectMask2D</code>），形狀本身完全丟失。<code>[MASK]</code> 補上非矩形裁切；純矩形仍建議走 <code>RectMask2D</code>（不走 stencil、不多 draw call）。</li>
+    <li>四道守門：<code>MASK_OVERRIDES_CLIP</code>（同時有 PS 遮罩與 <code>[MASK]</code>）、<code>MASK_DUPLICATE</code>（多個 <code>[MASK]</code>）、<code>MASK_IN_SCROLL_UNSUPPORTED</code>（用在捲動群組）、<code>MASK_ORPHAN</code>（沒被任何群組收編，Unity 端會整層消失）。遮罩 sprite 解析失敗時直接中止生成 —— <code>Mask</code> 的 sprite 為空會把整組子物件裁成全透明，比生成失敗更糟。</li>
+  </ul>
+
 <h3>v2.12.12（2026-08-14）— 修正安裝器靜默失敗，說明書全面改寫</h3>
   <ul>
     <li><strong>P0：安裝器會謊報成功</strong>。<code>canWriteToFolder()</code> 用 try/catch 判斷寫入權限，但 ExtendScript 的 <code>File.open()</code> / <code>write()</code> / <code>remove()</code> 失敗時是<strong>回傳 <code>false</code> 而非丟例外</strong>，catch 永遠不會觸發 → 一律回報可寫入 → 跳過改選資料夾的分支 → 兩個檔案都沒寫進去，卻照樣跳出「installed」。Photoshop 裝在 <code>C:\Program Files\</code> 的使用者（多數人）因此完全裝不起來，且沒有任何錯誤訊息可循。</li>
@@ -1364,7 +1399,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.12.12 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.13.0 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

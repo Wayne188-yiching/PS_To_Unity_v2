@@ -86,7 +86,11 @@ namespace PhotoshopToUnity.EditorImporter
             var isLayoutGroup = node.NormalizedType == "group" && !string.IsNullOrWhiteSpace(node.layoutType);
             // OPTIMIZATION_PLAN_zh.html#phase4-5-q1：scroll group 一定有自己的 rect（= viewport 可視範圍）。
             var isScrollGroup = node.NormalizedType == "group" && node.HasScrollRect;
+            var isScrollbarGroup = node.NormalizedType == "group" && node.HasScrollbar;
             var isClippedGroup = node.NormalizedType == "group" && node.clipToBounds;
+            // schema 2.11：群組帶 [MASK] 子層 → 需要自己的 rect（= 遮罩圖 bounds，由 JSX 端寫入），
+            // Image 的 rect 必須與遮罩圖一致，Mask 才會裁在正確位置。
+            var isSpriteMaskGroup = node.NormalizedType == "group" && node.HasSpriteMask;
 
             // 響應式模式下，一般 group 不再展開成 canvas 尺寸的透明容器，
             // 改用自身 PS bounds 建 Rect，子節點 anchor 才能相對 group 邊緣生效
@@ -98,7 +102,7 @@ namespace PhotoshopToUnity.EditorImporter
                                && node.NormalizedType == "group"
                                && node.width > 0f
                                && node.height > 0f;
-            var hasOwnRect = isVisualNode || isLayoutGroup || isSizedGroup || isScrollGroup || isClippedGroup;
+            var hasOwnRect = isVisualNode || isLayoutGroup || isSizedGroup || isScrollGroup || isScrollbarGroup || isClippedGroup || isSpriteMaskGroup;
 
             if (hasOwnRect)
             {
@@ -136,6 +140,8 @@ namespace PhotoshopToUnity.EditorImporter
                         ApplyLayoutGroup(gameObject, node);
                     if (isClippedGroup)
                         gameObject.AddComponent<RectMask2D>();
+                    if (isSpriteMaskGroup)
+                        ApplySpriteMask(gameObject, node, context);
                     if (node.hasCanvasGroup)
                         ApplyCanvasGroup(gameObject);
                     break;
@@ -148,6 +154,10 @@ namespace PhotoshopToUnity.EditorImporter
 
             foreach (var child in node.children)
             {
+                // [MASK] 圖層只提供 sprite 給父群組，本身不生成節點（ApplySpriteMask 已取用）。
+                if (child != null && child.IsMaskShape)
+                    continue;
+
                 if (hasOwnRect)
                 {
                     CreateNode(child, rectTransform, node.x, node.y, node.width, node.height, rectTransform.pivot, context);
@@ -426,9 +436,155 @@ namespace PhotoshopToUnity.EditorImporter
             {
                 foreach (var child in node.children)
                 {
-                    CreateNode(child, contentRect, node.contentX, node.contentY, node.contentWidth, node.contentHeight, contentRect.pivot, context);
+                    if (child != null && child.HasScrollbar)
+                    {
+                        CreateNode(child, rootRect, node.x, node.y, node.width, node.height, rootRect.pivot, context);
+                        AttachScrollbar(scrollRect, rootRect, child);
+                    }
+                    else
+                    {
+                        CreateNode(child, contentRect, node.contentX, node.contentY, node.contentWidth, node.contentHeight, contentRect.pivot, context);
+                    }
                 }
             }
+        }
+
+        // schema 2.11：把群組內標了 [MASK] 的圖層收編成該群組的形狀遮罩。
+        // 走 uGUI 原生 Mask（stencil，依 Image 的 alpha 裁切），不需要額外 runtime 套件。
+        // showMaskGraphic = false → 遮罩形狀本身不顯示，只做裁切。
+        // 群組 rect 已由 JSX 端寫成遮罩圖的 bounds，因此 Image 的 rect 與 sprite 對齊。
+        private static void ApplySpriteMask(GameObject gameObject, PhotoshopUiNode node, PrefabGenerationContext context)
+        {
+            var maskNode = FindMaskShapeNode(node);
+            if (maskNode == null)
+                throw new InvalidOperationException(
+                    $"群組 {node.name} 標示為形狀遮罩（maskMode=sprite），但找不到帶 [MASK] 的直接子層。");
+
+            var sprite = context.skinResolver?.Resolve(maskNode);
+            if (sprite == null)
+                throw new InvalidOperationException(
+                    $"群組 {node.name} 的遮罩圖 {maskNode.imagePath} 找不到對應 Sprite。" +
+                    "Mask 的 sprite 為空會讓整組子物件被裁成全透明，因此中止生成。");
+
+            var image = gameObject.AddComponent<Image>();
+            image.sprite = sprite;
+            image.type = Image.Type.Simple;
+            image.preserveAspect = false;
+            image.raycastTarget = false;
+
+            var mask = gameObject.AddComponent<Mask>();
+            mask.showMaskGraphic = false;
+        }
+
+        private static PhotoshopUiNode FindMaskShapeNode(PhotoshopUiNode node)
+        {
+            if (node.children == null) return null;
+            foreach (var child in node.children)
+            {
+                if (child != null && child.IsMaskShape)
+                    return child;
+            }
+            return null;
+        }
+
+        private static void AttachScrollbar(ScrollRect scrollRect, RectTransform scrollRoot, PhotoshopUiNode scrollbarNode)
+        {
+            var scrollbarRect = scrollRoot.Find(scrollbarNode.name) as RectTransform;
+            if (scrollbarRect == null)
+                throw new InvalidOperationException($"Scrollbar node was not generated: {scrollbarNode.name}");
+
+            var trackRect = FindScrollbarVisual(scrollbarRect, scrollbarNode, "track");
+            var handleRect = FindScrollbarVisual(scrollbarRect, scrollbarNode, "handle");
+            var handleNode = FindScrollbarVisualNode(scrollbarNode, "handle");
+            var handleGraphic = handleRect == null ? null : handleRect.GetComponentInChildren<Graphic>(true);
+            if (trackRect == null || handleRect == null || handleNode == null || handleGraphic == null)
+                throw new InvalidOperationException($"Scrollbar {scrollbarNode.name} requires direct [TRACK] and [HANDLE] children with image graphics.");
+
+            var trackGraphic = trackRect.GetComponentInChildren<Graphic>(true);
+            if (trackGraphic != null) trackGraphic.raycastTarget = true;
+            handleGraphic.raycastTarget = true;
+
+            var slidingArea = CreateScrollbarSlidingArea(scrollbarRect, scrollbarNode, handleNode);
+            handleRect.SetParent(slidingArea, false);
+            handleRect.anchorMin = Vector2.zero;
+            handleRect.anchorMax = Vector2.one;
+            handleRect.offsetMin = Vector2.zero;
+            handleRect.offsetMax = Vector2.zero;
+
+            var scrollbar = scrollbarRect.gameObject.AddComponent<Scrollbar>();
+            scrollbar.handleRect = handleRect;
+            scrollbar.targetGraphic = handleGraphic;
+            scrollbar.transition = Selectable.Transition.ColorTint;
+
+            if (string.Equals(scrollbarNode.scrollbarDirection, "horizontal", StringComparison.OrdinalIgnoreCase))
+            {
+                if (!scrollRect.horizontal)
+                    throw new InvalidOperationException($"Horizontal Scrollbar {scrollbarNode.name} requires [SCROLL_H] on its parent group.");
+                scrollbar.direction = Scrollbar.Direction.LeftToRight;
+                scrollRect.horizontalScrollbar = scrollbar;
+                scrollRect.horizontalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+                scrollRect.horizontalScrollbarSpacing = 0f;
+            }
+            else
+            {
+                if (!scrollRect.vertical)
+                    throw new InvalidOperationException($"Vertical Scrollbar {scrollbarNode.name} requires [SCROLL_V] on its parent group.");
+                scrollbar.direction = Scrollbar.Direction.BottomToTop;
+                scrollRect.verticalScrollbar = scrollbar;
+                scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+                scrollRect.verticalScrollbarSpacing = 0f;
+            }
+        }
+
+        private static RectTransform CreateScrollbarSlidingArea(
+            RectTransform scrollbarRect,
+            PhotoshopUiNode scrollbarNode,
+            PhotoshopUiNode handleNode)
+        {
+            var left = Mathf.Max(0f, handleNode.x - scrollbarNode.x);
+            var right = Mathf.Max(0f, scrollbarNode.x + scrollbarNode.width - handleNode.x - handleNode.width);
+            var top = Mathf.Max(0f, handleNode.y - scrollbarNode.y);
+            var bottom = Mathf.Max(0f, scrollbarNode.y + scrollbarNode.height - handleNode.y - handleNode.height);
+
+            // Along the movement axis, the far-side gap contains the handle's travel range.
+            // Mirror the leading inset so Unity can resize the handle while preserving the
+            // visual padding authored in Photoshop.
+            if (string.Equals(scrollbarNode.scrollbarDirection, "horizontal", StringComparison.OrdinalIgnoreCase))
+                right = left;
+            else
+                bottom = top;
+
+            var area = new GameObject("SlidingArea", typeof(RectTransform)).GetComponent<RectTransform>();
+            area.SetParent(scrollbarRect, false);
+            area.anchorMin = Vector2.zero;
+            area.anchorMax = Vector2.one;
+            area.pivot = new Vector2(0.5f, 0.5f);
+            area.offsetMin = new Vector2(left, bottom);
+            area.offsetMax = new Vector2(-right, -top);
+            return area;
+        }
+
+        private static RectTransform FindScrollbarVisual(RectTransform scrollbarRect, PhotoshopUiNode scrollbarNode, string role)
+        {
+            if (scrollbarNode.children == null) return null;
+            foreach (var child in scrollbarNode.children)
+            {
+                if (child == null || !string.Equals(child.scrollbarRole, role, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                return scrollbarRect.Find(child.name) as RectTransform;
+            }
+            return null;
+        }
+
+        private static PhotoshopUiNode FindScrollbarVisualNode(PhotoshopUiNode scrollbarNode, string role)
+        {
+            if (scrollbarNode.children == null) return null;
+            foreach (var child in scrollbarNode.children)
+            {
+                if (child != null && string.Equals(child.scrollbarRole, role, StringComparison.OrdinalIgnoreCase))
+                    return child;
+            }
+            return null;
         }
 
         // OPTIMIZATION_PLAN_zh.html#phase4-decisions Q6 / Q6.1：JSX 偵測 [CG] / [CANVASGROUP] → hasCanvasGroup=true → 掛 CanvasGroup。
