@@ -2,11 +2,11 @@
 
 將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。
 
-**目前版本：v2.13.3**
+**目前版本：v2.13.4**
 
 > PNG 像素去重會先依檔案大小與圖片尺寸篩選候選者；只有可能重複的圖片才會讀取完整檔案計算雜湊，而且每個候選檔案最多只計算一次。這項最佳化不會改動版面 JSON、PNG 像素或 Unity 圖片引用結果。
 
-> 可見滑軌自動化：在 `[SCROLL_V]` / `[SCROLL_H]` 群組下加入直接子群組 `[SCROLLBAR_V]` / `[SCROLLBAR_H]`，其直接圖片子圖層以英文命名並分別加上 `[TRACK]`、`[HANDLE]`；父層同時必須包含它要控制的內容。若群組只有滑軌、內容在外部，v2.13.3 會輸出 `SCROLL_NO_CONTENT` 並降級為普通圖像，避免生成無法接線又會改動 Handle 版面的 ScrollRect。
+> 可見滑軌自動化：滑軌群組使用 `[SCROLLBAR_V]` / `[SCROLLBAR_H]`，其直接圖片子圖層以英文命名並分別加上 `[TRACK]`、`[HANDLE]`。放在對應 `[SCROLL_*]` 群組內仍是最明確的結構；v2.13.4 起，若滑軌因 PS 排版需要放在外部，只要整個 Prefab 內剛好只有一個方向相容、尚未接線的 ScrollRect，也會安全自動配對。多組可能配對時不猜測，會輸出 `SCROLLBAR_ORPHAN_UNRESOLVED`。接線會保留 PS 匯出的 Content 初始位置，再讓 Handle 可拖動。
 
 > 詞庫式圖層命名：`PhotoshopLayerAutoNamer.jsx` 改用 `PhotoshopExporter/naming_glossary.tsv`（納入版控的中英對照表）做最長匹配翻譯，推不出來的圖層**維持原名不動**並把未知詞寫進 `naming_glossary_todo.tsv`，補完再跑一次即可。編號規則為「同父群組 + 同譯名 = 同族變體」，產出如 `ranking_ui_frame01`、`ranking_ui_frame01_1`。
 
@@ -41,6 +41,7 @@
 > 圖層命名會觸發哪些 Unity 端行為（`[GRID]`、`[CG]`、`[SCROLL_V]`/`[SCROLL_H]`、`BTN_`…），見 PS 匯出對話框的「命名規則說明」按鈕；此按鈕會關閉匯出主視窗，並在瀏覽器開啟可搜尋的本機速查頁，可放在 Photoshop 旁邊，邊看邊修改圖層名稱。
 
 > 群組名稱加入 `[MERGE]`，會將目前可見內容（含文字、效果、遮色片）烘成一張 PNG，Unity 只建立一個 Image 節點。子項需要互動、動畫、換皮或改字時不要使用。工具會逐組取得可見合成像素，存檔後立即釋放暫存層；操作上仍只需按一次 Export。
+> v2.13.4 起，MERGE 暫存合成會依實際 alpha 像素裁去全透明邊界，再以 PS 的無效果中心回補 JSON 座標；隱藏子層或群組 bounds 不再把透明空白帶進 Unity 排版。
 >
 > 群組標 `[SCROLL_V]` / `[SCROLL_H]` 會在 Unity 自動組出 ScrollView > Viewport > Content 三層（ScrollRect + RectMask2D）。群組內圖層的遮色片視為「runtime 裁切預覽」——子圖層一律匯出完整圖；群組自身的遮色片（若有）定義可視窗範圍。可與 `[GRID]`/`[V]`/`[H]` 組合，排版元件會掛在 Content 上。
 > 捲動群組可再加 `[SOFTMASK_BOTTOM=64]`，Unity 會用雙層原生 `RectMask2D` 只柔化底邊 64 像素，不需要額外 runtime 套件；`[SOFTMASK_Y=64]` 保留為相容別名。

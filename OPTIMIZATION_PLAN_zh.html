@@ -725,7 +725,20 @@ SettingPage_layout Missing Prefab 與本工具無關，不要在未確認需求�
         <tr><td><code>[SCROLL_V]</code>／<code>[SCROLLBAR_V]</code></td><td>PSD 的 Bar 群組只有 Scrollbar，實際排行榜內容在外部，Unity 不可能自動推斷連線。新增 <code>SCROLL_NO_CONTENT</code> 並降級為普通群組，保留 Track／Handle。</td><td>Prefab 的 Bar 不再生成錯接的 ScrollRect／Scrollbar；滑軌 image 節點與 JSON 座標一致。</td></tr>
         <tr><td>TMP 描邊</td><td><code>tmp_number_006</code> 的 4px 描邊超出 MiSans Padding=9 上限；保留舊資產，新增 Dynamic <code>MiSans-Semibold SDF P10</code>（90pt、2048²、Padding=10）與材質並更新映射。</td><td><code>OutlineOverflow</code> 已消失；Prefab 使用 P10 Font Asset 與專屬 outline 材質。</td></tr>
       </table>
-      <p>Console 剩餘 <code>LAYOUT_CROSS_AXIS_DEGRADED</code>／<code>SCROLL_NO_CONTENT</code> 都是「為保留 PS 座標而拒絕掛錯元件」的保護性警告，不代表 Prefab 座標仍有誤差。若要真正可捲動，PSD 必須把內容與 <code>[SCROLLBAR_*]</code> 放在同一個 <code>[SCROLL_*]</code> 群組。</p>
+      <p>此段記錄 v2.13.3 當時的保護性降級：<code>LAYOUT_CROSS_AXIS_DEGRADED</code>／<code>SCROLL_NO_CONTENT</code> 都是為保留 PS 座標而拒絕掛錯元件。外置滑軌的唯一安全配對已於下方 v2.13.4 回歸補上。</p>
+    </div>
+
+    <h4 id="phase4-5-merge-scrollbar-regression-20260817">2026-08-17 MERGE 透明畫布／外置 Scrollbar 回歸（v2.13.4）</h4>
+    <div class="panel">
+      <p><strong>結論：使用者指出的出圖空白確為本次跑版主因；已修復並完成 Photoshop + Unity MCP 實機回歸。</strong>驗收對象為目前開啟的真實排行榜 PSD、43 張 Base PNG、<code>Rank_layout.json</code> 與 Unity 2022.3.62f1 的 <code>Rank_layout.prefab</code>。</p>
+      <table>
+        <tr><th>驗收項目</th><th>查證／修正</th><th>複驗結果</th></tr>
+        <tr><td>全量 PNG alpha bounds</td><td>逐張計算畫布、實際 alpha bbox 與四邊透明 margin。只有 <code>ranking_ui_frame02/03</code> 各有 52px 異常上邊界；其餘最大 4px 為既有效果安全邊距。</td><td>修正後 43 張均無大於 8px 的異常透明邊界；問題圖由 1116×200／1116×197 改為 1093×141／1094×141。</td></tr>
+        <tr><td>MERGE 根因</td><td><code>Copy Merged</code> 會保留選取框畫布並在暫存文件置中；LayerSet bounds 又可能被隱藏子層污染。改為合成後依實際 alpha 裁切、MERGE 不套群組陰影補償，並以 <code>boundsNoEffects</code> 中心回補 JSON 座標；快取簽名升為 <code>fastalign_v3</code>，強制舊 Package 一次性重建。</td><td>JSON 座標收斂為 frame02 (768,385)、frame03 (768,543)；Unity 全域 RectTransform 同值。</td></tr>
+        <tr><td>外置 Handle 可拖</td><td>PSD 保留 <code>[SCROLL_V]RankList</code> 與外置 <code>[SCROLLBAR_V]ScrollBar</code>。Unity 僅在「唯一相容、未接線 ScrollRect」時自動配對；多組不猜測。</td><td><code>verticalScrollbar == scrollbar</code>、Handle/targetGraphic 完整；Scrollbar 1→0 驅動 Content Y 0→104。</td></tr>
+        <tr><td>接線後初始跑版</td><td>原生 Scrollbar 預設 0 曾把 Content 推到最底端，造成所有列一致上移 104px。接線前保存 authored Content position／normalized value，接線後還原。</td><td>Prefab 資產與實例初始 Content Y=0、Scrollbar value=1；第一列不再被 Viewport 裁掉。</td></tr>
+        <tr><td>LayoutGroup 排除</td><td>Console 的 <code>LAYOUT_CROSS_AXIS_DEGRADED</code> 是保護性降級，會保留絕對 PS 座標，並非本次位移來源。</td><td>83 個可視節點中，除原生 ScrollRect 依 viewport/content 比例動態控制的 Handle 尺寸外，其餘位置與尺寸最大差異 0px；Console error=0。</td></tr>
+      </table>
     </div>
 
     <details class="handoff">
@@ -1037,7 +1050,7 @@ commit → push → 交由使用者/Codex 在 Unity 專案實機驗收。</pre>
   </div>
 
   <footer>
-    PS → Unity UI Tool 優化計畫 · 起始基準 v2.4.2（2026-06-11）· 目前已推進至 v2.13.3（固定解析度 0px 座標誤差／滑軌防誤接／已複驗）<br>
+    PS → Unity UI Tool 優化計畫 · 起始基準 v2.4.2（2026-06-11）· 目前已推進至 v2.13.4（MERGE 透明邊界／外置滑軌／初始捲動位置已複驗）<br>
     最後更新：2026-07-14 · 配合文件：GUIDE_zh.html、README_zh.md · <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" style="color:var(--accent)">GitHub</a>
   </footer>
 

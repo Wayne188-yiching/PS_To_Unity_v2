@@ -6,7 +6,7 @@ It exports a Photoshop UI as a UI Package, then rebuilds the layout in Unity as 
 
 ## Version
 
-v2.13.3
+v2.13.4
 
 ## Main Workflow
 
@@ -55,9 +55,9 @@ Unity Atlas output:
   - `[TMP]`, `[TEXT]`, `TMP_`, or `TXT_` keeps that text editable as a Unity TMP node.
 - All text layers remain TMP by default, regardless of font family. Use a `TmpFontMap` asset (Create > Photoshop UI Importer > Tmp Font Map) to map each exported font token to the matching TMP Font Asset. Enable `白名單外字型改為 PNG` only when intentionally baking unsupported fonts; explicit `[PNG]` naming overrides still work.
 - The export dialog's `命名規則說明` button closes the modal exporter and opens a searchable local reference page in the browser, so it can stay beside Photoshop while layers are renamed.
-- Add `[MERGE]` to a group name to bake its visible contents (including text, effects, and masks) into one PNG and one Unity Image node. Do not use it when child layers must remain interactive, animated, reskinnable, or editable. Since v2.12.5, MERGE groups are composited sequentially from visible pixels and their temporary raster layer is released immediately.
+- Add `[MERGE]` to a group name to bake its visible contents (including text, effects, and masks) into one PNG and one Unity Image node. Do not use it when child layers must remain interactive, animated, reskinnable, or editable. Since v2.12.5, MERGE groups are composited sequentially from visible pixels and their temporary raster layer is released immediately. Since v2.13.4, the temporary composite is alpha-trimmed and re-anchored to the Photoshop no-effects center, so hidden child bounds cannot add transparent bands or shift the JSON rect.
 - Tag a group `[SCROLL_V]` / `[SCROLL_H]` to auto-build a full ScrollView > Viewport > Content hierarchy in Unity (ScrollRect + RectMask2D). Layer masks inside the group are treated as the runtime-clipping preview: children export as full images, and the group's own mask (if any) defines the viewport window. Combine with `[GRID]`/`[V]`/`[H]` to mount the layout component on Content.
-- For a visible Photoshop-authored scrollbar, add a direct child group named in English with `[SCROLLBAR_V]` or `[SCROLLBAR_H]`. Its direct image children must carry `[TRACK]` and `[HANDLE]`. The parent `[SCROLL_*]` group must also contain the content it controls. If it contains only the scrollbar, v2.13.3 emits `SCROLL_NO_CONTENT` and preserves the Photoshop geometry as ordinary visuals instead of creating a disconnected ScrollRect.
+- For a visible Photoshop-authored scrollbar, add a group named in English with `[SCROLLBAR_V]` or `[SCROLLBAR_H]`; its direct image children must carry `[TRACK]` and `[HANDLE]`. A direct child of the matching `[SCROLL_*]` group is the explicit, preferred structure. Since v2.13.4, an externally positioned scrollbar is also linked when the Prefab contains exactly one compatible unbound ScrollRect; ambiguous multi-scroll layouts emit `SCROLLBAR_ORPHAN_UNRESOLVED` instead of guessing. Linking preserves the Photoshop-authored initial Content position before the native Scrollbar becomes draggable.
 - Vertical and horizontal layout groups preserve negative spacing from Photoshop, so intentionally overlapping rows or columns keep their authored positions in Unity.
 - If tagged `[V]`/`[H]` children do not share the cross-axis center required by Unity's fixed LayoutGroup alignment, the exporter emits `LAYOUT_CROSS_AXIS_DEGRADED` and keeps absolute Photoshop coordinates instead of silently moving the UI. Since v2.13.3 this check also rejects half-pixel drift.
 - For pixel-identical review at the Photoshop reference resolution, leave the experimental responsive-anchor option disabled. It intentionally changes nested coordinate spaces and is not the fixed-resolution fidelity mode.
