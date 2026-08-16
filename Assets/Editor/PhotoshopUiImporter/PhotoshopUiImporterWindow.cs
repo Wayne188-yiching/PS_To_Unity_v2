@@ -59,7 +59,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.13.0";
+        private const string ToolVersion = "2.13.1";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -955,7 +955,9 @@ namespace PhotoshopToUnity.EditorImporter
 
             EditorUtility.DisplayProgressBar("生成 Prefab", "生成 Prefab 節點...", 0.75f);
             EditorUtility.DisplayProgressBar("Generate Prefab", "Create and pack SpriteAtlas...", 0.65f);
-            CreateOrUpdateSpriteAtlas(ResolveSpriteAtlasFolder(importFolder));
+            // importResult.sprites 的值已由 DedupSpritesByPixelContent 收斂成 canonical Sprite，
+            // 因此圖集只會收到真正被引用的圖，像素重複的別名 PNG 留在磁碟但不進包。
+            CreateOrUpdateSpriteAtlas(ResolveSpriteAtlasFolder(importFolder), importResult.sprites.Values);
 
             var skinResolver = new SkinResolver(skinMap, importResult.sprites);
             var generatedMaterialFolder = string.IsNullOrWhiteSpace(projectFolder)
@@ -1102,7 +1104,19 @@ namespace PhotoshopToUnity.EditorImporter
                 : normalized;
         }
 
-        private static void CreateOrUpdateSpriteAtlas(string atlasFolder)
+        // packSprites = 這次 Generate 實際被引用的 canonical Sprite（像素去重後的結果）。
+        //
+        // 舊版把整個資料夾當 packable，因此 PS Save for Web 對相同像素產生不同 bytes 而躲過
+        // 匯出器 bytes 雜湊去重的那些別名 PNG，雖然 Prefab 的 Sprite 參照已被 Unity 端的
+        // 像素去重收斂到同一張，檔案卻仍留在資料夾內 → 出包時整包被打進圖集。實測一份排行榜
+        // Package：43 張 PNG 只有 26 種不同像素，多出來的 17 張佔 258 KB 全部進了圖集。
+        // 改成只丟明確的 Sprite 清單，圖集就只含真正被引用的圖。
+        //
+        // packSprites 為 null（「建立專案資料夾」的鷹架路徑）時不動 packable 清單，
+        // 只更新 importer 設定 —— 鷹架不該清掉既有專案已經設定好的內容。
+        private static void CreateOrUpdateSpriteAtlas(
+            string atlasFolder,
+            System.Collections.Generic.ICollection<Sprite> packSprites = null)
         {
             atlasFolder = PathUtility.NormalizeAssetKey(atlasFolder).TrimEnd('/');
             EnsureAssetFolder(atlasFolder);
@@ -1153,12 +1167,25 @@ namespace PhotoshopToUnity.EditorImporter
             atlasImporter.SetPlatformSettings(CreateAtlasPlatformSettings("iPhone", maxTextureSize));
             atlasImporter.SaveAndReimport();
 
-            atlas = new SpriteAtlasAsset();
-            var folderObject = AssetDatabase.LoadAssetAtPath<Object>(atlasFolder);
-            if (folderObject != null)
-                atlas.Add(new[] { folderObject });
-            SpriteAtlasAsset.Save(atlas, atlasPath);
-            AssetDatabase.ImportAsset(atlasPath, ImportAssetOptions.ForceUpdate);
+            if (packSprites != null)
+            {
+                // 同一顆 canonical Sprite 會被多個 imagePath 指到（像素去重的結果），必須先去重，
+                // 否則同一張圖會被重複加入 packable 清單。
+                var seen = new System.Collections.Generic.HashSet<int>();
+                var packables = new System.Collections.Generic.List<Object>();
+                foreach (var sprite in packSprites)
+                {
+                    if (sprite == null || !seen.Add(sprite.GetInstanceID()))
+                        continue;
+                    packables.Add(sprite);
+                }
+
+                atlas = new SpriteAtlasAsset();
+                if (packables.Count > 0)
+                    atlas.Add(packables.ToArray());
+                SpriteAtlasAsset.Save(atlas, atlasPath);
+                AssetDatabase.ImportAsset(atlasPath, ImportAssetOptions.ForceUpdate);
+            }
 
             var runtimeAtlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
             if (runtimeAtlas != null)
