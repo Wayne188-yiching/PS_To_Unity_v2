@@ -702,6 +702,19 @@ SettingPage_layout Missing Prefab 與本工具無關，不要在未確認需求�
       <p><strong>v2.11.1 複驗證據：</strong>Photoshop 6 份 JSON 全數符合方向／尺寸／Grid constraint，row mask PNG=400×100；Unity MCP 斷言回傳 <code>PASS | group=350/580 | prescrolled=350/580/y=120 | reskin=sens25,viewport:row_01,content:row_01,visual:row_02,replaced:1</code>，Console error=0。</p>
     </div>
 
+    <h4 id="phase4-5-layout-regression-20260817">2026-08-17 排行榜 H/V Layout 跑版回歸（v2.13.2）</h4>
+    <div class="panel">
+      <p><strong>結論：根因已查明並修復，Photoshop + Unity MCP 複驗通過。</strong>先同步 GitHub 最新 <code>main</code>（<code>5d6d4b7</code>，v2.13.1），再以使用者目前開啟的真實排行榜 PSD 與 Unity <code>Rank_layout.prefab</code> 做雙端座標對照。</p>
+      <table>
+        <tr><th>查證項目</th><th>實測結果</th></tr>
+        <tr><td>排除畫布／根節點問題</td><td>PS 文件與 Unity Prefab root 均為 2340×1080；主面板 <code>oceanfish_rank</code> 1469×856、<code>blue_board</code> 1425×747，核心幾何一致。</td></tr>
+        <tr><td>根因</td><td><code>[V]Option</code> 內子項水平中心不一致（差 64.5px），但 Unity <code>VerticalLayoutGroup</code> 固定 <code>UpperCenter</code>，重排後把文字推入 409px 形狀 Mask 的裁切邊界；不是 Scene 縮放或舊 Prefab override。</td></tr>
+        <tr><td>修正</td><td>linear H/V Layout 輸出前驗證交叉軸中心；無法無位移表示時輸出 <code>LAYOUT_CROSS_AXIS_DEGRADED</code> 並保留 PS 絕對座標。規則整齊群組仍生成 LayoutGroup。</td></tr>
+        <tr><td>Photoshop 複驗</td><td>真實 PSD 重匯完成：43 images、40 TMP、28 groups；外層 <code>option</code>/<code>select01</code> 正確降級，內層 <code>not_selectedXX</code> 仍為 vertical layout。</td></tr>
+        <tr><td>Unity MCP 複驗</td><td>隔離 Prefab 中 <code>tmp_optiontitle02</code> 回到 PS X=496、Y=343、205×46；錯誤的外層 VerticalLayoutGroup／ContentSizeFitter 不再存在，內層 LayoutGroup 保留。</td></tr>
+      </table>
+    </div>
+
     <details class="handoff">
       <summary>Phase 4.5 交接提示詞（實作用）</summary>
 <pre>你正在協助 PS_To_Unity_v2 專案實作 Phase 4.5（ScrollRect 完整套件，v2.11.0）。倉庫在
@@ -1011,7 +1024,7 @@ commit → push → 交由使用者/Codex 在 Unity 專案實機驗收。</pre>
   </div>
 
   <footer>
-    PS → Unity UI Tool 優化計畫 · 起始基準 v2.4.2（2026-06-11）· 目前已推進至 v2.10.1（Phase 4 完成／已驗收）<br>
+    PS → Unity UI Tool 優化計畫 · 起始基準 v2.4.2（2026-06-11）· 目前已推進至 v2.13.2（排行榜 H/V Layout 跑版修復／已複驗）<br>
     最後更新：2026-07-14 · 配合文件：GUIDE_zh.html、README_zh.md · <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" style="color:var(--accent)">GitHub</a>
   </footer>
 

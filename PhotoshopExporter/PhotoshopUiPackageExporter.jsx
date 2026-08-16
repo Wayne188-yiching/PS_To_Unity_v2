@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.13.1";
+var SCRIPT_VERSION = "2.13.2";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 // OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。
@@ -208,6 +208,7 @@ function buildNamingHelpText() {
         + "── 群組標籤（自動掛 Unity Component）──\n"
         + "[H] / [HLAYOUT]         Horizontal Layout Group\n"
         + "[V] / [VLAYOUT]         Vertical Layout Group\n"
+        + "                        子項交叉軸中心不一致時，為避免 Unity 重排跑版會降級為普通群組並保留 PS 座標\n"
         + "[GRID] / [GLAYOUT]      Grid Layout Group（子圖層寬高差 >20% 自動降級成普通群組並警告）\n"
         + "[CG] / [CANVASGROUP]    Canvas Group（Prefab 根節點免標籤、一律自動掛）\n"
         + "[MERGE]                  群組可見內容合成單張 PNG（文字／效果／遮色片一併烘入；優先於排版與 Scroll 標籤）\n"
@@ -1805,6 +1806,19 @@ function applyLayoutGroupMetadata(node, group, children, bounds, context) {
         return;
     }
 
+    // Unity's linear LayoutGroup controls the cross axis as well as the main axis
+    // (VerticalLayoutGroup = UpperCenter, HorizontalLayoutGroup = MiddleLeft).
+    // If the PSD children do not share that same cross-axis center, generating the
+    // component would move them and can push text underneath a parent mask. Keep
+    // the exported absolute positions instead; fidelity is safer than a misleading
+    // LayoutGroup that cannot represent the source geometry.
+    if (!canRepresentLinearLayoutWithoutCrossAxisDrift(layoutType, children, bounds)) {
+        pushWarning(context, displayName, "LAYOUT_CROSS_AXIS_DEGRADED",
+            "[" + (layoutType === "vertical" ? "V" : "H") + "] 子節點在交叉軸沒有共用中心，" +
+            "Unity LayoutGroup 會改動 Photoshop 座標；已降級為普通群組並保留原始排版。");
+        return;
+    }
+
     var padding = calcLayoutPadding(bounds, children);
     node.layoutType = layoutType;
     node.layoutSpacing = calcLayoutSpacing(layoutType, children);
@@ -1817,6 +1831,29 @@ function applyLayoutGroupMetadata(node, group, children, bounds, context) {
     // H/V Layout Group uses sibling index as layout order. PS layer order is depth order,
     // so sort by visual position instead of reusing the bottom-to-top drawing order.
     node.children = sortLinearLayoutChildren(children, layoutType);
+}
+
+function canRepresentLinearLayoutWithoutCrossAxisDrift(layoutType, children, bounds) {
+    var items = layoutVisibleChildren(children);
+    if (!bounds || items.length === 0) {
+        return true;
+    }
+
+    var expectedCenter = layoutType === "vertical"
+        ? bounds.left + bounds.width * 0.5
+        : bounds.top + bounds.height * 0.5;
+    var tolerance = 1;
+
+    for (var i = 0; i < items.length; i++) {
+        var itemCenter = layoutType === "vertical"
+            ? items[i].x + items[i].width * 0.5
+            : items[i].y + items[i].height * 0.5;
+        if (Math.abs(itemCenter - expectedCenter) > tolerance) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 // Independently implemented on both the main and codex/font-asset-created-state branches

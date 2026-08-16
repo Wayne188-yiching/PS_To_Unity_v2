@@ -1,6 +1,6 @@
 {
-    "version":  "2.13.1",
-    "phase":  "SpriteAtlas packs only referenced sprites (pixel-duplicate aliases excluded)",
+    "version":  "2.13.2",
+    "phase":  "Linear layout cross-axis fidelity guard",
     "updated":  "2026-08-17",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [

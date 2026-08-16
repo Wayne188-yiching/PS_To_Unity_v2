@@ -523,7 +523,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.13.1</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.13.2</span></h1>
     <p class="lead">在 Photoshop 排好的遊戲介面，一鍵搬進 Unity。圖自動切好、文字還能繼續改、位置自動對齊。</p>
   </header>
 
@@ -1108,7 +1108,7 @@ TXT_score_[THICK:2]</code></pre>
   <p>預設所有字型都會輸出成可編輯文字。只有這三種情況會變圖片：圖層名稱含 <code>[PNG]</code> / <code>TXTIMG_</code> 等標記、你在匯出前選取了該文字圖層並勾了對應選項、或你勾了「白名單外字型改為 PNG」。多字型的 PSD 請在 Unity 用 <code>TmpFontMap</code> 把 <code>fontToken</code> 對應到正確字型。</p>
 
   <h3>怎麼讓群組自動排列？<span class="tag tag-new">v2.10.1</span></h3>
-  <p>在群組名稱加 <code>[H]</code>、<code>[V]</code> 或 <code>[GRID]</code>。v2.10.1 起不再依子層位置自動猜測，避免沒標記的設計稿群組被重排。</p>
+  <p>在群組名稱加 <code>[H]</code>、<code>[V]</code> 或 <code>[GRID]</code>。v2.10.1 起不再依子層位置自動猜測。v2.13.2 起，若 H/V 子項的交叉軸中心不一致、Unity 固定對齊必然改動 PS 座標，匯出器會輸出 <code>LAYOUT_CROSS_AXIS_DEGRADED</code> 並降級為普通群組，優先保留設計稿排版。</p>
 
   <!-- ══════════════════════════════════════════════════════════════ -->
   <h2 id="changelog">版本紀錄</h2>
@@ -1116,6 +1116,13 @@ TXT_score_[THICK:2]</code></pre>
   <details>
     <summary>展開完整版本紀錄<span class="hint">每個版本改了什麼，想追來龍去脈再看</span></summary>
     <div class="details-body">
+<h3>v2.13.2（2026-08-17）— H/V Layout 交叉軸防跑版</h3>
+  <ul>
+    <li><strong>根因</strong>：Unity <code>VerticalLayoutGroup</code>／<code>HorizontalLayoutGroup</code> 會同時控制主軸與交叉軸；排行榜 PSD 的 <code>[V]Option</code> 子項水平中心相差 64.5px，Unity 以固定 <code>UpperCenter</code> 重排後把文字推進形狀 Mask 邊界，造成截字與 PS／Unity 排版不一致。</li>
+    <li><strong>修正</strong>：Exporter 在輸出 linear LayoutGroup 前驗證所有可見子項是否符合 Unity 固定交叉軸中心；不符合時輸出 <code>LAYOUT_CROSS_AXIS_DEGRADED</code>，保留絕對 PS 座標。規則整齊的內層 <code>[V]Not_selectedXX</code> 仍正常生成 LayoutGroup。</li>
+    <li><strong>實機複驗</strong>：Photoshop 2026 重新匯出真實排行榜（2340×1080、43 images、40 TMP）；Unity 2022.3.62f1 MCP 生成隔離 Prefab，<code>tmp_optiontitle02</code> 回到 PS 的 X=496、Y=343、205×46，外層錯誤 LayoutGroup／CSF 消失。</li>
+  </ul>
+
 <h3>v2.13.1（2026-08-17）— SpriteAtlas 只收錄實際引用的圖</h3>
   <ul>
     <li><strong>問題</strong>：PS 的 Save for Web 對相同像素會產生不同 bytes（連檔案大小都不同），因此匯出器那層以「檔案大小 + 尺寸」預篩、再比對 PNG bytes 雜湊的去重<strong>常常完全抓不到</strong>——候選在預篩階段就被排除，連雜湊都沒算。</li>
@@ -1410,7 +1417,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.13.1 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.13.2 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

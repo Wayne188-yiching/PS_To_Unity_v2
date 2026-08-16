@@ -2,7 +2,7 @@
 
 將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。
 
-**目前版本：v2.13.1**
+**目前版本：v2.13.2**
 
 > PNG 像素去重會先依檔案大小與圖片尺寸篩選候選者；只有可能重複的圖片才會讀取完整檔案計算雜湊，而且每個候選檔案最多只計算一次。這項最佳化不會改動版面 JSON、PNG 像素或 Unity 圖片引用結果。
 
@@ -44,6 +44,8 @@
 >
 > 群組標 `[SCROLL_V]` / `[SCROLL_H]` 會在 Unity 自動組出 ScrollView > Viewport > Content 三層（ScrollRect + RectMask2D）。群組內圖層的遮色片視為「runtime 裁切預覽」——子圖層一律匯出完整圖；群組自身的遮色片（若有）定義可視窗範圍。可與 `[GRID]`/`[V]`/`[H]` 組合，排版元件會掛在 Content 上。
 > 捲動群組可再加 `[SOFTMASK_BOTTOM=64]`，Unity 會用雙層原生 `RectMask2D` 只柔化底邊 64 像素，不需要額外 runtime 套件；`[SOFTMASK_Y=64]` 保留為相容別名。
+>
+> `[V]`／`[H]` 只有在 Unity 固定對齊方式能原樣重現 PS 交叉軸位置時才會生成 LayoutGroup；子項中心不一致時會輸出 `LAYOUT_CROSS_AXIS_DEGRADED`，改保留 PS 絕對座標，避免文字被重排進 Mask 後裁切。
 
 > 圖片圖層可加 `[SLICED=32]` 使用四邊相同的九宮格，或 `[SLICED=左,上,右,下]` 分別指定 Border。Unity 會自動寫入 Sprite Border 並把生成的 Image 設為 `Sliced`；未加標記時，既有 Sprite Editor 手動 Border 仍會保留並自動使用 `Sliced`。
 

@@ -6,7 +6,7 @@ It exports a Photoshop UI as a UI Package, then rebuilds the layout in Unity as 
 
 ## Version
 
-v2.13.1
+v2.13.2
 
 ## Main Workflow
 
@@ -59,6 +59,7 @@ Unity Atlas output:
 - Tag a group `[SCROLL_V]` / `[SCROLL_H]` to auto-build a full ScrollView > Viewport > Content hierarchy in Unity (ScrollRect + RectMask2D). Layer masks inside the group are treated as the runtime-clipping preview: children export as full images, and the group's own mask (if any) defines the viewport window. Combine with `[GRID]`/`[V]`/`[H]` to mount the layout component on Content.
 - For a visible Photoshop-authored scrollbar, add a direct child group named in English with `[SCROLLBAR_V]` or `[SCROLLBAR_H]`. Its direct image children must carry `[TRACK]` and `[HANDLE]`. Unity creates a `Scrollbar`, preserves the Photoshop padding through a generated `SlidingArea`, and binds it to the parent `ScrollRect`.
 - Vertical and horizontal layout groups preserve negative spacing from Photoshop, so intentionally overlapping rows or columns keep their authored positions in Unity.
+- If tagged `[V]`/`[H]` children do not share the cross-axis center required by Unity's fixed LayoutGroup alignment, the exporter emits `LAYOUT_CROSS_AXIS_DEGRADED` and keeps absolute Photoshop coordinates instead of silently moving the UI.
 - Add `[SOFTMASK_BOTTOM=64]` to a scroll group when the viewport should feather only its bottom edge by 64 pixels. Unity builds the effect from nested native `RectMask2D` components; no extra runtime package is required. `[SOFTMASK_Y=64]` remains an accepted alias.
 - Tag a direct child layer of a group with `[MASK]` to use its shape as a clipping mask for the whole group. Unity mounts `Image` + `Mask` (`showMaskGraphic` off, so the shape itself is not drawn) on the group and sizes the group to the mask layer's bounds; the mask layer produces no node of its own. Use it only for non-rectangular shapes — a plain rectangular Photoshop layer mask already becomes a cheaper `RectMask2D` automatically, and `Mask` costs two extra draw calls per level. Not supported on `[SCROLL_*]` groups, which build their own viewport mask.
 - Tag an image layer `[SLICED=32]` for a uniform nine-slice border, or `[SLICED=left,top,right,bottom]` for explicit borders. Unity writes the Sprite Editor border and sets the generated `Image` to `Sliced`. Existing manual Sprite Editor borders are preserved when the tag is absent.
