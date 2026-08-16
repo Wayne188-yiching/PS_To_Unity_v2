@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.13.2";
+var SCRIPT_VERSION = "2.13.3";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 // OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。
@@ -1010,6 +1010,22 @@ function createGroupNode(layerSet, children, context, parentBounds, bounds) {
         }
         node.children = contentChildren;
     }
+
+    // A ScrollRect cannot control content outside its own Photoshop group. A group
+    // containing only [SCROLLBAR_*] is therefore a visual scrollbar, not a complete
+    // scroll view. Degrade it before Unity creates synthetic Viewport / Content
+    // objects that would take over the authored handle geometry.
+    if (isScrollNode && contentChildren.length === 0 && scrollbarChildren.length > 0) {
+        node.children = children;
+        pushWarning(context, node.name, "SCROLL_NO_CONTENT",
+            "[SCROLL] 群組只有 Scrollbar、沒有可捲動內容；Unity 無法推斷要控制的外部清單，" +
+            "已降級為普通群組並保留 Photoshop 座標。請把內容與 [SCROLLBAR_*] 放在同一個 [SCROLL_*] 群組，或移除 [SCROLL_*]。");
+        applyCanvasGroupMetadata(node, layerSet);
+        node._parentBounds = parentBounds;
+        node._rawName = layerSet.name;
+        return node;
+    }
+
     var scrollContentBounds = applyScrollMetadata(node, layerSet, contentChildren, bounds, context);
     // 遮罩圖層不是排版項目（Unity 端不會生成它），排除後再算 spacing / padding / grid 參數。
     var layoutChildren = contentChildren;
@@ -1842,7 +1858,9 @@ function canRepresentLinearLayoutWithoutCrossAxisDrift(layoutType, children, bou
     var expectedCenter = layoutType === "vertical"
         ? bounds.left + bounds.width * 0.5
         : bounds.top + bounds.height * 0.5;
-    var tolerance = 1;
+    // LayoutGroup alignment is allowed only when it can reproduce the Photoshop
+    // centers exactly. Even a half-pixel mismatch is visible on compact TMP rows.
+    var tolerance = 0.01;
 
     for (var i = 0; i < items.length; i++) {
         var itemCenter = layoutType === "vertical"

@@ -2,11 +2,11 @@
 
 將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。
 
-**目前版本：v2.13.2**
+**目前版本：v2.13.3**
 
 > PNG 像素去重會先依檔案大小與圖片尺寸篩選候選者；只有可能重複的圖片才會讀取完整檔案計算雜湊，而且每個候選檔案最多只計算一次。這項最佳化不會改動版面 JSON、PNG 像素或 Unity 圖片引用結果。
 
-> 可見滑軌自動化：在 `[SCROLL_V]` / `[SCROLL_H]` 群組下加入直接子群組 `[SCROLLBAR_V]` / `[SCROLLBAR_H]`，其直接圖片子圖層以英文命名並分別加上 `[TRACK]`、`[HANDLE]`。Unity 會自動建立 `Scrollbar`、保留 PS 內距的 `SlidingArea`，並接回父層 `ScrollRect`。
+> 可見滑軌自動化：在 `[SCROLL_V]` / `[SCROLL_H]` 群組下加入直接子群組 `[SCROLLBAR_V]` / `[SCROLLBAR_H]`，其直接圖片子圖層以英文命名並分別加上 `[TRACK]`、`[HANDLE]`；父層同時必須包含它要控制的內容。若群組只有滑軌、內容在外部，v2.13.3 會輸出 `SCROLL_NO_CONTENT` 並降級為普通圖像，避免生成無法接線又會改動 Handle 版面的 ScrollRect。
 
 > 詞庫式圖層命名：`PhotoshopLayerAutoNamer.jsx` 改用 `PhotoshopExporter/naming_glossary.tsv`（納入版控的中英對照表）做最長匹配翻譯，推不出來的圖層**維持原名不動**並把未知詞寫進 `naming_glossary_todo.tsv`，補完再跑一次即可。編號規則為「同父群組 + 同譯名 = 同族變體」，產出如 `ranking_ui_frame01`、`ranking_ui_frame01_1`。
 
@@ -45,7 +45,9 @@
 > 群組標 `[SCROLL_V]` / `[SCROLL_H]` 會在 Unity 自動組出 ScrollView > Viewport > Content 三層（ScrollRect + RectMask2D）。群組內圖層的遮色片視為「runtime 裁切預覽」——子圖層一律匯出完整圖；群組自身的遮色片（若有）定義可視窗範圍。可與 `[GRID]`/`[V]`/`[H]` 組合，排版元件會掛在 Content 上。
 > 捲動群組可再加 `[SOFTMASK_BOTTOM=64]`，Unity 會用雙層原生 `RectMask2D` 只柔化底邊 64 像素，不需要額外 runtime 套件；`[SOFTMASK_Y=64]` 保留為相容別名。
 >
-> `[V]`／`[H]` 只有在 Unity 固定對齊方式能原樣重現 PS 交叉軸位置時才會生成 LayoutGroup；子項中心不一致時會輸出 `LAYOUT_CROSS_AXIS_DEGRADED`，改保留 PS 絕對座標，避免文字被重排進 Mask 後裁切。
+> `[V]`／`[H]` 只有在 Unity 固定對齊方式能原樣重現 PS 交叉軸位置時才會生成 LayoutGroup；子項中心不一致時會輸出 `LAYOUT_CROSS_AXIS_DEGRADED`，改保留 PS 絕對座標，避免文字被重排進 Mask 後裁切。v2.13.3 起連 0.5px 的交叉軸偏移也會保護性降級。
+>
+> 要在 PS 參考解析度做逐像素驗收時，請關閉 Unity Importer 的「啟用響應式 anchor（實驗性）」；該模式會改寫巢狀座標空間，不是固定解析度的原位重建模式。
 
 > 圖片圖層可加 `[SLICED=32]` 使用四邊相同的九宮格，或 `[SLICED=左,上,右,下]` 分別指定 Border。Unity 會自動寫入 Sprite Border 並把生成的 Image 設為 `Sliced`；未加標記時，既有 Sprite Editor 手動 Border 仍會保留並自動使用 `Sliced`。
 

@@ -715,6 +715,19 @@ SettingPage_layout Missing Prefab 與本工具無關，不要在未確認需求�
       </table>
     </div>
 
+    <h4 id="phase4-5-exact-layout-regression-20260817">2026-08-17 PS 功能標籤／響應式 Anchor 追加回歸（v2.13.3）</h4>
+    <div class="panel">
+      <p><strong>結論：固定 2340×1080 參考解析度下，83 個可見 image/TMP 葉節點已達 83/83、位置與尺寸最大誤差 0px。</strong>本輪直接連線目前開啟的 Photoshop 排行榜 PSD 與 Unity 2022.3.62f1，釐清剩餘差異不是單一原因。</p>
+      <table>
+        <tr><th>查證項目</th><th>根因／處理</th><th>複驗證據</th></tr>
+        <tr><td>實驗性 responsive anchor</td><td>開啟時會改寫巢狀 group 座標空間；固定解析度驗收應關閉。</td><td><code>tmp_optiontitle02</code> 開啟時相對 JSON 偏 X=-102.5、Y=-19.5px；關閉後 X/Y/W/H 誤差皆 0。</td></tr>
+        <tr><td><code>[V]</code> 排版標籤</td><td><code>not_selected01~03</code> 的文字中心只差 0.5px，舊版 1px 容差誤判可生成 LayoutGroup；v2.13.3 改為 0.01px，保護性降級。</td><td>三個原本各偏 0.5px 的 TMP 重新生成後全部回到 PS 絕對座標。</td></tr>
+        <tr><td><code>[SCROLL_V]</code>／<code>[SCROLLBAR_V]</code></td><td>PSD 的 Bar 群組只有 Scrollbar，實際排行榜內容在外部，Unity 不可能自動推斷連線。新增 <code>SCROLL_NO_CONTENT</code> 並降級為普通群組，保留 Track／Handle。</td><td>Prefab 的 Bar 不再生成錯接的 ScrollRect／Scrollbar；滑軌 image 節點與 JSON 座標一致。</td></tr>
+        <tr><td>TMP 描邊</td><td><code>tmp_number_006</code> 的 4px 描邊超出 MiSans Padding=9 上限；保留舊資產，新增 Dynamic <code>MiSans-Semibold SDF P10</code>（90pt、2048²、Padding=10）與材質並更新映射。</td><td><code>OutlineOverflow</code> 已消失；Prefab 使用 P10 Font Asset 與專屬 outline 材質。</td></tr>
+      </table>
+      <p>Console 剩餘 <code>LAYOUT_CROSS_AXIS_DEGRADED</code>／<code>SCROLL_NO_CONTENT</code> 都是「為保留 PS 座標而拒絕掛錯元件」的保護性警告，不代表 Prefab 座標仍有誤差。若要真正可捲動，PSD 必須把內容與 <code>[SCROLLBAR_*]</code> 放在同一個 <code>[SCROLL_*]</code> 群組。</p>
+    </div>
+
     <details class="handoff">
       <summary>Phase 4.5 交接提示詞（實作用）</summary>
 <pre>你正在協助 PS_To_Unity_v2 專案實作 Phase 4.5（ScrollRect 完整套件，v2.11.0）。倉庫在
@@ -1024,7 +1037,7 @@ commit → push → 交由使用者/Codex 在 Unity 專案實機驗收。</pre>
   </div>
 
   <footer>
-    PS → Unity UI Tool 優化計畫 · 起始基準 v2.4.2（2026-06-11）· 目前已推進至 v2.13.2（排行榜 H/V Layout 跑版修復／已複驗）<br>
+    PS → Unity UI Tool 優化計畫 · 起始基準 v2.4.2（2026-06-11）· 目前已推進至 v2.13.3（固定解析度 0px 座標誤差／滑軌防誤接／已複驗）<br>
     最後更新：2026-07-14 · 配合文件：GUIDE_zh.html、README_zh.md · <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" style="color:var(--accent)">GitHub</a>
   </footer>
 
