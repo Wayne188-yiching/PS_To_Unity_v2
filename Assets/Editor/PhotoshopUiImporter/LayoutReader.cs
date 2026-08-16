@@ -9,7 +9,7 @@ namespace PhotoshopToUnity.EditorImporter
     {
         // 這個 Unity backend 認得的 JSON schema 最高版本。
         // 讀到 major.minor 比這個大的 JSON → 加 warning 提示更新 Unity 工具（OPTIMIZATION_PLAN_zh.html#phase4-decisions Q9-c）。
-        private const string HighestSupportedSchemaVersion = "2.10";
+        private const string HighestSupportedSchemaVersion = "2.11";
 
         private static readonly HashSet<string> SupportedTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -193,6 +193,10 @@ namespace PhotoshopToUnity.EditorImporter
                 contentWidth = GetFloat(source, "contentWidth"),
                 contentHeight = GetFloat(source, "contentHeight"),
                 scrollSoftnessY = GetFloat(source, "scrollSoftnessY"),
+                scrollbarDirection = GetString(source, "scrollbarDirection"),
+                scrollbarRole = GetString(source, "scrollbarRole"),
+                maskMode = GetString(source, "maskMode"),
+                maskRole = GetString(source, "maskRole"),
                 children = ParseNodes(GetArray(source, "children"))
             };
         }

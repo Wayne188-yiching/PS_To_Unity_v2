@@ -94,9 +94,23 @@ namespace PhotoshopToUnity.EditorImporter
         public float contentWidth;
         public float contentHeight;
         public float scrollSoftnessY;
+        public string scrollbarDirection; // "vertical" | "horizontal" | ""
+        public string scrollbarRole;      // "track" | "handle" | ""
+        // schema 2.11 形狀遮罩（PS [MASK] 標籤）：
+        // maskMode = "sprite" 掛在群組上 → Unity 掛 Image + Mask（showMaskGraphic = false，純裁切）。
+        // maskRole = "mask" 掛在被收編的遮罩圖層上 → 該節點不生成，只取它的 sprite 給父群組。
+        public string maskMode;           // "sprite" | ""
+        public string maskRole;           // "mask" | ""
         public List<PhotoshopUiNode> children = new List<PhotoshopUiNode>();
 
         public bool HasScrollRect => !string.IsNullOrWhiteSpace(scrollDirection);
+        public bool HasScrollbar => !string.IsNullOrWhiteSpace(scrollbarDirection);
+
+        public bool HasSpriteMask =>
+            string.Equals(maskMode, "sprite", StringComparison.OrdinalIgnoreCase);
+
+        public bool IsMaskShape =>
+            string.Equals(maskRole, "mask", StringComparison.OrdinalIgnoreCase);
 
         public bool RequestsSlicedImage =>
             string.Equals(imageType, "sliced", StringComparison.OrdinalIgnoreCase);

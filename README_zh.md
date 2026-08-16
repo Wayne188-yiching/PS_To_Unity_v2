@@ -2,9 +2,15 @@
 
 將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。
 
-**目前版本：v2.12.12**
+**目前版本：v2.13.0**
 
 > PNG 像素去重會先依檔案大小與圖片尺寸篩選候選者；只有可能重複的圖片才會讀取完整檔案計算雜湊，而且每個候選檔案最多只計算一次。這項最佳化不會改動版面 JSON、PNG 像素或 Unity 圖片引用結果。
+
+> 可見滑軌自動化：在 `[SCROLL_V]` / `[SCROLL_H]` 群組下加入直接子群組 `[SCROLLBAR_V]` / `[SCROLLBAR_H]`，其直接圖片子圖層以英文命名並分別加上 `[TRACK]`、`[HANDLE]`。Unity 會自動建立 `Scrollbar`、保留 PS 內距的 `SlidingArea`，並接回父層 `ScrollRect`。
+
+> 詞庫式圖層命名：`PhotoshopLayerAutoNamer.jsx` 改用 `PhotoshopExporter/naming_glossary.tsv`（納入版控的中英對照表）做最長匹配翻譯，推不出來的圖層**維持原名不動**並把未知詞寫進 `naming_glossary_todo.tsv`，補完再跑一次即可。編號規則為「同父群組 + 同譯名 = 同族變體」，產出如 `ranking_ui_frame01`、`ranking_ui_frame01_1`。
+
+> 形狀遮罩：群組的直接子圖層加 `[MASK]`，該層形狀成為整個群組的裁切遮罩（Unity 掛 `Image` + `Mask`，`showMaskGraphic` 關閉），遮罩層本身不生成節點。僅非矩形（圓角／圓形／不規則）才需要——純矩形的 PS 圖層遮罩會自動掛更省的 `RectMask2D`。
 
 ---
 
@@ -22,7 +28,7 @@
 
 ## 主流程
 
-1. 在 Photoshop 整理 UI PSD，圖層使用英文命名（需要時執行 `PhotoshopLayerAutoNamer.jsx`）。
+1. 在 Photoshop 整理 UI PSD，圖層使用英文命名。中文命名的 PSD **必須**先執行 `PhotoshopLayerAutoNamer.jsx`：匯出器會刪掉圖層名裡所有非 ASCII 字元，沒轉換的中文名會塌成 `layer.png` / `layer_002.png`，語意完全遺失。
 2. 執行 `PhotoshopUiPackageExporter.jsx`，指定 PNG 輸出資料夾與 Layout JSON 路徑，點 Export。
 3. 在 Unity 開啟 `Tools > Photoshop UI Importer > Importer_v2`。
 4. 選擇 Package 資料夾，點「套用 Package」。

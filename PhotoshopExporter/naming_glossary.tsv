@@ -1,0 +1,138 @@
+# PS To Unity v2 - Layer Auto Namer glossary
+# Format: <source term><TAB><english term>
+# - One pair per line. Lines starting with # are comments.
+# - Matching is longest-term-first, so 排行榜 wins over 排行 automatically.
+#   You do NOT need to sort this file; the script sorts by length at load time.
+# - Keep the English side lowercase, ASCII, and underscore-free where possible;
+#   the script joins matched terms with "_".
+# - Unknown terms are collected into naming_glossary_todo.tsv on each run.
+#   Fill in the blank column there and paste the lines back into this file.
+
+# ── structure / containers ──────────────────────────────────────────
+背景	background
+底圖	background
+底框	frame
+外框	frame
+邊框	frame
+框	frame
+面板	panel
+視窗	window
+彈窗	popup
+對話框	dialog
+介面	ui
+群組	group
+資料夾	folder
+圖層	layer
+清單	list
+列表	list
+卡片	card
+頁籤	tab
+分頁	tab
+
+# ── controls ────────────────────────────────────────────────────────
+按鈕	btn
+按键	btn
+關閉	close
+確定	confirm
+取消	cancel
+返回	back
+下一步	next
+上一步	prev
+滑軌	scrollbar
+捲軸	scrollbar
+滑塊	handle
+軌道	track
+進度條	progress
+血條	hpbar
+輸入框	input
+勾選	check
+開關	toggle
+
+# ── text ────────────────────────────────────────────────────────────
+標題	title
+副標	subtitle
+標籤	label
+說明	desc
+描述	desc
+文字	text
+數字	num
+數量	count
+
+# ── common game UI nouns ────────────────────────────────────────────
+圖示	icon
+圖標	icon
+頭像	avatar
+排行榜	ranking
+排行	ranking
+排名	rank
+名次	rank
+第一名	rank1
+第二名	rank2
+第三名	rank3
+金幣	coin
+鑽石	diamond
+寶石	gem
+寶珠	gem
+道具	item
+獎勵	reward
+獲得	get
+角色	role
+等級	level
+經驗	exp
+時間	time
+設定	setting
+商店	shop
+背包	bag
+任務	quest
+公告	notice
+郵件	mail
+好友	friend
+
+# ── decoration / effects ────────────────────────────────────────────
+遮罩	mask
+分隔	divider
+線	line
+光	glow
+光效	glow
+光暈	glow
+陰影	shadow
+箭頭	arrow
+星星	star
+鎖	lock
+紅點	reddot
+特效	vfx
+動畫	anim
+底紋	pattern
+
+# ── states ──────────────────────────────────────────────────────────
+選中	selected
+未選	normal
+一般	normal
+禁用	disabled
+按下	pressed
+高亮	highlight
+鎖定	locked
+
+# ── colors ──────────────────────────────────────────────────────────
+金色	gold
+銀色	silver
+銅色	bronze
+紅色	red
+藍色	blue
+綠色	green
+黃色	yellow
+紫色	purple
+橘色	orange
+白色	white
+黑色	black
+
+# ── position / size ─────────────────────────────────────────────────
+上	top
+下	bottom
+左	left
+右	right
+中	center
+大	big
+小	small
+新	new
+舊	old
