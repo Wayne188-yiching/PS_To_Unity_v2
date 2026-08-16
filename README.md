@@ -6,7 +6,7 @@ It exports a Photoshop UI as a UI Package, then rebuilds the layout in Unity as 
 
 ## Version
 
-v2.13.0
+v2.13.1
 
 ## Main Workflow
 
@@ -62,7 +62,8 @@ Unity Atlas output:
 - Add `[SOFTMASK_BOTTOM=64]` to a scroll group when the viewport should feather only its bottom edge by 64 pixels. Unity builds the effect from nested native `RectMask2D` components; no extra runtime package is required. `[SOFTMASK_Y=64]` remains an accepted alias.
 - Tag a direct child layer of a group with `[MASK]` to use its shape as a clipping mask for the whole group. Unity mounts `Image` + `Mask` (`showMaskGraphic` off, so the shape itself is not drawn) on the group and sizes the group to the mask layer's bounds; the mask layer produces no node of its own. Use it only for non-rectangular shapes — a plain rectangular Photoshop layer mask already becomes a cheaper `RectMask2D` automatically, and `Mask` costs two extra draw calls per level. Not supported on `[SCROLL_*]` groups, which build their own viewport mask.
 - Tag an image layer `[SLICED=32]` for a uniform nine-slice border, or `[SLICED=left,top,right,bottom]` for explicit borders. Unity writes the Sprite Editor border and sets the generated `Image` to `Sliced`. Existing manual Sprite Editor borders are preserved when the tag is absent.
-- Prefab generation automatically creates or updates `Atlas/SpriteAtlas.spriteatlasv2` and packs it once after all TextureImporters are ready. Atlas max size is selected from 2048/4096/8192 according to the largest source image. Pixel-identical Sprite references are packed only once while every exported PNG remains on disk, so the same package can be imported repeatedly.
+- Prefab generation automatically creates or updates `Atlas/SpriteAtlas.spriteatlasv2` and packs it once after all TextureImporters are ready. Atlas max size is selected from 2048/4096/8192 according to the largest source image.
+- Since v2.13.1 the atlas is built from an **explicit list of the Sprites this import actually references**, not from the packable folder. Photoshop's Save for Web produces different bytes for identical pixels, so the exporter's byte-hash dedup misses many duplicates; Unity's pixel dedup catches them and points every `Image` at one canonical Sprite, but the alias PNGs stay on disk so the same layout JSON remains importable. With a folder packable those aliases were still packed into the atlas — one real ranking package shipped 43 PNGs for 26 distinct images, wasting 258 KB. Note the trade-off: a PNG dropped into the atlas folder by hand is no longer picked up automatically, it takes one Generate to enter the atlas.
 
 Batch font replacement (`Tools > Photoshop UI Importer > Font Replacer`):
 

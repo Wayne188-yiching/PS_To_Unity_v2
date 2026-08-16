@@ -2,7 +2,7 @@
 
 將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。
 
-**目前版本：v2.13.0**
+**目前版本：v2.13.1**
 
 > PNG 像素去重會先依檔案大小與圖片尺寸篩選候選者；只有可能重複的圖片才會讀取完整檔案計算雜湊，而且每個候選檔案最多只計算一次。這項最佳化不會改動版面 JSON、PNG 像素或 Unity 圖片引用結果。
 
@@ -47,7 +47,9 @@
 
 > 圖片圖層可加 `[SLICED=32]` 使用四邊相同的九宮格，或 `[SLICED=左,上,右,下]` 分別指定 Border。Unity 會自動寫入 Sprite Border 並把生成的 Image 設為 `Sliced`；未加標記時，既有 Sprite Editor 手動 Border 仍會保留並自動使用 `Sliced`。
 
-> 生成 Prefab 時會自動建立／更新 `Atlas/SpriteAtlas.spriteatlasv2`，所有圖片完成匯入後只打包一次。Atlas 上限會依最大來源圖自動選擇 2048／4096／8192；像素相同的 Sprite 引用只包一次，但所有 PS 匯出 PNG 都會保留，因此同一 Package 可安全重複匯入。
+> 生成 Prefab 時會自動建立／更新 `Atlas/SpriteAtlas.spriteatlasv2`，所有圖片完成匯入後只打包一次。Atlas 上限會依最大來源圖自動選擇 2048／4096／8192。
+>
+> v2.13.1 起圖集改由「這次匯入**實際引用到的 Sprite 清單**」組成，不再掛整個資料夾。PS 的 Save for Web 對相同像素會產生不同 bytes，匯出器的 bytes 雜湊去重因此常抓不到；Unity 端的像素去重會抓到並把所有 `Image` 收斂到同一顆 canonical Sprite，但別名 PNG 會保留在磁碟上，讓同一份 layout JSON 仍可重複匯入。掛資料夾時那些別名仍會被打進圖集——實測一份排行榜 Package：43 張 PNG 只有 26 種不同像素，多出來的 258 KB 全部進了包。**副作用**：手動丟進圖集資料夾的 PNG 不再自動被收錄，要經過一次 Generate 才會進圖集。
 >
 > 「只換字體」需求走 `Tools > Photoshop UI Importer > Font Replacer`：分析 Prefab 的 TMP 字型/材質使用 → 一鍵替換，只寫 `font`/`fontSharedMaterial` 兩欄位，排版/字級/顏色/Sprite 全不動；描邊材質自動克隆到新字型。字型資產工廠可從專案內 .ttf/.otf 一鍵建 Dynamic SDF Font Asset 並自動登記 TmpFontMap；Importer 的「掃描 Package 字型」按鈕會列出每個 fontToken 的資產狀態（已對應／缺 Font Asset 可一鍵建立／缺字型檔）。
 

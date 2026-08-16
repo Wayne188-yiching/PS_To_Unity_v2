@@ -1,7 +1,7 @@
 {
-    "version":  "2.13.0",
-    "phase":  "Scrollbar automation, glossary-driven layer naming, shape masks (layout schema 2.11)",
-    "updated":  "2026-08-16",
+    "version":  "2.13.1",
+    "phase":  "SpriteAtlas packs only referenced sprites (pixel-duplicate aliases excluded)",
+    "updated":  "2026-08-17",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [
                      {
