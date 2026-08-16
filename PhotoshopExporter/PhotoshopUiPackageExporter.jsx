@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.13.3";
+var SCRIPT_VERSION = "2.13.4";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 // OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。
@@ -1309,7 +1309,13 @@ function createImageNode(layer, context, parentBounds) {
     node._parentBounds = parentBounds;
     node._rawName = layer.name;
 
-    if (insideScroll) {
+    var isMergedComposite = layer.typename === "LayerSet" && hasMergeGroupTag(layer.name);
+    if (isMergedComposite) {
+        // MERGE exports already contain the rendered layer effects. LayerSet
+        // boundsNoEffects can include non-rendering child bounds, so using it
+        // as extra padding creates transparent bands and shifts the JSON rect.
+        node._padding = zeroPadding();
+    } else if (insideScroll) {
         // Direct scroll items drop their viewport-preview mask; nested artwork keeps
         // its own design masks. The cache signature carries nomask only when removed.
         node._noMaskExport = removeMaskForScroll;
@@ -1665,7 +1671,8 @@ function trimTransparentPixelsAndApplyPadding(doc, node) {
     // document and trimming its transparent canvas gives the real pixel rect.
     // Two-stage trim preserves the removed left/top offset for Layout JSON.
     var smartObjectTrim = trimActiveSmartObjectTransparency(doc);
-    var contentBounds = smartObjectTrim || readLayerBounds(doc.activeLayer);
+    var transparencyTrim = smartObjectTrim || trimDocumentTransparency(doc);
+    var contentBounds = transparencyTrim || readLayerBounds(doc.activeLayer);
     if (!contentBounds || contentBounds.width <= 0 || contentBounds.height <= 0) {
         return false;
     }
@@ -1678,7 +1685,7 @@ function trimTransparentPixelsAndApplyPadding(doc, node) {
     var finalWidth = Math.max(1, contentBounds.width + padLeft + padRight);
     var finalHeight = Math.max(1, contentBounds.height + padTop + padBottom);
 
-    if (!smartObjectTrim) {
+    if (!transparencyTrim) {
         doc.crop([
             UnitValue(contentBounds.left, "px"),
             UnitValue(contentBounds.top, "px"),
@@ -1692,9 +1699,16 @@ function trimTransparentPixelsAndApplyPadding(doc, node) {
         doc.activeLayer.translate(padLeft, padTop);
     }
 
+    var isMergedComposite = hasMergeGroupTag(node._rawName);
     var isOversizedSmartObject = smartObjectTrim &&
         (contentBounds.width < node.width * 0.5 || contentBounds.height < node.height * 0.5);
-    if (isOversizedSmartObject && typeof node._duplicateExportOriginX === "number") {
+    if (isMergedComposite && node._noEffectsBounds) {
+        // Copy Merged centers the clipboard pixels in the temporary document and
+        // loses their transparent selection offset. Re-anchor the tight bitmap to
+        // the source group's no-effects center so hidden child bounds cannot shift it.
+        node.x = Math.round((node._noEffectsBounds.left + node._noEffectsBounds.right - finalWidth) * 0.5);
+        node.y = Math.round((node._noEffectsBounds.top + node._noEffectsBounds.bottom - finalHeight) * 0.5);
+    } else if (isOversizedSmartObject && typeof node._duplicateExportOriginX === "number") {
         node.x = Math.round(node._duplicateExportOriginX + contentBounds.left - padLeft);
         node.y = Math.round(node._duplicateExportOriginY + contentBounds.top - padTop);
     } else {
@@ -1712,6 +1726,31 @@ function trimTransparentPixelsAndApplyPadding(doc, node) {
         height: node.height
     }, node._parentBounds, node._rawName);
     return true;
+}
+
+function trimDocumentTransparency(doc) {
+    try {
+        var originalWidth = px(doc.width);
+        var originalHeight = px(doc.height);
+        doc.trim(TrimType.TRANSPARENT, true, true, false, false);
+        var removedLeft = Math.max(0, originalWidth - px(doc.width));
+        var removedTop = Math.max(0, originalHeight - px(doc.height));
+        doc.trim(TrimType.TRANSPARENT, true, true, true, true);
+
+        var width = Math.max(0, Math.round(px(doc.width)));
+        var height = Math.max(0, Math.round(px(doc.height)));
+        if (width <= 0 || height <= 0) return null;
+        return {
+            left: removedLeft,
+            top: removedTop,
+            right: removedLeft + width,
+            bottom: removedTop + height,
+            width: width,
+            height: height
+        };
+    } catch (error) {
+        return null;
+    }
 }
 
 function trimActiveSmartObjectTransparency(doc) {
@@ -3144,7 +3183,9 @@ function updateExportCacheRecord(entry, context, file) {
 
 function buildExportSignature(layer, node) {
     var parts = [];
-    parts.push("fastalign_v2");
+    // v3 invalidates pre-v2.13.4 records so every PNG receives the final
+    // alpha-trim pass and MERGE coordinate re-anchoring once after upgrade.
+    parts.push("fastalign_v3");
     parts.push(safeLayerId(layer));
     parts.push(node._rawName || "");
     appendBoundsSignature(parts, node._exportBounds);

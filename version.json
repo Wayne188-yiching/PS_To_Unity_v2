@@ -1,6 +1,6 @@
 {
-    "version":  "2.13.3",
-    "phase":  "Exact PSD coordinate guard for layout and malformed scroll",
+    "version":  "2.13.4",
+    "phase":  "MERGE alpha bounds and external draggable scrollbar acceptance",
     "updated":  "2026-08-17",
     "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
     "surfaces":  [

@@ -523,7 +523,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.13.3</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.13.4</span></h1>
     <p class="lead">在 Photoshop 排好的遊戲介面，一鍵搬進 Unity。圖自動切好、文字還能繼續改、位置自動對齊。</p>
   </header>
 
@@ -1110,8 +1110,8 @@ TXT_score_[THICK:2]</code></pre>
   <h3>怎麼讓群組自動排列？<span class="tag tag-new">v2.10.1</span></h3>
   <p>在群組名稱加 <code>[H]</code>、<code>[V]</code> 或 <code>[GRID]</code>。v2.10.1 起不再依子層位置自動猜測。若 H/V 子項的交叉軸中心不一致、Unity 固定對齊必然改動 PS 座標，匯出器會輸出 <code>LAYOUT_CROSS_AXIS_DEGRADED</code> 並降級為普通群組；v2.13.3 起連 0.5px 差異也會保護，優先保留設計稿排版。</p>
 
-  <h3>為什麼加了滑軌標籤反而跑版？<span class="tag tag-new">v2.13.3</span></h3>
-  <p><code>[SCROLL_V]</code>／<code>[SCROLL_H]</code> 群組必須同時包含可捲動內容與直接子層 <code>[SCROLLBAR_*]</code>。如果群組裡只有滑軌、真正內容在外部，工具無法推斷兩者關係；v2.13.3 會輸出 <code>SCROLL_NO_CONTENT</code> 並降級為普通群組，保留 PS 的 Track／Handle 座標。要建立可工作的 ScrollRect，請把內容與滑軌放進同一個 <code>[SCROLL_*]</code> 群組。</p>
+  <h3>為什麼加了滑軌標籤反而跑版？<span class="tag tag-new">v2.13.4</span></h3>
+  <p>最明確的方式仍是把 <code>[SCROLLBAR_*]</code> 放在對應 <code>[SCROLL_*]</code> 群組內。若 PS 排版不適合搬動圖層，v2.13.4 也允許外置滑軌：整個 Prefab 內必須剛好只有一個方向相容、尚未接線的 ScrollRect，Unity 才會自動配對，並保留 PS 匯出的 Content 初始位置。多組可能配對時會輸出 <code>SCROLLBAR_ORPHAN_UNRESOLVED</code>，不會猜測。</p>
 
   <h3>如何做 PS 與 Unity 固定解析度逐像素驗收？</h3>
   <p>使用 PSD 畫布尺寸作為 Prefab 參考解析度，並關閉「啟用響應式 anchor（實驗性）」。該選項是響應式實驗，不是固定解析度的原位重建模式；開啟後巢狀 group 的座標空間可能改變。</p>
@@ -1122,6 +1122,14 @@ TXT_score_[THICK:2]</code></pre>
   <details>
     <summary>展開完整版本紀錄<span class="hint">每個版本改了什麼，想追來龍去脈再看</span></summary>
     <div class="details-body">
+<h3>v2.13.4（2026-08-17）— MERGE 透明邊界與外置滑軌回歸</h3>
+  <ul>
+    <li><strong>MERGE 透明邊界</strong>：輸出暫存文件一律依實際 alpha 像素裁切；MERGE 群組不再採用會被隱藏子層污染的群組陰影補償，並以 PS 無效果範圍中心回補 JSON 座標。匯出快取簽名升為 <code>fastalign_v3</code>，升級後會自動完整重匯一次，避免沿用舊座標。</li>
+    <li><strong>外置 Scrollbar</strong>：直接子層仍優先；若整個 Prefab 只有一個方向相容、尚未接線的 ScrollRect，外置 <code>[SCROLLBAR_V/H]</code> 也會安全配對。多組時輸出 <code>SCROLLBAR_ORPHAN_UNRESOLVED</code>。</li>
+    <li><strong>初始位置</strong>：接線前保存 Content 的 PS 初始位置與 normalized value，避免 Scrollbar 預設值 0 把清單自動推到底端。</li>
+    <li><strong>真實排行榜複驗</strong>：43 張 PNG 全掃描後無大於 8px 的異常透明邊界；兩張問題 MERGE 圖由 1116×200／1116×197 收斂為 1093×141／1094×141。Unity 初始 Content Y=0，Handle 1→0 可驅動 104px，Console error=0。</li>
+  </ul>
+
 <h3>v2.13.3（2026-08-17）— 固定解析度 0px 座標誤差與滑軌防誤接</h3>
   <ul>
     <li><strong>PS 標籤查證</strong>：排行榜的 <code>[V]Not_selected01~03</code> 子文字中心相差 0.5px；舊版 1px 容差仍會生成 LayoutGroup，造成半像素位移。判定容差改為 0.01px，不可原樣表示即保留 PS 絕對座標。</li>
@@ -1431,7 +1439,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.13.3 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.13.4 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

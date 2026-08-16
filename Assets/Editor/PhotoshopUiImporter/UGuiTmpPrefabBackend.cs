@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using TMPro;
 using UnityEditor;
@@ -52,6 +53,8 @@ namespace PhotoshopToUnity.EditorImporter
                     {
                         CreateNode(node, rootRect, cropOffsetX, cropOffsetY, referenceWidth, referenceHeight, rootRect.pivot, context);
                     }
+
+                    AttachUniqueOrphanScrollbars(rootRect, context.layout.nodes);
                 }
 
                 var prefabPath = $"{PathUtility.NormalizeAssetKey(context.prefabOutputFolder).TrimEnd('/')}/{MakeSafeFileName(rootName)}.prefab";
@@ -493,6 +496,14 @@ namespace PhotoshopToUnity.EditorImporter
             if (scrollbarRect == null)
                 throw new InvalidOperationException($"Scrollbar node was not generated: {scrollbarNode.name}");
 
+            AttachScrollbarVisual(scrollRect, scrollbarRect, scrollbarNode);
+        }
+
+        private static void AttachScrollbarVisual(ScrollRect scrollRect, RectTransform scrollbarRect, PhotoshopUiNode scrollbarNode)
+        {
+            var authoredContentPosition = scrollRect.content == null
+                ? Vector2.zero
+                : scrollRect.content.anchoredPosition;
             var trackRect = FindScrollbarVisual(scrollbarRect, scrollbarNode, "track");
             var handleRect = FindScrollbarVisual(scrollbarRect, scrollbarNode, "handle");
             var handleNode = FindScrollbarVisualNode(scrollbarNode, "handle");
@@ -520,19 +531,92 @@ namespace PhotoshopToUnity.EditorImporter
             {
                 if (!scrollRect.horizontal)
                     throw new InvalidOperationException($"Horizontal Scrollbar {scrollbarNode.name} requires [SCROLL_H] on its parent group.");
+                var authoredValue = scrollRect.horizontalNormalizedPosition;
                 scrollbar.direction = Scrollbar.Direction.LeftToRight;
                 scrollRect.horizontalScrollbar = scrollbar;
                 scrollRect.horizontalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
                 scrollRect.horizontalScrollbarSpacing = 0f;
+                scrollbar.SetValueWithoutNotify(authoredValue);
             }
             else
             {
                 if (!scrollRect.vertical)
                     throw new InvalidOperationException($"Vertical Scrollbar {scrollbarNode.name} requires [SCROLL_V] on its parent group.");
+                var authoredValue = scrollRect.verticalNormalizedPosition;
                 scrollbar.direction = Scrollbar.Direction.BottomToTop;
                 scrollRect.verticalScrollbar = scrollbar;
                 scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
                 scrollRect.verticalScrollbarSpacing = 0f;
+                scrollbar.SetValueWithoutNotify(authoredValue);
+            }
+
+            if (scrollRect.content != null)
+                scrollRect.content.anchoredPosition = authoredContentPosition;
+        }
+
+        private static void AttachUniqueOrphanScrollbars(RectTransform root, List<PhotoshopUiNode> rootNodes)
+        {
+            var scrollbarNodes = new List<PhotoshopUiNode>();
+            CollectScrollbarNodes(rootNodes, scrollbarNodes);
+            if (scrollbarNodes.Count == 0) return;
+
+            var scrollRects = root.GetComponentsInChildren<ScrollRect>(true);
+            foreach (var scrollbarNode in scrollbarNodes)
+            {
+                var matches = new List<RectTransform>();
+                CollectTransformsByName(root, scrollbarNode.name, matches);
+                if (matches.Count != 1)
+                {
+                    Debug.LogWarning($"[PhotoshopUiImporter] SCROLLBAR_ORPHAN_UNRESOLVED @ {scrollbarNode.name} — 找到 {matches.Count} 個同名物件，無法安全自動接線。");
+                    continue;
+                }
+
+                var scrollbarRect = matches[0];
+                if (scrollbarRect.GetComponent<Scrollbar>() != null)
+                    continue;
+
+                ScrollRect compatible = null;
+                var compatibleCount = 0;
+                var horizontal = string.Equals(scrollbarNode.scrollbarDirection, "horizontal", StringComparison.OrdinalIgnoreCase);
+                foreach (var scrollRect in scrollRects)
+                {
+                    var available = horizontal
+                        ? scrollRect.horizontal && scrollRect.horizontalScrollbar == null
+                        : scrollRect.vertical && scrollRect.verticalScrollbar == null;
+                    if (!available) continue;
+                    compatible = scrollRect;
+                    compatibleCount++;
+                }
+
+                if (compatibleCount != 1)
+                {
+                    Debug.LogWarning($"[PhotoshopUiImporter] SCROLLBAR_ORPHAN_UNRESOLVED @ {scrollbarNode.name} — 找到 {compatibleCount} 個相容 ScrollRect；只有唯一配對時才會自動接線。");
+                    continue;
+                }
+
+                AttachScrollbarVisual(compatible, scrollbarRect, scrollbarNode);
+            }
+        }
+
+        private static void CollectScrollbarNodes(List<PhotoshopUiNode> nodes, List<PhotoshopUiNode> result)
+        {
+            if (nodes == null) return;
+            foreach (var node in nodes)
+            {
+                if (node == null) continue;
+                if (node.HasScrollbar) result.Add(node);
+                CollectScrollbarNodes(node.children, result);
+            }
+        }
+
+        private static void CollectTransformsByName(RectTransform parent, string name, List<RectTransform> result)
+        {
+            for (var i = 0; i < parent.childCount; i++)
+            {
+                var child = parent.GetChild(i) as RectTransform;
+                if (child == null) continue;
+                if (string.Equals(child.name, name, StringComparison.Ordinal)) result.Add(child);
+                CollectTransformsByName(child, name, result);
             }
         }
 
