@@ -26,3 +26,5 @@ Use a release-result trajectory. The first viewport makes the mechanism visible 
 ## Unresolved decisions
 
 No public customer names, usage totals, time-saving benchmark, or presentation-event identity was supplied; keep these absent until verified material exists.
+
+Packaging the tool as a skill driven by an agent — drop a PSD or a path, everything else runs automatically — is under evaluation and not decided. The report carries it as an open question with its unanswered parts listed (both ends are GUI applications, naming tags are semantic decisions, degradation messages need a human reader, the Chinese glossary needs manual completion, and the responsibility boundary is undrawn). Keep it framed as a question until a decision exists; do not upgrade it to a roadmap promise.

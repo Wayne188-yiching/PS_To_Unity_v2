@@ -744,6 +744,7 @@ function exportUiPackage(sourceDoc, options) {
             gradientTextCount: textStats.gradientTextCount,
             dedupStats: dedupStats,
             pngStats: pngStats,
+            nearTransparentNotes: collectNearTransparentNotes(nodes),
             reportFile: reportFile
         };
         writeExportReport(reportFile, resultObj, dedupStats, pngStats);
@@ -1677,6 +1678,13 @@ function trimTransparentPixelsAndApplyPadding(doc, node) {
         return false;
     }
 
+    // Stash a rescued invisible border so export_report.txt can name the layer:
+    // the crop keeps the package correct, but the PSD still carries a halo the
+    // designer probably did not intend.
+    if (transparencyTrim && transparencyTrim.nearTransparentRescue) {
+        node._nearTransparentRescue = transparencyTrim.nearTransparentRescue;
+    }
+
     var padding = node._padding || zeroPadding();
     var padLeft = Math.max(0, Math.round(padding.left || 0));
     var padTop = Math.max(0, Math.round(padding.top || 0));
@@ -1728,6 +1736,19 @@ function trimTransparentPixelsAndApplyPadding(doc, node) {
     return true;
 }
 
+// Photoshop's Trim > Transparent only drops rows/columns whose pixels are all
+// exactly alpha 0. A soft glow or feathered light streak that fades out to
+// alpha 1 therefore pins the canvas at its full size: the PNG keeps a margin
+// nobody can see and the Layout JSON rect inherits it. Observed on a real
+// package: a 1948x1047 board whose visible pixels only start at x=438, which
+// reached Unity as a 33.5px RectTransform offset plus ~22% of wasted atlas
+// width. Pixels at or below this alpha are treated as empty when the plain
+// trim comes back empty-handed.
+var NEAR_TRANSPARENT_ALPHA_CUTOFF = 2;
+
+// Only report a rescue worth a designer's attention; sub-pixel slivers are noise.
+var NEAR_TRANSPARENT_REPORT_MIN_PX = 8;
+
 function trimDocumentTransparency(doc) {
     try {
         var originalWidth = px(doc.width);
@@ -1739,6 +1760,27 @@ function trimDocumentTransparency(doc) {
 
         var width = Math.max(0, Math.round(px(doc.width)));
         var height = Math.max(0, Math.round(px(doc.height)));
+        var rescue = null;
+
+        // The plain trim removed nothing at all -> a sub-threshold halo is pinning
+        // every edge. Measure again treating near-zero alpha as empty. Every step
+        // below is fail-safe: a null measurement keeps the untouched result.
+        // The probe duplicates the export document, so it is gated on "the plain
+        // trim achieved nothing" plus a size floor -- a fully opaque sprite pays
+        // one duplicate and gets a null back, which is cheap enough, but there is
+        // nothing worth reclaiming on a 64x64 icon.
+        if (removedLeft === 0 && removedTop === 0 &&
+            width === Math.round(originalWidth) && height === Math.round(originalHeight) &&
+            width * height >= 4096) {
+            rescue = rescueNearTransparentBounds(doc, width, height);
+            if (rescue) {
+                removedLeft += rescue.left;
+                removedTop += rescue.top;
+                width = rescue.width;
+                height = rescue.height;
+            }
+        }
+
         if (width <= 0 || height <= 0) return null;
         return {
             left: removedLeft,
@@ -1746,11 +1788,121 @@ function trimDocumentTransparency(doc) {
             right: removedLeft + width,
             bottom: removedTop + height,
             width: width,
-            height: height
+            height: height,
+            nearTransparentRescue: rescue
         };
     } catch (error) {
         return null;
     }
+}
+
+// Crops away a border made only of near-invisible pixels. Returns the applied
+// crop, or null when nothing was measurable or worth cropping.
+function rescueNearTransparentBounds(doc, docWidth, docHeight) {
+    var rect = measureThresholdedBounds(doc, NEAR_TRANSPARENT_ALPHA_CUTOFF, docWidth, docHeight);
+    if (!rect) return null;
+
+    var cutLeft = rect.left;
+    var cutTop = rect.top;
+    var cutRight = docWidth - rect.right;
+    var cutBottom = docHeight - rect.bottom;
+    if (cutLeft <= 0 && cutTop <= 0 && cutRight <= 0 && cutBottom <= 0) {
+        // Measurement agreed with the plain trim: nothing to gain, and this is
+        // also what a Photoshop API surprise looks like. Leave the document be.
+        return null;
+    }
+
+    try {
+        doc.crop([
+            UnitValue(rect.left, "px"),
+            UnitValue(rect.top, "px"),
+            UnitValue(rect.right, "px"),
+            UnitValue(rect.bottom, "px")
+        ]);
+    } catch (cropError) {
+        return null;
+    }
+
+    return {
+        left: cutLeft,
+        top: cutTop,
+        right: cutRight,
+        bottom: cutBottom,
+        width: rect.right - rect.left,
+        height: rect.bottom - rect.top,
+        originalWidth: docWidth,
+        originalHeight: docHeight
+    };
+}
+
+// Measures the pixel bounds that survive once alpha <= cutoff counts as empty.
+// Runs entirely on a throwaway duplicate, so a Photoshop API surprise can never
+// reach the exported pixels -- the worst case is a null return and the caller
+// keeps today's behaviour.
+function measureThresholdedBounds(doc, cutoff, docWidth, docHeight) {
+    var probe = null;
+    var previousDoc = null;
+    try {
+        previousDoc = app.activeDocument;
+        probe = doc.duplicate();
+        app.activeDocument = probe;
+        if (probe.layers.length > 1) {
+            probe.mergeVisibleLayers();
+        }
+
+        selectActiveLayerTransparency();
+        var mask = probe.channels.add();
+        probe.selection.store(mask);
+        probe.selection.deselect();
+
+        // Input black and white one step apart turns the stored alpha into a hard
+        // mask: <= cutoff becomes 0, everything above becomes 255. Anti-aliased
+        // edges above the cutoff keep their exact position.
+        probe.activeChannels = [mask];
+        probe.activeLayer.adjustLevels(cutoff, cutoff + 1, 1.0, 0, 255);
+        probe.activeChannels = probe.componentChannels;
+
+        probe.selection.load(mask, SelectionType.REPLACE, false);
+        var bounds = probe.selection.bounds;
+        probe.selection.deselect();
+        if (!bounds || bounds.length < 4) return null;
+
+        var rect = {
+            left: Math.floor(px(bounds[0])),
+            top: Math.floor(px(bounds[1])),
+            right: Math.ceil(px(bounds[2])),
+            bottom: Math.ceil(px(bounds[3]))
+        };
+
+        // Sanity gate: the measurement has to sit inside the document and stay
+        // non-degenerate. Anything else means it cannot be trusted.
+        if (rect.left < 0 || rect.top < 0) return null;
+        if (rect.right > docWidth || rect.bottom > docHeight) return null;
+        if (rect.right - rect.left < 1 || rect.bottom - rect.top < 1) return null;
+        return rect;
+    } catch (error) {
+        return null;
+    } finally {
+        if (probe) {
+            try { probe.close(SaveOptions.DONOTSAVECHANGES); } catch (ignoredClose) {}
+        }
+        if (previousDoc) {
+            try { app.activeDocument = previousDoc; } catch (ignoredRestore) {}
+        }
+    }
+}
+
+// Loads the active layer's transparency as a selection; the selection value of
+// each pixel equals its alpha.
+function selectActiveLayerTransparency() {
+    var descriptor = new ActionDescriptor();
+    var target = new ActionReference();
+    target.putProperty(charIDToTypeID("Chnl"), charIDToTypeID("fsel"));
+    descriptor.putReference(charIDToTypeID("null"), target);
+    var source = new ActionReference();
+    source.putEnumerated(charIDToTypeID("Chnl"), charIDToTypeID("Chnl"), charIDToTypeID("Trsp"));
+    descriptor.putReference(charIDToTypeID("T   "), source);
+    executeAction(charIDToTypeID("setd"), descriptor, DialogModes.NO);
 }
 
 function trimActiveSmartObjectTransparency(doc) {
@@ -3515,6 +3667,27 @@ function writeExportReport(reportFile, result, dedupStats, pngStats) {
         }
     }
     lines.push("");
+    lines.push("[隱形邊界]");
+    var invisibleNotes = result.nearTransparentNotes || [];
+    if (invisibleNotes.length > 0) {
+        lines.push("以下圖層的邊緣有肉眼看不見的殘留像素（alpha <= "
+            + NEAR_TRANSPARENT_ALPHA_CUTOFF + "），Photoshop 的透明修剪砍不掉；");
+        lines.push("匯出時已自動裁掉，但建議回 PS 檢查光暈、陰影或羽化範圍是否過大。");
+        for (var m = 0; m < invisibleNotes.length && m < 20; m++) {
+            var note = invisibleNotes[m];
+            lines.push("  - " + note.name
+                + "：裁掉 左" + note.left + " 上" + note.top
+                + " 右" + note.right + " 下" + note.bottom + " px"
+                + "（" + note.originalWidth + "x" + note.originalHeight
+                + " → " + note.width + "x" + note.height + "）");
+        }
+        if (invisibleNotes.length > 20) {
+            lines.push("  …（其餘 " + (invisibleNotes.length - 20) + " 筆省略）");
+        }
+    } else {
+        lines.push("0 筆");
+    }
+    lines.push("");
     lines.push("[Layout JSON]");
     lines.push(result.layoutJsonFile.fsName);
 
@@ -3559,6 +3732,42 @@ function exportReportFile(imageFolder) {
 }
 
 // 掃 layout tree 計算「含描邊文字 / 含漸層文字」筆數，給報告用
+// Collects the layers whose exported PNG carried an invisible (alpha <= cutoff)
+// border that had to be cropped. Worth surfacing: the package is correct after
+// the crop, but the PSD still holds a halo the designer probably did not mean.
+function collectNearTransparentNotes(nodes) {
+    var notes = [];
+    walk(nodes);
+    notes.sort(function (a, b) { return b.maxEdge - a.maxEdge; });
+    return notes;
+    function walk(arr) {
+        if (!arr) return;
+        for (var i = 0; i < arr.length; i++) {
+            var n = arr[i];
+            if (!n) continue;
+            var rescue = n._nearTransparentRescue;
+            if (rescue) {
+                var maxEdge = Math.max(rescue.left, rescue.top, rescue.right, rescue.bottom);
+                if (maxEdge >= NEAR_TRANSPARENT_REPORT_MIN_PX) {
+                    notes.push({
+                        name: n.name || "",
+                        left: rescue.left,
+                        top: rescue.top,
+                        right: rescue.right,
+                        bottom: rescue.bottom,
+                        maxEdge: maxEdge,
+                        originalWidth: rescue.originalWidth,
+                        originalHeight: rescue.originalHeight,
+                        width: rescue.width,
+                        height: rescue.height
+                    });
+                }
+            }
+            if (n.children && n.children.length) walk(n.children);
+        }
+    }
+}
+
 function countTextStats(nodes) {
     var stats = { outlineTextCount: 0, gradientTextCount: 0 };
     walk(nodes);

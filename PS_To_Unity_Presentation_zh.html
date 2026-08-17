@@ -681,6 +681,38 @@
       font-weight: 700;
     }
 
+    /* ---- 下一步：評估中的方向 ---- */
+    .specimen--prose {
+      font-family: var(--body);
+      font-size: clamp(1.05rem, 2.2vw, 1.5rem);
+      line-height: 1.6;
+    }
+    .openq-title { margin: clamp(40px, 6vw, 68px) 0 0; }
+    .openq {
+      margin: var(--space-lg) 0 0;
+      padding: 0;
+      list-style: none;
+      border-top: 1px solid var(--line);
+    }
+    .openq li {
+      position: relative;
+      padding: 20px 0 20px 30px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 18px;
+    }
+    .openq li::before {
+      content: "？";
+      position: absolute;
+      top: 18px;
+      left: -2px;
+      color: var(--accent-10);
+      font-size: 20px;
+      font-weight: 900;
+    }
+    .openq li strong { color: var(--ink); }
+    .openq-note { max-width: 40em; margin: var(--space-xl) 0 0; color: var(--muted); font-size: 18px; }
+
     /* ---- 結語 ---- */
     .closing { min-height: 66svh; border-top: 6px solid var(--accent-10); text-align: center; }
     .closing .wrap { display: grid; justify-items: center; }
@@ -783,7 +815,8 @@
   <!--
     THESIS: 把「設計稿轉 Prefab」做成一條看得見的成果軌跡，拒絕先堆技術名詞的傳統發表頁。
     OWN-WORLD: 延續專案深墨與深藍介面，只用薄荷綠作唯一強調；資訊圖採圖層、節點與製作軌道語彙。
-    STORY: 痛點（含改稿回圈）→ 語意對應 → 命名即規格 → 兩端技術 → 四步操作 → 可編輯結果 → 生成後仍可換 → 降級護欄。
+    STORY: 痛點（含改稿回圈）→ 語意對應 → 命名即規格 → 兩端技術 → 四步操作 → 可編輯結果 → 生成後仍可換 → 降級護欄 → 評估中的下一步。
+    OPEN QUESTION: skill + agent 方向寫成公開的未決問題，不是承諾；列出未解的部分才是「評估中」的證據。
     FIRST VIEWPORT: 左側一句價值主張，右側等比例展示 Photoshop 圖層經轉譯成 Unity Prefab 階層；主行動指向流程。
     FORM: 成果軌跡，既有視覺世界中的第 7 個結構候選，seed 830c02f9。
     EVIDENCE: 只引用 README_zh.md、version.json、Samples/Phase4_5/README.md 與原始碼中確實存在的標記與警告碼。
@@ -1217,6 +1250,28 @@
             <div><h3>用真實 PSD 驗收，缺陷公開記錄</h3><p>Phase&nbsp;4.5 首輪就發現 2 個阻斷缺陷，修復後以同一批樣本複驗通過；當時 Unity Console 為 0 筆 error／warning。</p></div>
           </article>
         </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="next" data-nav="result">
+      <div class="wrap">
+        <div class="section-head section-head--stack">
+          <h2>下一步，<br><span class="accent">也許不用再開工具。</span></h2>
+          <p class="lead">現在的流程已經夠短，但還是要有人在 Photoshop 按 Export，再到 Unity 選 Package、Validate、Generate。我們正在評估把整套包成一個 skill 搭配 agent：丟一個 PSD 檔或檔案路徑，其餘自動完成。</p>
+        </div>
+
+        <p class="specimen specimen--prose"><span class="specimen-tag">設想</span><span>&nbsp;把 <span translate="no">Rank.psd</span> 轉成 Unity Prefab，放進 Rank 的專案資料夾。</span></p>
+        <p class="specimen-note">這是設想中的用法，目前還沒有這個功能。</p>
+
+        <h3 class="openq-title">要先回答的問題</h3>
+        <ul class="openq">
+          <li><strong>兩端都是 GUI 程式。</strong>匯出腳本跑在 Photoshop 裡，生成工具跑在 Unity Editor 裡；要全自動，得先決定是讓兩邊常駐，還是仍由人開好再交給 agent。</li>
+          <li><strong>命名標記是語意決策，不是機械步驟。</strong>哪一組要捲動、哪張圖要九宮格、哪一組該烘成一張——目前由設計師判斷。交給 agent 之前，要先確認它猜錯時的代價由誰承擔。</li>
+          <li><strong>降級訊息需要有人讀。</strong>工具遇到不確定會保留原座標並回報代碼，這些訊息是要人看懂並決定怎麼處理的，不該被自動流程默默略過。</li>
+          <li><strong>中文圖層仍需人工補詞。</strong>詞庫推不出來的圖層會維持原名並列進待辦，那份對照表目前只能由人補完。</li>
+          <li><strong>責任邊界還沒畫。</strong>全自動之後，錯誤的版面在哪一步被攔下、由誰驗收，還沒有答案。</li>
+        </ul>
+        <p class="openq-note">結論還沒有。放進報告是因為它會決定這個工具接下來往哪裡走，想先聽聽大家的想法。</p>
       </div>
     </section>
 
