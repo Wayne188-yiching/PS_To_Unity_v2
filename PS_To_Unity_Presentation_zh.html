@@ -6,20 +6,43 @@
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#07131a">
   <title>Photoshop To Unity V2｜工具發表報告</title>
+  <meta name="description" content="把 Photoshop 排好的遊戲 UI 轉成可編輯的 Unity uGUI + TextMeshPro Prefab：問題、語意對應、命名規格、四步操作、驗收與護欄。">
   <style>
+    /* Hallmark · macrostructure: 成果軌跡（Result Trajectory）· nav: N9 edge-aligned · footer: Ft5 statement
+     * system: DESIGN.md（Photoshop To Unity V2 · 深墨語意工作台）— locked, not rotated
+     * tone: 技術 / 克制 · anchor hue: mint 165° · 60/30/10 enforced page-wide
+     * pre-emit critique: P5 H5 E4 S5 R4 V4
+     */
     :root {
+      color-scheme: dark;
+
       /* 60 / 30 / 10：墨色主場、深藍資訊面、薄荷綠唯一強調 */
       --base-60: #07131a;
       --surface-30: #12314a;
       --accent-10: #2ee6b2;
+      --panel: #0b1e2a;
       --ink: #f2f8f7;
       --muted: #a8bec3;
       --line: rgba(168, 190, 195, .22);
       --soft-accent: rgba(46, 230, 178, .10);
+
       --max: 1180px;
       --radius: 14px;
+      --radius-control: 10px;
+      --radius-compact: 8px;
+
+      --space-xs: 8px;
+      --space-sm: 12px;
+      --space-md: 16px;
+      --space-lg: 24px;
+      --space-xl: 34px;
+
       --display: "Report CJK", "Bahnschrift", "Microsoft JhengHei", sans-serif;
       --body: "Report CJK", "Microsoft JhengHei", "Noto Sans TC", "Segoe UI", sans-serif;
+      --mono: ui-monospace, "Cascadia Mono", "Consolas", "Roboto Mono", monospace;
+
+      --ease-out: cubic-bezier(.22, .61, .36, 1);
+      --dur: 180ms;
     }
 
     @font-face {
@@ -31,21 +54,51 @@
     }
 
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+
+    html {
+      overflow-x: clip;
+      scroll-behavior: smooth;
+      scroll-padding-top: 84px;
+    }
+
     body {
       margin: 0;
+      overflow-x: clip;
       background: var(--base-60);
       color: var(--ink);
       font-family: var(--body);
       font-size: 17px;
       line-height: 1.7;
-      overflow-x: hidden;
+      -webkit-tap-highlight-color: rgba(46, 230, 178, .22);
+      /* 中文避頭尾：句號、逗號、括號不落在行首。 */
+      line-break: strict;
     }
+
+    /* 避免段落尾行只剩一兩個字的孤行。 */
+    p, dd, li, .lead, .step-key, .tree-row, .layer { text-wrap: pretty; }
 
     ::selection { color: var(--base-60); background: var(--accent-10); }
     :focus-visible { outline: 3px solid var(--accent-10); outline-offset: 4px; }
     a { color: inherit; text-decoration-color: var(--accent-10); text-underline-offset: .28em; }
     button { font: inherit; }
+    code, .mono { font-family: var(--mono); }
+
+    .skip-link {
+      position: fixed;
+      z-index: 200;
+      top: var(--space-sm);
+      left: var(--space-sm);
+      padding: 10px 16px;
+      color: var(--base-60);
+      background: var(--accent-10);
+      border-radius: var(--radius-compact);
+      font-size: 16px;
+      font-weight: 800;
+      text-decoration: none;
+      transform: translateY(-180%);
+      transition: transform var(--dur) var(--ease-out);
+    }
+    .skip-link:focus-visible { transform: translateY(0); }
 
     .progress {
       position: fixed;
@@ -69,24 +122,32 @@
       width: min(calc(100% - 40px), var(--max));
       min-height: 68px;
       margin-inline: auto;
+      padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 24px;
+      gap: var(--space-lg);
     }
 
     .brand {
       display: inline-flex;
       align-items: center;
-      gap: 12px;
+      gap: var(--space-sm);
       font-family: var(--display);
       font-weight: 700;
       letter-spacing: -.02em;
       text-decoration: none;
       white-space: nowrap;
+      touch-action: manipulation;
     }
 
-    .release-meta { color: var(--muted); font-size: 16px; font-weight: 700; white-space: nowrap; }
+    .release-meta {
+      color: var(--muted);
+      font-size: 16px;
+      font-weight: 700;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
 
     .brand-mark {
       width: 30px;
@@ -95,7 +156,7 @@
       place-items: center;
       color: var(--base-60);
       background: var(--accent-10);
-      border-radius: 8px;
+      border-radius: var(--radius-compact);
       font-size: 14px;
       letter-spacing: -.04em;
     }
@@ -106,73 +167,108 @@
       color: var(--muted);
       font-size: 16px;
       font-weight: 700;
+      white-space: nowrap;
       text-decoration: none;
-      border-radius: 8px;
+      border-radius: var(--radius-compact);
+      touch-action: manipulation;
+      transition: color var(--dur) var(--ease-out), background-color var(--dur) var(--ease-out);
     }
     .topnav a:hover,
     .topnav a[aria-current="true"] { color: var(--accent-10); background: var(--soft-accent); }
 
     main { display: block; }
     .chapter {
-      min-height: 82vh;
+      min-height: 82svh;
       padding: clamp(84px, 11vw, 154px) 20px;
       display: grid;
+      /* minmax(0, 1fr)：避免長字串（JSON、標記名）把 auto 軌道撐破章節寬度。 */
+      grid-template-columns: minmax(0, 1fr);
       align-items: center;
       border-bottom: 1px solid var(--line);
     }
-    .chapter:nth-of-type(3n) { background: var(--surface-30); }
-    .wrap { width: min(100%, var(--max)); margin-inline: auto; }
+    /* 深藍資訊面只給三個「交易本身」的章節：對應、操作、行動。 */
+    .chapter--panel { background: var(--surface-30); }
+    .wrap { width: min(100%, var(--max)); min-width: 0; margin-inline: auto; }
 
     h1, h2, h3, p { margin-top: 0; }
-    h1, h2, h3 { font-family: var(--display); text-wrap: balance; }
+    h1, h2, h3 {
+      font-family: var(--display);
+      text-wrap: balance;
+      overflow-wrap: anywhere;
+      /* 中文標點不落在行首、不因 balance 被拆到孤行。 */
+      line-break: strict;
+    }
+    /* CJK 排版註記：max-width 一律用 em（1em = 1 個中文字寬）。
+     * ch 是拉丁數字「0」的寬度（約 .5em），用在中文標題會讓可用字數腰斬。
+     * line-height 也不能沿用拉丁顯示字的 .94／1.02——中文字框約 1.16em，
+     * 低於 1.16 的行距會讓 mark 底色與相鄰行的字互相覆蓋。 */
     h1 {
-      max-width: 11ch;
+      max-width: 8.5em;
       margin-bottom: 28px;
-      font-size: clamp(3.7rem, 9vw, 6rem);
-      line-height: .94;
-      letter-spacing: -.04em;
+      font-size: clamp(2.4rem, 5.2vw, 4.4rem);
+      line-height: 1.12;
+      letter-spacing: -.02em;
     }
     h2 {
-      max-width: 15ch;
+      max-width: 11em;
       margin-bottom: 28px;
-      font-size: clamp(2.5rem, 6vw, 5rem);
-      line-height: 1.02;
-      letter-spacing: -.035em;
+      font-size: clamp(1.75rem, 4.2vw, 3.5rem);
+      line-height: 1.16;
+      letter-spacing: -.02em;
     }
-    h3 { margin-bottom: 10px; font-size: clamp(1.2rem, 2.1vw, 1.65rem); line-height: 1.25; }
-    .lead { max-width: 66ch; color: var(--muted); font-size: clamp(1.05rem, 1.5vw, 1.28rem); }
+    h3 { margin-bottom: 10px; font-size: clamp(1.2rem, 2.1vw, 1.65rem); line-height: 1.35; }
+    .lead { max-width: 40em; color: var(--muted); font-size: clamp(1.05rem, 1.5vw, 1.28rem); }
     .lead strong { color: var(--ink); }
     .accent { color: var(--accent-10); }
+    /* 用 background-image 而非 background-color 畫底色：塗色高度固定 1.02em，
+     * 永遠小於行高，所以多行 mark 不會蓋到上一行的字。 */
     mark {
-      padding: .05em .18em;
+      padding: 0 .16em;
       color: var(--base-60);
-      background: var(--accent-10);
+      background-color: transparent;
+      background-image: linear-gradient(var(--accent-10), var(--accent-10));
+      background-repeat: no-repeat;
+      background-size: 100% 1.08em;
+      background-position: 0 .22em;
       box-decoration-break: clone;
       -webkit-box-decoration-break: clone;
     }
 
     .section-head {
       display: grid;
-      grid-template-columns: minmax(0, .7fr) minmax(280px, 1fr);
+      /* 標題欄放寬到 1fr：中文標題需要每行 10 字以上才不會出現「同一個畫／面」這種斷詞。 */
+      grid-template-columns: minmax(0, 1fr) minmax(0, .8fr);
       align-items: end;
       gap: clamp(32px, 7vw, 96px);
       margin-bottom: clamp(48px, 7vw, 92px);
     }
+    /* 兩欄時由 grid gap 控距，標題自身的 margin 會在單欄模式疊成過大的空白。 */
+    .section-head h2 { margin-bottom: 0; }
     .section-head p { margin-bottom: 6px; }
+    /* 節奏變化：命名與後續工具章節改用堆疊標題，避免整份報告只有一種段落開場。 */
+    .section-head--stack { grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--space-lg); }
+    .section-head--stack h2 { max-width: 14em; margin-bottom: 0; }
 
     .hero {
-      min-height: calc(100vh - 68px);
-      padding-top: clamp(64px, 8vw, 112px);
+      min-height: calc(100svh - 68px);
+      /* 單欄 hero 要在一個視窗內放下標題、導言、行動與示意圖，上下留白收緊。 */
+      padding-top: clamp(48px, 5vw, 84px);
+      padding-bottom: clamp(48px, 5vw, 96px);
       overflow: hidden;
     }
+    /* Hero 一律單欄。左右構圖在 1180px 容器下放不進兩個 18px 文字的視窗
+     * （右欄最多 587px，需要約 664px），硬塞的代價是圖層名稱被 ellipsis 吃掉——
+     * 而那些名稱正是這張圖要證明的東西。改成標題在上、示意圖佔滿容器寬度。 */
     .hero-grid {
       display: grid;
-      grid-template-columns: minmax(0, .8fr) minmax(560px, 1.2fr);
-      align-items: center;
-      gap: clamp(44px, 7vw, 92px);
+      grid-template-columns: minmax(0, 1fr);
+      align-content: center;
+      gap: clamp(36px, 5vw, 60px);
     }
-    .hero-copy .lead { max-width: 31em; }
-    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 34px; }
+    .hero-copy { max-width: 62em; }
+    .hero-copy .lead { max-width: 34em; }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin-top: var(--space-xl); }
+
     .button {
       min-height: 46px;
       padding: 10px 18px;
@@ -181,20 +277,25 @@
       justify-content: center;
       gap: 9px;
       border: 1px solid var(--line);
-      border-radius: 10px;
+      border-radius: var(--radius-control);
       color: var(--ink);
       background: transparent;
       font-weight: 800;
+      white-space: nowrap;
       text-decoration: none;
       cursor: pointer;
+      touch-action: manipulation;
+      transition: border-color var(--dur) var(--ease-out), background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
     }
     .button.primary { color: var(--base-60); background: var(--accent-10); border-color: var(--accent-10); }
-    .button:hover { border-color: var(--accent-10); }
+    .button:hover { border-color: var(--accent-10); background: var(--soft-accent); }
+    .button.primary:hover { background: var(--ink); border-color: var(--ink); }
+    .button:active { transform: translateY(1px); }
     .button svg { width: 18px; height: 18px; stroke: currentColor; }
 
     .pipeline-stage {
       position: relative;
-      min-height: 570px;
+      min-height: 390px;
       display: grid;
       place-items: center;
       isolation: isolate;
@@ -212,14 +313,14 @@
     .conversion {
       width: 100%;
       display: grid;
-      grid-template-columns: 1fr 116px 1fr;
+      grid-template-columns: minmax(0, 1fr) 116px minmax(0, 1fr);
       align-items: center;
       gap: 18px;
     }
     .app-window {
       min-width: 0;
       overflow: hidden;
-      background: #0b1e2a;
+      background: var(--panel);
       border: 1px solid var(--line);
       border-radius: var(--radius);
     }
@@ -229,19 +330,21 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: var(--space-sm);
       color: var(--muted);
       background: var(--surface-30);
       font-size: 18px;
       font-weight: 800;
     }
-    .window-dots { display: flex; gap: 5px; }
+    .window-bar span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .window-dots { display: flex; gap: 5px; flex: 0 0 auto; }
     .window-dots i { width: 6px; height: 6px; background: var(--muted); border-radius: 50%; opacity: .52; }
-    .layers { padding: 16px; }
+    .layers { padding: var(--space-md); }
     .layer {
       min-height: 48px;
       padding: 9px 10px;
       display: grid;
-      grid-template-columns: 24px 1fr auto;
+      grid-template-columns: 24px minmax(0, 1fr) auto;
       align-items: center;
       gap: 9px;
       border-bottom: 1px solid var(--line);
@@ -249,13 +352,14 @@
     }
     .layer:last-child { border-bottom: 0; }
     .layer svg { width: 19px; stroke: var(--accent-10); }
-    .layer small { color: var(--muted); }
+    .layer span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .layer small { min-width: 0; overflow: hidden; color: var(--muted); font-size: 16px; letter-spacing: .04em; text-overflow: ellipsis; white-space: nowrap; }
     .layer-indent { padding-left: 25px; }
 
     .bridge {
       display: grid;
       justify-items: center;
-      gap: 12px;
+      gap: var(--space-sm);
       color: var(--accent-10);
       text-align: center;
       font-size: 18px;
@@ -269,7 +373,7 @@
       border: 1px solid var(--accent-10);
       border-radius: 50%;
       background: var(--base-60);
-      animation: pulse 2.8s ease-in-out infinite;
+      animation: pulse 2.8s var(--ease-out) infinite;
     }
     .bridge svg { width: 46px; height: 46px; stroke: currentColor; }
 
@@ -287,22 +391,22 @@
       font-size: 18px;
     }
     .proof-strip strong { color: var(--ink); }
-    .ratio-swatch { display: grid; grid-template-columns: 6fr 3fr 1fr; width: 132px; height: 10px; overflow: hidden; border-radius: 5px; }
+    .ratio-swatch { display: grid; grid-template-columns: 6fr 3fr 1fr; width: 132px; height: 10px; flex: 0 0 auto; overflow: hidden; border-radius: 5px; }
     .ratio-swatch i:nth-child(1) { background: var(--base-60); border: 1px solid var(--line); }
     .ratio-swatch i:nth-child(2) { background: var(--surface-30); }
     .ratio-swatch i:nth-child(3) { background: var(--accent-10); }
 
+    /* ---- 問題：手動重建帳本 ---- */
     .problem-line {
       position: relative;
       display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 0;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       border-block: 1px solid var(--line);
     }
     .manual-task {
       position: relative;
       min-height: 218px;
-      padding: 34px 24px;
+      padding: var(--space-xl) var(--space-lg);
       border-right: 1px solid var(--line);
     }
     .manual-task:last-child { border-right: 0; }
@@ -313,70 +417,110 @@
       font-family: var(--display);
       font-size: 3rem;
       line-height: 1;
+      font-variant-numeric: tabular-nums;
     }
     .manual-task p { margin: 0; color: var(--muted); font-size: 18px; }
-    .problem-summary {
-      margin-top: 34px;
+
+    .loop-note {
+      margin-top: var(--space-lg);
+      padding: 18px 0;
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 30px minmax(0, 1fr);
+      align-items: center;
+      gap: var(--space-md);
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 18px;
+    }
+    .loop-note svg { width: 26px; stroke: var(--accent-10); }
+    .loop-note strong { color: var(--ink); }
+
+    .problem-summary {
+      margin-top: var(--space-xl);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
       gap: 28px;
     }
     .problem-summary strong { font-family: var(--display); font-size: clamp(1.5rem, 3vw, 2.5rem); line-height: 1.15; }
     .problem-summary span { color: var(--muted); }
 
-    .mapping {
+    /* ---- 解法：語意對應表（單一標記，桌機並列、手機堆疊） ---- */
+    .mapping { border-block: 1px solid var(--line); }
+    .mapping-head,
+    .mapping-row {
       display: grid;
-      grid-template-columns: 1fr 110px 1fr;
-      gap: 0;
-      align-items: stretch;
+      grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr);
+      align-items: center;
     }
-    .mapping-mobile { display: none; }
-    .mapping-side { border-block: 1px solid var(--line); }
-    .mapping-title {
-      padding: 16px 20px;
+    .mapping-head { border-bottom: 1px solid var(--line); }
+    .mapping-head span {
+      padding: var(--space-md) 20px;
       color: var(--accent-10);
       font-family: var(--display);
       font-size: 18px;
       font-weight: 900;
       letter-spacing: .08em;
-      border-bottom: 1px solid var(--line);
     }
-    .mapping-row {
+    .mapping-row { border-bottom: 1px solid var(--line); }
+    .mapping-row:last-child { border-bottom: 0; }
+    .mapping-cell {
       min-height: 76px;
-      padding: 16px 20px;
+      min-width: 0;
+      padding: var(--space-md) 20px;
       display: flex;
       align-items: center;
       gap: 14px;
-      border-bottom: 1px solid var(--line);
     }
-    .mapping-row:last-child { border-bottom: 0; }
-    .mapping-row svg { width: 26px; min-width: 26px; stroke: var(--accent-10); }
-    .mapping-row small { display: block; color: var(--muted); font-size: 18px; }
-    .mapping-arrows {
-      display: grid;
-      grid-template-rows: 57px repeat(5, 76px);
-      align-items: center;
-      justify-items: center;
-      color: var(--accent-10);
-    }
-    .mapping-arrows span { width: 58px; height: 1px; position: relative; background: currentColor; }
-    .mapping-arrows span::after {
-      content: "";
-      position: absolute;
-      right: -1px;
-      top: -4px;
-      width: 8px;
-      height: 8px;
-      border-top: 1px solid currentColor;
-      border-right: 1px solid currentColor;
-      transform: rotate(45deg);
-    }
+    .mapping-cell svg { width: 26px; min-width: 26px; stroke: var(--accent-10); }
+    .mapping-cell div { min-width: 0; }
+    .mapping-cell small { display: block; color: var(--muted); font-size: 18px; }
+    .cell-side { display: none; }
+    .mapping-link { display: grid; place-items: center; color: var(--accent-10); }
+    .mapping-link svg { width: 40px; height: 20px; stroke: currentColor; }
 
+    /* ---- 命名：標記字典 ---- */
+    .specimen {
+      padding: clamp(24px, 4vw, 40px) clamp(20px, 3vw, 32px);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: clamp(1.15rem, 3vw, 2rem);
+      font-weight: 700;
+      line-height: 1.5;
+      overflow-wrap: anywhere;
+    }
+    .specimen-tag { color: var(--base-60); background: var(--accent-10); padding: .06em .22em; border-radius: 5px; }
+    .specimen-note { margin: var(--space-md) 0 clamp(40px, 6vw, 68px); color: var(--muted); font-size: 18px; }
+
+    .tagbook {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: clamp(32px, 6vw, 80px);
+      border-top: 1px solid var(--line);
+    }
+    .tag-row { padding: 22px 0; border-bottom: 1px solid var(--line); }
+    .tag-keys { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-bottom: 10px; }
+    .tag-keys code {
+      padding: 5px 9px;
+      color: var(--accent-10);
+      background: rgba(46, 230, 178, .10);
+      border: 1px solid rgba(46, 230, 178, .34);
+      border-radius: var(--radius-compact);
+      font-size: 17px;
+      font-weight: 700;
+    }
+    .tag-row p { margin: 0; color: var(--muted); font-size: 18px; }
+    .tag-row p strong { color: var(--ink); }
+    .naming-note { margin: var(--space-xl) 0 0; max-width: 38em; color: var(--muted); font-size: 18px; }
+    .naming-note code { color: var(--ink); font-size: 17px; }
+
+    /* ---- 技術：兩端與 Layout JSON ---- */
     .tech-rail {
       position: relative;
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: clamp(40px, 8vw, 120px);
     }
     .tech-rail::before {
@@ -390,11 +534,11 @@
     }
     .tech-block { padding: 40px 0; }
     .tech-block:nth-child(even) { margin-top: 112px; }
-    .tech-label { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; color: var(--accent-10); font-weight: 900; }
-    .tech-label svg { width: 34px; height: 34px; stroke: currentColor; }
-    .tech-block p { max-width: 42ch; color: var(--muted); font-size: 18px; }
-    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
-    .chip { padding: 7px 10px; color: var(--ink); background: rgba(7, 19, 26, .36); border: 1px solid var(--line); border-radius: 8px; font-size: 18px; font-weight: 700; }
+    .tech-label { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: 20px; color: var(--accent-10); font-weight: 900; }
+    .tech-label svg { width: 34px; height: 34px; min-width: 34px; stroke: currentColor; }
+    .tech-block p { max-width: 24em; color: var(--muted); font-size: 18px; }
+    .chips { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-lg); }
+    .chip { padding: 7px 10px; color: var(--ink); background: rgba(7, 19, 26, .36); border: 1px solid var(--line); border-radius: var(--radius-compact); font-size: 18px; font-weight: 700; }
     .bridge-data {
       position: absolute;
       top: 50%;
@@ -403,34 +547,80 @@
       padding: 10px 12px;
       color: var(--base-60);
       background: var(--accent-10);
-      border-radius: 8px;
+      border-radius: var(--radius-compact);
       transform: translate(-50%, -50%) rotate(-90deg);
       font-size: 18px;
       font-weight: 900;
       white-space: nowrap;
     }
 
+    .datasheet {
+      margin-top: clamp(40px, 6vw, 72px);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .datasheet-title {
+      padding: var(--space-sm) 18px;
+      color: var(--muted);
+      background: rgba(18, 49, 74, .55);
+      border-bottom: 1px solid var(--line);
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: .06em;
+    }
+    .datasheet pre {
+      margin: 0;
+      max-width: 100%;
+      padding: clamp(18px, 3vw, 28px);
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      color: var(--ink);
+      font-family: var(--mono);
+      font-size: 16px;
+      line-height: 1.85;
+      tab-size: 2;
+    }
+    .datasheet b { color: var(--accent-10); font-weight: 700; }
+    .datasheet i { color: var(--muted); font-style: normal; }
+
+    /* ---- 操作：四步 + 改稿回圈 ---- */
     .steps {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       border-block: 1px solid var(--line);
     }
     .step {
       min-height: 410px;
-      padding: 34px 24px 28px;
+      padding: var(--space-xl) var(--space-lg) 28px;
       display: flex;
       flex-direction: column;
       border-right: 1px solid var(--line);
     }
     .step:last-child { border-right: 0; }
-    .step-num { margin-bottom: 68px; color: var(--accent-10); font-family: var(--display); font-size: 4.5rem; font-weight: 900; line-height: .9; }
+    .step-num { margin-bottom: 68px; color: var(--accent-10); font-family: var(--display); font-size: 4.5rem; font-weight: 900; line-height: .9; font-variant-numeric: tabular-nums; }
     .step p { color: var(--muted); font-size: 18px; }
     .step-key { margin-top: auto; padding-top: 26px; color: var(--ink); border-top: 1px solid var(--line); font-size: 18px; font-weight: 800; }
     .step-key span { color: var(--accent-10); }
 
+    .rerun {
+      margin-top: var(--space-xl);
+      padding: 26px 0 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr);
+      align-items: baseline;
+      gap: var(--space-lg) clamp(24px, 5vw, 64px);
+      border-top: 1px solid var(--line);
+    }
+    .rerun h3 { margin: 0; color: var(--accent-10); }
+    .rerun p { margin: 0; color: var(--muted); font-size: 18px; }
+    .rerun p strong { color: var(--ink); }
+
+    /* ---- 結果：Prefab 階層與數字 ---- */
     .result-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.1fr) minmax(300px, .9fr);
+      grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr);
       gap: clamp(36px, 7vw, 96px);
       align-items: center;
     }
@@ -440,50 +630,75 @@
       border: 1px solid var(--line);
       border-radius: var(--radius);
     }
-    .tree-head { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding-bottom: 20px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
-    .tree-head strong { font-family: var(--display); font-size: 1.25rem; }
-    .status { padding: 5px 9px; color: var(--base-60); background: var(--accent-10); border-radius: 7px; font-size: 16px; font-weight: 900; }
+    .tree-head { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding-bottom: 20px; margin-bottom: var(--space-md); border-bottom: 1px solid var(--line); }
+    .tree-head strong { min-width: 0; font-family: var(--display); font-size: 1.25rem; overflow-wrap: anywhere; }
+    .status { padding: 5px 9px; color: var(--base-60); background: var(--accent-10); border-radius: 7px; font-size: 16px; font-weight: 900; flex: 0 0 auto; }
     .tree-row { position: relative; min-height: 45px; padding: 9px 0 9px calc(var(--depth) * 24px); display: flex; align-items: center; gap: 10px; color: var(--muted); }
-    .tree-row::before { content: ""; width: 14px; height: 14px; border: 1px solid var(--accent-10); border-radius: 3px; }
+    .tree-row::before { content: ""; flex: 0 0 auto; width: 14px; height: 14px; border: 1px solid var(--accent-10); border-radius: 3px; }
     .tree-row strong { color: var(--ink); }
-    .tree-row code { margin-left: auto; color: var(--accent-10); font-size: 18px; }
+    .tree-row code { margin-left: auto; padding-left: var(--space-sm); color: var(--accent-10); font-size: 17px; white-space: nowrap; }
     .metrics { display: grid; gap: 28px; }
-    .metric { padding-bottom: 24px; border-bottom: 1px solid var(--line); }
+    .metric { padding-bottom: var(--space-lg); border-bottom: 1px solid var(--line); }
     .metric:last-child { border-bottom: 0; }
-    .metric-value { display: block; margin-bottom: 8px; color: var(--accent-10); font-family: var(--display); font-size: clamp(2.5rem, 5vw, 4.8rem); font-weight: 900; line-height: .95; letter-spacing: -.035em; }
+    .metric-value { display: block; margin-bottom: var(--space-xs); color: var(--accent-10); font-family: var(--display); font-size: clamp(2.5rem, 5vw, 4.4rem); font-weight: 900; line-height: .95; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
     .metric p { margin: 0; color: var(--muted); font-size: 18px; }
 
+    /* ---- 生成之後：可換的東西 ---- */
+    .ledger { margin: 0; border-top: 1px solid var(--line); }
+    .ledger-row {
+      padding: 26px 0;
+      display: grid;
+      grid-template-columns: minmax(0, .62fr) minmax(0, 1.38fr);
+      gap: var(--space-sm) clamp(24px, 5vw, 72px);
+      border-bottom: 1px solid var(--line);
+    }
+    .ledger-row dt { min-width: 0; }
+    .ledger-row dd { margin: 0; min-width: 0; color: var(--muted); font-size: 18px; }
+    .ledger-name { display: block; font-family: var(--display); font-size: clamp(1.2rem, 2.1vw, 1.6rem); font-weight: 900; line-height: 1.25; }
+    .ledger-path { display: block; margin-top: 6px; color: var(--accent-10); font-family: var(--mono); font-size: 15px; }
+
+    /* ---- 護欄 ---- */
     .guardrail {
       display: grid;
-      grid-template-columns: .72fr 1.28fr;
+      grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr);
       gap: clamp(36px, 8vw, 110px);
       align-items: start;
     }
     .guardrail-list { border-top: 1px solid var(--line); }
-    .guardrail-item { padding: 26px 0; display: grid; grid-template-columns: 32px 1fr; gap: 16px; border-bottom: 1px solid var(--line); }
+    .guardrail-item { padding: 26px 0; display: grid; grid-template-columns: 32px minmax(0, 1fr); gap: var(--space-md); border-bottom: 1px solid var(--line); }
     .guardrail-item svg { width: 28px; stroke: var(--accent-10); }
     .guardrail-item p { margin: 5px 0 0; color: var(--muted); font-size: 18px; }
+    .guardrail-code {
+      display: inline-block;
+      margin-top: var(--space-sm);
+      padding: 4px 8px;
+      color: var(--accent-10);
+      background: var(--soft-accent);
+      border: 1px solid rgba(46, 230, 178, .34);
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 15px;
+      font-weight: 700;
+    }
 
-    .closing { min-height: 66vh; color: var(--base-60); background: linear-gradient(to bottom, var(--accent-10) 0 80%, var(--surface-30) 80% 100%) !important; text-align: center; }
+    /* ---- 結語 ---- */
+    .closing { min-height: 66svh; border-top: 6px solid var(--accent-10); text-align: center; }
     .closing .wrap { display: grid; justify-items: center; }
-    .closing h2 { max-width: 12ch; }
-    .closing .accent { color: var(--surface-30); }
-    .closing .lead { max-width: 38ch; color: #16363d; }
-    .closing-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 34px; }
-    .closing .button { color: var(--base-60); border-color: rgba(7, 19, 26, .42); }
-    .closing .button.primary { color: var(--ink); background: var(--base-60); border-color: var(--base-60); }
-    .source-note { max-width: 76ch; margin-top: 64px; padding-top: 24px; color: var(--muted); border-top: 1px solid var(--line); font-size: 18px; }
+    .closing h2 { max-width: 13em; }
+    .closing .lead { max-width: 30em; }
+    .closing-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-sm); margin-top: var(--space-xl); }
+    .source-note { max-width: 39em; margin-top: 64px; padding-top: var(--space-lg); color: var(--muted); border-top: 1px solid var(--line); font-size: 17px; text-align: left; }
 
     .present-hint {
       position: fixed;
       z-index: 80;
-      right: 18px;
-      bottom: 18px;
+      right: calc(18px + env(safe-area-inset-right));
+      bottom: calc(18px + env(safe-area-inset-bottom));
       padding: 7px 10px;
       color: var(--muted);
       background: var(--base-60);
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: var(--radius-compact);
       font-size: 16px;
     }
 
@@ -494,51 +709,53 @@
 
     @media (max-width: 940px) {
       .topnav { display: none; }
-      .hero-grid, .section-head, .result-grid, .guardrail { grid-template-columns: 1fr; }
-      .pipeline-stage { min-height: 500px; }
-      .conversion { grid-template-columns: 1fr 84px 1fr; }
-      .problem-line { grid-template-columns: repeat(2, 1fr); }
+      .section-head, .result-grid, .guardrail, .tagbook, .rerun, .ledger-row { grid-template-columns: minmax(0, 1fr); }
+      .pipeline-stage { min-height: 400px; }
+      .conversion { grid-template-columns: minmax(0, 1fr) 84px minmax(0, 1fr); }
+      .problem-line { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .manual-task { min-height: 170px; border-bottom: 1px solid var(--line); }
       .manual-task:nth-child(2n) { border-right: 0; }
       .manual-task:last-child { grid-column: 1 / -1; border-bottom: 0; }
       .manual-task b { margin-bottom: 28px; }
-      .steps { grid-template-columns: repeat(2, 1fr); }
+      .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .step { min-height: 330px; border-bottom: 1px solid var(--line); }
       .step:nth-child(2n) { border-right: 0; }
       .step:nth-last-child(-n+2) { border-bottom: 0; }
+      .ledger-row { gap: var(--space-xs); }
     }
 
     @media (max-width: 680px) {
       body { font-size: 16px; }
-      .topbar-inner { width: min(calc(100% - 28px), var(--max)); padding-block: 10px; flex-wrap: wrap; gap: 8px 16px; }
+      .topbar-inner { width: min(calc(100% - 28px), var(--max)); padding-block: 10px; flex-wrap: wrap; gap: var(--space-xs) var(--space-md); }
       .release-meta { margin-left: auto; }
       .topnav { width: 100%; display: flex; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
       .topnav a { flex: 0 0 auto; font-size: 16px; }
-      .chapter { min-height: auto; padding: 88px 16px; border-bottom: 10px solid var(--accent-10); }
+      .chapter { min-height: auto; padding: 88px 16px; }
       .hero { padding-top: 54px; }
       .hero-grid { gap: 36px; }
       .pipeline-stage { min-height: auto; padding-bottom: 72px; }
       .pipeline-stage::before { display: none; }
-      .conversion { grid-template-columns: 1fr; }
+      .conversion { grid-template-columns: minmax(0, 1fr); }
+      /* 窄螢幕收緊圖層列的間距，把寬度留給圖層名稱本身（型別標籤維持 16px 下限）。 */
+      .layers { padding: var(--space-sm); }
+      .layer { grid-template-columns: 22px minmax(0, 1fr) auto; gap: 8px; padding: 9px 4px; }
+      .layer-indent { padding-left: 18px; }
       .bridge { grid-template-columns: auto auto; margin-block: 6px; }
       .bridge-orbit { width: 60px; }
       .bridge svg { transform: rotate(90deg); }
       .proof-strip { inset: auto 0 0; align-items: flex-start; flex-direction: column; }
-      #problem { background: linear-gradient(to bottom, var(--base-60) 0 43%, var(--surface-30) 43% 100%); }
-      .closing { background: var(--accent-10) !important; }
-      .closing .source-note { color: #244b50; border-color: rgba(7, 19, 26, .30); }
-      .problem-line, .steps { grid-template-columns: 1fr; }
+      .problem-line, .steps { grid-template-columns: minmax(0, 1fr); }
       .manual-task, .step { min-height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
       .manual-task:last-child, .step:last-child { border-bottom: 0; }
       .step-num { margin-bottom: 40px; }
-      .problem-summary { grid-template-columns: 1fr; }
-      .mapping { display: none; }
-      .mapping-mobile { display: grid; border-block: 1px solid var(--line); }
-      .mapping-pair { padding: 22px 0; display: grid; grid-template-columns: 1fr 32px 1fr; gap: 12px; align-items: center; border-bottom: 1px solid var(--line); }
-      .mapping-pair:last-child { border-bottom: 0; }
-      .mapping-pair small { display: block; color: var(--muted); font-size: 18px; }
-      .mapping-pair svg { width: 24px; stroke: var(--accent-10); }
-      .tech-rail { grid-template-columns: 1fr; }
+      .problem-summary { grid-template-columns: minmax(0, 1fr); }
+      .mapping-head { display: none; }
+      .mapping-row { grid-template-columns: minmax(0, 1fr); padding: 18px 0; }
+      .mapping-cell { min-height: 0; padding: 6px 0; }
+      .cell-side { display: block; margin-bottom: 4px; color: var(--accent-10); font-size: 15px; font-weight: 900; letter-spacing: .1em; }
+      .mapping-link { justify-items: start; padding: 4px 0; }
+      .mapping-link svg { width: 22px; height: 30px; transform: rotate(90deg); }
+      .tech-rail { grid-template-columns: minmax(0, 1fr); }
       .tech-rail::before, .bridge-data { display: none; }
       .tech-block:nth-child(even) { margin-top: 0; }
       .tree-row code { display: none; }
@@ -553,10 +770,11 @@
     @media print {
       :root { color-scheme: light; }
       body { color: #102128; background: #fff; }
-      .topbar, .progress, .present-hint { display: none; }
-      .chapter, .chapter:nth-of-type(3n) { min-height: auto; padding: 42px 24px; color: #102128; background: #fff; break-inside: avoid; }
-      .lead, .manual-task p, .tech-block p, .step p, .metric p, .guardrail-item p, .source-note { color: #40545a; }
-      .app-window, .prefab-tree { color: #f2f8f7; background: var(--base-60); }
+      .topbar, .progress, .present-hint, .skip-link { display: none; }
+      .chapter, .chapter--panel { min-height: auto; padding: 42px 24px; color: #102128; background: #fff; break-inside: avoid; }
+      .lead, .manual-task p, .tech-block p, .step p, .metric p, .guardrail-item p, .tag-row p, .ledger-row dd, .rerun p, .loop-note, .source-note { color: #40545a; }
+      .app-window, .prefab-tree, .specimen, .datasheet { color: #f2f8f7; background: var(--base-60); }
+      .closing { border-top: 2px solid #102128; }
       .chapter { page-break-after: always; }
     }
   </style>
@@ -565,24 +783,27 @@
   <!--
     THESIS: 把「設計稿轉 Prefab」做成一條看得見的成果軌跡，拒絕先堆技術名詞的傳統發表頁。
     OWN-WORLD: 延續專案深墨與深藍介面，只用薄荷綠作唯一強調；資訊圖採圖層、節點與製作軌道語彙。
-    STORY: 觀眾先理解重做 UI 的痛點，再看到語意轉譯、四步操作、可編輯結果與驗證護欄。
+    STORY: 痛點（含改稿回圈）→ 語意對應 → 命名即規格 → 兩端技術 → 四步操作 → 可編輯結果 → 生成後仍可換 → 降級護欄。
     FIRST VIEWPORT: 左側一句價值主張，右側等比例展示 Photoshop 圖層經轉譯成 Unity Prefab 階層；主行動指向流程。
     FORM: 成果軌跡，既有視覺世界中的第 7 個結構候選，seed 830c02f9。
+    EVIDENCE: 只引用 README_zh.md、version.json、Samples/Phase4_5/README.md 與原始碼中確實存在的標記與警告碼。
     FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
   -->
 
+  <a class="skip-link" href="#start">跳到報告內容</a>
   <div class="progress" id="progress" aria-hidden="true"></div>
 
   <header class="topbar">
     <div class="topbar-inner">
       <a class="brand" href="#start" aria-label="回到報告開頭">
-        <span class="brand-mark">P→U</span>
+        <span class="brand-mark" aria-hidden="true">P→U</span>
         <span>Photoshop To Unity V2</span>
       </a>
-      <span class="release-meta">v2.13.3 · 2026.08.17</span>
+      <span class="release-meta" translate="no">v2.13.4&nbsp;·&nbsp;2026.08.17</span>
       <nav class="topnav" aria-label="報告章節">
         <a href="#problem">問題</a>
         <a href="#solution">解法</a>
+        <a href="#naming">命名</a>
         <a href="#technology">技術</a>
         <a href="#usage">操作</a>
         <a href="#result">結果</a>
@@ -590,11 +811,11 @@
     </div>
   </header>
 
-  <main>
+  <main id="main">
     <section class="chapter hero" id="start" data-nav="start">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <h1>做好一次，<span class="accent">直接進 Unity。</span></h1>
+          <h1>做好一次，<br><span class="accent">直接進 Unity。</span></h1>
           <p class="lead">把 Photoshop 排好的遊戲 UI，轉成<mark>可編輯的 Unity UI</mark>（uGUI + TextMeshPro Prefab）。</p>
           <div class="hero-actions">
             <a class="button primary" href="#problem">
@@ -608,23 +829,23 @@
         <div class="pipeline-stage" aria-label="Photoshop 圖層轉成 Unity Prefab 的示意圖">
           <div class="conversion">
             <div class="app-window">
-              <div class="window-bar"><span>PHOTOSHOP · PSD 圖層 · 流程示意</span><span class="window-dots"><i></i><i></i><i></i></span></div>
+              <div class="window-bar"><span>PHOTOSHOP · 圖層示意</span><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span></div>
               <div class="layers">
                 <div class="layer">
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m4 7 8-4 8 4-8 4-8-4Zm0 5 8 4 8-4M4 17l8 4 8-4" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  <span>Ranking_Panel</span><small>GROUP</small>
+                  <span translate="no">Ranking_Panel</span><small>GROUP</small>
                 </div>
                 <div class="layer layer-indent">
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h5" stroke-width="1.7" stroke-linecap="round"/></svg>
-                  <span>title_text</span><small>TEXT</small>
+                  <span translate="no">title_text</span><small>TEXT</small>
                 </div>
                 <div class="layer layer-indent">
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v14H4zM7 15l3-3 2 2 3-4 2 3" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  <span>ranking_frame</span><small>IMAGE</small>
+                  <span translate="no">ranking_frame</span><small>IMAGE</small>
                 </div>
                 <div class="layer layer-indent">
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h3" stroke-width="1.7" stroke-linecap="round"/></svg>
-                  <span>[SCROLL_V] list</span><small>LAYOUT</small>
+                  <span translate="no">[SCROLL_V] list</span><small>GROUP</small>
                 </div>
               </div>
             </div>
@@ -637,23 +858,23 @@
             </div>
 
             <div class="app-window">
-              <div class="window-bar"><span>UNITY · PREFAB 階層 · 結構示意</span><span class="window-dots"><i></i><i></i><i></i></span></div>
+              <div class="window-bar"><span>UNITY · Prefab 階層示意</span><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span></div>
               <div class="layers">
                 <div class="layer">
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3 8 5v8l-8 5-8-5V8l8-5Zm0 0v18M4 8l8 5 8-5" stroke-width="1.7" stroke-linejoin="round"/></svg>
-                  <span>Ranking_Panel</span><small>RECT</small>
+                  <span translate="no">Ranking_Panel</span><small>RECT</small>
                 </div>
                 <div class="layer layer-indent">
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14M12 5v14M8 19h8" stroke-width="1.7" stroke-linecap="round"/></svg>
-                  <span>title_text</span><small>TMP</small>
+                  <span translate="no">title_text</span><small>TMP</small>
                 </div>
                 <div class="layer layer-indent">
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v14H4zM7 15l3-3 2 2 3-4 2 3" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  <span>ranking_frame</span><small>SPRITE</small>
+                  <span translate="no">ranking_frame</span><small>SPRITE</small>
                 </div>
                 <div class="layer layer-indent">
                   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 4h14v16H5zM8 7h8M8 11h8M8 15h8" stroke-width="1.7" stroke-linecap="round"/></svg>
-                  <span>ScrollView / Content</span><small>UGUI</small>
+                  <span translate="no">ScrollView / Content</span><small>UGUI</small>
                 </div>
               </div>
             </div>
@@ -670,7 +891,7 @@
     <section class="chapter" id="problem" data-nav="problem">
       <div class="wrap">
         <div class="section-head">
-          <h2>同一個畫面，團隊常常<mark>做兩次。</mark></h2>
+          <h2>同一個畫面，<br>團隊常常<mark>做兩次。</mark></h2>
           <p class="lead">設計師已經在 Photoshop 排好畫面，開發者卻還要在 Unity 重新切圖、定位、建文字與階層。</p>
         </div>
         <div class="problem-line" aria-label="傳統手動重建流程">
@@ -678,8 +899,12 @@
           <article class="manual-task"><b>02</b><h3>重新量位置</h3><p>把座標、尺寸再搬進 Unity。</p></article>
           <article class="manual-task"><b>03</b><h3>重建文字</h3><p>重設字型、字級、顏色與描邊。</p></article>
           <article class="manual-task"><b>04</b><h3>補齊結構</h3><p>遮罩、列表、捲動與排版再做一次。</p></article>
-          <article class="manual-task"><b>05</b><h3>反覆比對</h3><p>改稿後再走一次相同流程。</p></article>
+          <article class="manual-task"><b>05</b><h3>反覆比對</h3><p>對照設計稿檢查，找出跑掉的地方。</p></article>
         </div>
+        <p class="loop-note">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.24M4 4v5h5" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span><strong>而且每改一次稿，01 到 05 就再走一次。</strong> 重工不是一次性成本，是整個專案期間持續付出的成本。</span>
+        </p>
         <div class="problem-summary">
           <strong>問題不是不會做，<br>而是<span class="accent">重做太多次。</span></strong>
           <span>重工增加，誤差與溝通成本也跟著出現。</span>
@@ -687,47 +912,129 @@
       </div>
     </section>
 
-    <section class="chapter" id="solution" data-nav="solution">
+    <section class="chapter chapter--panel" id="solution" data-nav="solution">
       <div class="wrap">
         <div class="section-head">
-          <h2>工具搬運的不是畫面，<span class="accent">是畫面的意思。</span></h2>
+          <h2>工具搬運的不是畫面，<br><span class="accent">是畫面的意思。</span></h2>
           <p class="lead">它讀懂「這是文字、這是圖片、這裡要裁切、這一組要捲動」，再交給 Unity 建成對應元件。</p>
         </div>
 
-        <div class="mapping" aria-label="Photoshop 與 Unity 元件對應表">
-          <div class="mapping-side">
-            <div class="mapping-title">PHOTOSHOP 裡的內容</div>
-            <div class="mapping-row"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14M12 5v14M8 19h8" stroke-width="1.7" stroke-linecap="round"/></svg><div><strong>文字圖層</strong><small>內容、字型、字級、顏色</small></div></div>
-            <div class="mapping-row"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v14H4zM7 15l3-3 2 2 3-4 2 3" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><div><strong>圖片圖層</strong><small>可見像素與邊界</small></div></div>
-            <div class="mapping-row"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h7l2 2h7v10H4z" stroke-width="1.7" stroke-linejoin="round"/></svg><div><strong>群組階層</strong><small>父子關係與相對位置</small></div></div>
-            <div class="mapping-row"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14v14H5zM8 8h8v8H8z" stroke-width="1.7"/></svg><div><strong>遮罩</strong><small>矩形或形狀裁切</small></div></div>
-            <div class="mapping-row"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h3" stroke-width="1.7" stroke-linecap="round"/></svg><div><strong>命名標記</strong><small>[SCROLL]、[GRID]、[SLICED]</small></div></div>
+        <div class="mapping">
+          <div class="mapping-head">
+            <span>PHOTOSHOP 裡的內容</span><span aria-hidden="true"></span><span>UNITY 裡的結果</span>
           </div>
-          <div class="mapping-arrows" aria-hidden="true"><i></i><span></span><span></span><span></span><span></span><span></span></div>
-          <div class="mapping-side">
-            <div class="mapping-title">UNITY 裡的結果</div>
-            <div class="mapping-row"><div><strong>TextMeshPro（TMP）</strong><small>Unity 可即時修改的文字元件</small></div></div>
-            <div class="mapping-row"><div><strong>Image + Sprite</strong><small>Sprite 是 Unity 顯示用的圖片素材</small></div></div>
-            <div class="mapping-row"><div><strong>RectTransform</strong><small>保留結構、座標與尺寸</small></div></div>
-            <div class="mapping-row"><div><strong>RectMask2D / Mask</strong><small>依形狀選擇合適遮罩</small></div></div>
-            <div class="mapping-row"><div><strong>ScrollRect / Layout / Sliced</strong><small>生成可直接使用的 UI 行為</small></div></div>
+
+          <div class="mapping-row">
+            <div class="mapping-cell">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14M12 5v14M8 19h8" stroke-width="1.7" stroke-linecap="round"/></svg>
+              <div><span class="cell-side">PHOTOSHOP</span><strong>文字圖層</strong><small>內容、字型、字級、顏色</small></div>
+            </div>
+            <div class="mapping-link" aria-hidden="true"><svg viewBox="0 0 40 20" fill="none"><path d="M2 10h34m-6-6 6 6-6 6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="mapping-cell">
+              <div><span class="cell-side">UNITY</span><strong translate="no">TextMeshPro（TMP）</strong><small>Unity 可即時修改的文字元件</small></div>
+            </div>
+          </div>
+
+          <div class="mapping-row">
+            <div class="mapping-cell">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h16v14H4zM7 15l3-3 2 2 3-4 2 3" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <div><span class="cell-side">PHOTOSHOP</span><strong>圖片圖層</strong><small>可見像素與邊界</small></div>
+            </div>
+            <div class="mapping-link" aria-hidden="true"><svg viewBox="0 0 40 20" fill="none"><path d="M2 10h34m-6-6 6 6-6 6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="mapping-cell">
+              <div><span class="cell-side">UNITY</span><strong translate="no">Image + Sprite</strong><small>Sprite 是 Unity 顯示用的圖片素材</small></div>
+            </div>
+          </div>
+
+          <div class="mapping-row">
+            <div class="mapping-cell">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h7l2 2h7v10H4z" stroke-width="1.7" stroke-linejoin="round"/></svg>
+              <div><span class="cell-side">PHOTOSHOP</span><strong>群組階層</strong><small>父子關係與相對位置</small></div>
+            </div>
+            <div class="mapping-link" aria-hidden="true"><svg viewBox="0 0 40 20" fill="none"><path d="M2 10h34m-6-6 6 6-6 6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="mapping-cell">
+              <div><span class="cell-side">UNITY</span><strong translate="no">RectTransform</strong><small>保留結構、座標與尺寸</small></div>
+            </div>
+          </div>
+
+          <div class="mapping-row">
+            <div class="mapping-cell">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 5h14v14H5zM8 8h8v8H8z" stroke-width="1.7"/></svg>
+              <div><span class="cell-side">PHOTOSHOP</span><strong>遮罩</strong><small>矩形或形狀裁切</small></div>
+            </div>
+            <div class="mapping-link" aria-hidden="true"><svg viewBox="0 0 40 20" fill="none"><path d="M2 10h34m-6-6 6 6-6 6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="mapping-cell">
+              <div><span class="cell-side">UNITY</span><strong translate="no">RectMask2D / Mask</strong><small>矩形用較省的 RectMask2D，異形才用 Mask</small></div>
+            </div>
+          </div>
+
+          <div class="mapping-row">
+            <div class="mapping-cell">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h3" stroke-width="1.7" stroke-linecap="round"/></svg>
+              <div><span class="cell-side">PHOTOSHOP</span><strong>命名標記</strong><small translate="no">[SCROLL_V]、[GRID]、[SLICED=32]</small></div>
+            </div>
+            <div class="mapping-link" aria-hidden="true"><svg viewBox="0 0 40 20" fill="none"><path d="M2 10h34m-6-6 6 6-6 6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <div class="mapping-cell">
+              <div><span class="cell-side">UNITY</span><strong translate="no">ScrollRect / Layout / Sliced</strong><small>生成可直接使用的 UI 行為</small></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="naming" data-nav="naming">
+      <div class="wrap">
+        <div class="section-head section-head--stack">
+          <h2>圖層名稱，<br><span class="accent">就是規格。</span></h2>
+          <p class="lead">不用寫設定檔，也不用在 Unity 手動接線。要什麼行為，就在 Photoshop 的圖層名稱上加標記——設計師改名字，開發者就得到對應元件。</p>
+        </div>
+
+        <p class="specimen" translate="no"><span class="specimen-tag">[SCROLL_V]</span><span>&nbsp;ranking_list</span></p>
+        <p class="specimen-note">中括號裡面是給工具看的指令，外面是給人看的名字；兩者寫在同一行，不需要額外的對照表。</p>
+
+        <div class="tagbook">
+          <div class="tag-row">
+            <div class="tag-keys" translate="no"><code>[SCROLL_V]</code><code>[SCROLL_H]</code></div>
+            <p>自動組出 <strong>ScrollView › Viewport › Content</strong> 三層，掛上 ScrollRect 與 RectMask2D。</p>
+          </div>
+          <div class="tag-row">
+            <div class="tag-keys" translate="no"><code>[GRID]</code><code>[V]</code><code>[H]</code></div>
+            <p>生成對應的 <strong>Layout Group</strong>；可與捲動組合，排版元件會掛在 Content 上。</p>
+          </div>
+          <div class="tag-row">
+            <div class="tag-keys" translate="no"><code>[MASK]</code></div>
+            <p>以該圖層的形狀裁切整個群組。<strong>只有非矩形才需要</strong>；純矩形會自動改用更省的 RectMask2D。</p>
+          </div>
+          <div class="tag-row">
+            <div class="tag-keys" translate="no"><code>[SLICED=32]</code><code>[SLICED=左,上,右,下]</code></div>
+            <p>寫入 Sprite Border，並把 Image 設為 <strong>九宮格 Sliced</strong>，按鈕與底框可以自由拉伸。</p>
+          </div>
+          <div class="tag-row">
+            <div class="tag-keys" translate="no"><code>[MERGE]</code></div>
+            <p>把整個群組的可見結果烘成<strong>一張 PNG</strong>、只建一個節點。裡面還要換字或動畫時不要用。</p>
+          </div>
+          <div class="tag-row">
+            <div class="tag-keys" translate="no"><code>[SCROLLBAR_V]</code><code>[TRACK]</code><code>[HANDLE]</code></div>
+            <p>自動接上<strong>可拖動的捲軸</strong>，並保留匯出時的 Content 初始位置。</p>
+          </div>
+          <div class="tag-row">
+            <div class="tag-keys" translate="no"><code>[SOFTMASK_BOTTOM=64]</code></div>
+            <p>用兩層原生 RectMask2D <strong>柔化底邊 64&nbsp;像素</strong>，不必額外安裝 runtime 套件。</p>
+          </div>
+          <div class="tag-row">
+            <div class="tag-keys" translate="no"><code>[PNG]</code><code>[CG]</code></div>
+            <p>指定文字圖層<strong>改輸出成圖片</strong>，或替群組加上 CanvasGroup 以便整組淡入淡出。</p>
           </div>
         </div>
 
-        <div class="mapping-mobile" aria-label="Photoshop 與 Unity 元件逐項對應">
-          <div class="mapping-pair"><div><strong>文字圖層</strong><small>內容、字型、字級</small></div><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h16m-5-5 5 5-5 5" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><div><strong>TextMeshPro</strong><small>可修改的 Unity 文字</small></div></div>
-          <div class="mapping-pair"><div><strong>圖片圖層</strong><small>可見像素</small></div><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h16m-5-5 5 5-5 5" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><div><strong>Image + Sprite</strong><small>Unity 圖片素材</small></div></div>
-          <div class="mapping-pair"><div><strong>群組階層</strong><small>父子關係</small></div><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h16m-5-5 5 5-5 5" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><div><strong>RectTransform</strong><small>結構、位置、尺寸</small></div></div>
-          <div class="mapping-pair"><div><strong>遮罩</strong><small>裁切形狀</small></div><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h16m-5-5 5 5-5 5" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><div><strong>Mask</strong><small>Unity 裁切元件</small></div></div>
-          <div class="mapping-pair"><div><strong>命名標記</strong><small>Scroll、Grid、Sliced</small></div><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12h16m-5-5 5 5-5 5" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg><div><strong>UI 行為</strong><small>捲動、排版、九宮格</small></div></div>
-        </div>
+        <p class="naming-note">其他圖層維持有意義的英文命名即可。中文命名的 PSD 請先跑 <code translate="no">PhotoshopLayerAutoNamer.jsx</code>，它以納入版控的 <code translate="no">naming_glossary.tsv</code> 做最長匹配翻譯；推不出來的圖層維持原名，並把未知詞寫進待辦表，補完再跑一次即可。</p>
       </div>
     </section>
 
     <section class="chapter" id="technology" data-nav="technology">
       <div class="wrap">
         <div class="section-head">
-          <h2>兩端工具，<span class="accent">一份共同語言。</span></h2>
+          <h2>兩端工具，<br><span class="accent">一份共同語言。</span></h2>
           <p class="lead">Photoshop 負責讀懂設計，Unity 負責重建元件；中間用 Layout JSON——一份記錄名稱、位置、大小與文字的清單檔——傳遞資料。</p>
         </div>
 
@@ -735,7 +1042,7 @@
           <article class="tech-block">
             <div class="tech-label">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 4h16v16H4zM8 8h4a3 3 0 0 1 0 6H8V8Zm8 3h2m-2 4h2" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              PHOTOSHOP · JAVASCRIPT / JSX
+              <span translate="no">PHOTOSHOP · JAVASCRIPT / JSX</span>
             </div>
             <h3>把設計拆成「像素 + 語意」</h3>
             <p>讀取圖層、文字、遮罩與座標；匯出 Sprite、Layout JSON 與警告報告。</p>
@@ -745,21 +1052,37 @@
           <article class="tech-block">
             <div class="tech-label">
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3 8 5v8l-8 5-8-5V8l8-5Zm0 0v18M4 8l8 5 8-5" stroke-width="1.6" stroke-linejoin="round"/></svg>
-              UNITY EDITOR · C#
+              <span translate="no">UNITY EDITOR · C#</span>
             </div>
             <h3>把資料建成可維護 Prefab</h3>
             <p>先驗證 Package，再建立 uGUI、TMP、遮罩、捲動、排版與 Sprite Atlas。</p>
             <div class="chips"><span class="chip">Package 驗證</span><span class="chip">Prefab Builder</span><span class="chip">TMP 字型對應</span><span class="chip">Sprite Atlas</span></div>
           </article>
-          <div class="bridge-data">LAYOUT JSON</div>
+          <div class="bridge-data" translate="no">LAYOUT JSON</div>
+        </div>
+
+        <div class="datasheet">
+          <div class="datasheet-title">LAYOUT JSON · 欄位示意（非完整結構）</div>
+          <pre translate="no" tabindex="0" role="group" aria-label="Layout JSON 欄位示意，可左右捲動"><code>{
+  <b>"schemaVersion"</b>: "2.11",
+  <b>"nodes"</b>: [
+    { <b>"name"</b>: "title_text", <b>"type"</b>: "text",
+      <b>"x"</b>: 64, <b>"y"</b>: 128, <b>"width"</b>: 420, <b>"height"</b>: 56,
+      <b>"text"</b>: "RANKING", <b>"fontSize"</b>: 36, <b>"fontToken"</b>: "Main_Bold" },
+
+    { <b>"name"</b>: "ranking_list", <b>"type"</b>: "group",
+      <b>"scrollDirection"</b>: "vertical", <b>"children"</b>: [ <i>…</i> ] }
+  ],
+  <b>"warnings"</b>: [ { <b>"code"</b>: "LAYOUT_CROSS_AXIS_DEGRADED", <b>"node"</b>: "row_group" } ]
+}</code></pre>
         </div>
       </div>
     </section>
 
-    <section class="chapter" id="usage" data-nav="usage">
+    <section class="chapter chapter--panel" id="usage" data-nav="usage">
       <div class="wrap">
         <div class="section-head">
-          <h2>從 PSD 到 Prefab，<mark>四個動作。</mark></h2>
+          <h2>從 PSD 到 Prefab，<br><mark>四個動作。</mark></h2>
           <p class="lead">平常情況不必理解內部演算法，只要照順序完成命名、匯出、驗證與生成。</p>
         </div>
 
@@ -789,82 +1112,123 @@
             <div class="step-key"><span>完成：</span>可編輯 Unity UI</div>
           </article>
         </div>
+
+        <div class="rerun">
+          <h3>改稿之後，只是再跑一次。</h3>
+          <p><strong>Photoshop 重新 Export，Unity 重新 Generate。</strong>命名與標記都留在 PSD 裡，所以捲動、排版、九宮格與遮罩的行為會跟著回來——這正是本頁開頭那個 01 → 05 迴圈真正被拆掉的地方。</p>
+        </div>
       </div>
     </section>
 
     <section class="chapter" id="result" data-nav="result">
       <div class="wrap">
         <div class="section-head">
-          <h2>最後得到的，是<mark>能繼續工作的 UI。</mark></h2>
-          <p class="lead">輸出保留階層與元件語意，不把整個畫面壓成一張不能維護的圖片。</p>
+          <h2>最後得到的，<br>是<mark>能繼續工作的 UI。</mark></h2>
+          <p class="lead">輸出保留階層與元件語意，<strong>TMP 文字、Sprite 與 UI 元件都能在 Unity 繼續調整</strong>，不把整個畫面壓成一張不能維護的圖片。</p>
         </div>
 
         <div class="result-grid">
           <div class="prefab-tree" aria-label="生成後的 Unity Prefab 階層示意">
-            <div class="tree-head"><strong>Ranking_Panel.prefab · 結構示意</strong><span class="status">DEMO</span></div>
-            <div class="tree-row" style="--depth:0"><strong>Canvas_Ranking</strong><code>RectTransform</code></div>
-            <div class="tree-row" style="--depth:1"><span>Background</span><code>Image</code></div>
-            <div class="tree-row" style="--depth:1"><span>Title</span><code>TextMeshProUGUI</code></div>
-            <div class="tree-row" style="--depth:1"><strong>ScrollView</strong><code>ScrollRect</code></div>
-            <div class="tree-row" style="--depth:2"><span>Viewport</span><code>RectMask2D</code></div>
-            <div class="tree-row" style="--depth:3"><span>Content</span><code>VerticalLayout</code></div>
-            <div class="tree-row" style="--depth:4"><span>Ranking_Row</span><code>Image + TMP</code></div>
+            <div class="tree-head"><strong translate="no">Ranking_Panel.prefab · 結構示意</strong><span class="status">DEMO</span></div>
+            <div class="tree-row" style="--depth:0" translate="no"><strong>Canvas_Ranking</strong><code>RectTransform</code></div>
+            <div class="tree-row" style="--depth:1" translate="no"><span>Background</span><code>Image</code></div>
+            <div class="tree-row" style="--depth:1" translate="no"><span>Title</span><code>TextMeshProUGUI</code></div>
+            <div class="tree-row" style="--depth:1" translate="no"><strong>ScrollView</strong><code>ScrollRect</code></div>
+            <div class="tree-row" style="--depth:2" translate="no"><span>Viewport</span><code>RectMask2D</code></div>
+            <div class="tree-row" style="--depth:3" translate="no"><span>Content</span><code>VerticalLayout</code></div>
+            <div class="tree-row" style="--depth:4" translate="no"><span>Ranking_Row</span><code>Image + TMP</code></div>
           </div>
 
           <div class="metrics">
             <div class="metric">
-              <span class="metric-value">可編輯</span>
-              <p>TMP 文字、Sprite、階層與 UI 元件都能在 Unity 繼續調整。</p>
+              <span class="metric-value">43&nbsp;→&nbsp;26</span>
+              <p>一份排行榜 Package 的實例：43 張 PNG 經像素去重後，收斂為 26 種不同像素。</p>
             </div>
             <div class="metric">
-              <span class="metric-value">43 → 26</span>
-              <p>一份排行榜 Package 的實例：43 張 PNG 收斂為 26 種不同像素。</p>
-            </div>
-            <div class="metric">
-              <span class="metric-value">−258 KB</span>
+              <span class="metric-value">−258&nbsp;KB</span>
               <p>同一實例中，避免重複像素內容被再次打進 Sprite Atlas。</p>
+            </div>
+            <div class="metric">
+              <span class="metric-value">6 份樣本</span>
+              <p>Phase&nbsp;4.5 以 6 個 ScrollRect PSD 樣本，在 Photoshop&nbsp;2026 + Unity&nbsp;2022.3.62f1 實機驗收通過。</p>
             </div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section class="chapter" id="after" data-nav="result">
+      <div class="wrap">
+        <div class="section-head section-head--stack">
+          <h2>生成之後，<br><span class="accent">還能一直換。</span></h2>
+          <p class="lead">Prefab 不是終點。字型、皮膚與圖集各有專用工具，換的時候不會動到已經排好的版面。</p>
+        </div>
+
+        <dl class="ledger">
+          <div class="ledger-row">
+            <dt><span class="ledger-name">只換字型</span><span class="ledger-path" translate="no">Font Replacer</span></dt>
+            <dd>分析 Prefab 目前用到的 TMP 字型與材質，一鍵替換。只寫 <code translate="no">font</code> 與 <code translate="no">fontSharedMaterial</code> 兩個欄位——排版、字級、顏色與 Sprite 全部不動，描邊材質會自動克隆到新字型。</dd>
+          </div>
+          <div class="ledger-row">
+            <dt><span class="ledger-name">整套換皮</span><span class="ledger-path" translate="no">SkinTheme</span></dt>
+            <dd>用一組對應表批次換掉整套 Sprite，做節慶版或不同陣營配色。Prefab 上已經掛好的 Script 與 Button 都會保留。</dd>
+          </div>
+          <div class="ledger-row">
+            <dt><span class="ledger-name">圖集自動維護</span><span class="ledger-path" translate="no">Sprite Atlas</span></dt>
+            <dd>生成時自動建立或更新圖集，且<strong>只收錄這次實際引用到的 Sprite</strong>；上限依最大來源圖自動選 2048／4096／8192。</dd>
+          </div>
+          <div class="ledger-row">
+            <dt><span class="ledger-name">圖層自動命名</span><span class="ledger-path" translate="no">PhotoshopLayerAutoNamer</span></dt>
+            <dd>以版控中的中英詞庫翻譯圖層名，同族圖層自動編號。翻不出來的<strong>維持原名並列進待辦</strong>，不會擅自猜一個英文名字。</dd>
+          </div>
+        </dl>
       </div>
     </section>
 
     <section class="chapter" id="trust" data-nav="result">
       <div class="wrap guardrail">
         <div>
-          <h2>遇到不安全的情況，<span class="accent">工具不硬做。</span></h2>
-          <p class="lead">可預測，比看似成功更重要。無法可靠重建時，工具會警告或降級，避免把錯誤帶進 Prefab。</p>
+          <h2>不確定的時候，<br><span class="accent">工具不硬做。</span></h2>
+          <p class="lead">可預測，比看似成功更重要。無法可靠重建時，工具會警告或降級，並在 Layout JSON 留下代碼，避免把錯誤悄悄帶進 Prefab。</p>
         </div>
         <div class="guardrail-list">
           <article class="guardrail-item">
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m12 3 9 16H3l9-16Zm0 6v4m0 3h.01" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <div><h3>先 Validate，再 Generate</h3><p>在建立 Prefab 前檢查路徑、字型與 Package 結構。</p></div>
+            <div><h3>先 Validate，再 Generate</h3><p>在建立 Prefab 前檢查路徑、字型與 Package 結構，問題在生成之前就攔下來。</p></div>
           </article>
           <article class="guardrail-item">
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.24M4 4v5h5" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <div><h3>無法安全套 Layout 時保留座標</h3><p>遇到交叉軸偏移，寧可維持 Photoshop 的絕對位置，也不強制重排。</p></div>
+            <div>
+              <h3>排版對不上就保留原座標</h3>
+              <p>交叉軸有偏移時，寧可維持 Photoshop 的絕對位置，也不強制重排把文字擠進遮罩裡；v2.13.3 起連 0.5&nbsp;px 偏移都會保護性降級。</p>
+              <span class="guardrail-code" translate="no">LAYOUT_CROSS_AXIS_DEGRADED</span>
+            </div>
           </article>
           <article class="guardrail-item">
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12h14M12 5v14M4 4l16 16" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <div><h3>Scroll 缺少內容時主動降級</h3><p>避免生成無法接線、反而改壞 Handle 版面的 ScrollRect。</p></div>
+            <div>
+              <h3>配對不唯一時不猜</h3>
+              <p>外置捲軸只有在整個 Prefab 剛好有一個相容且未接線的 ScrollRect 時才自動配對；有多種可能就停手並回報。</p>
+              <span class="guardrail-code" translate="no">SCROLLBAR_ORPHAN_UNRESOLVED</span>
+            </div>
           </article>
           <article class="guardrail-item">
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m5 12 4 4L19 6" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <div><h3>使用真實 PSD 與 Unity 驗收</h3><p>Phase 4.5 已完成 ScrollRect、預捲動與換皮行為驗證；當時 Unity Console 為 0 筆錯誤。</p></div>
+            <div><h3>用真實 PSD 驗收，缺陷公開記錄</h3><p>Phase&nbsp;4.5 首輪就發現 2 個阻斷缺陷，修復後以同一批樣本複驗通過；當時 Unity Console 為 0 筆 error／warning。</p></div>
           </article>
         </div>
       </div>
     </section>
 
-    <section class="chapter closing" id="close" data-nav="result">
+    <section class="chapter chapter--panel closing" id="close" data-nav="result">
       <div class="wrap">
-        <h2>讓設計只做一次，<span class="accent">讓團隊繼續往前。</span></h2>
-        <p class="lead">Photoshop To Unity V2 把重複搬運變成可驗證的轉換流程，交付的終點不再是平面稿，而是能繼續製作的 Unity UI。</p>
+        <h2>讓設計只做一次，<br><span class="accent">讓團隊繼續往前。</span></h2>
+        <p class="lead">Photoshop To Unity V2 把重複搬運變成可驗證、可重跑的轉換流程；交付的終點不再是平面稿，而是能繼續製作的 Unity UI。</p>
         <div class="closing-actions">
           <a class="button primary" href="GUIDE_zh.html">開啟完整使用說明</a>
           <a class="button" href="https://github.com/Wayne188-yiching/PS_To_Unity_v2">查看 GitHub 專案</a>
         </div>
-        <p class="source-note">報告依據：README_zh.md、GUIDE_zh.html、version.json、Phase 4.5 驗收紀錄。版本 v2.13.3；43 → 26 與 258 KB 為單一排行榜 Package 實例，不代表所有專案的固定比例。</p>
+        <p class="source-note">報告依據：<code translate="no">README_zh.md</code>、<code translate="no">GUIDE_zh.html</code>、<code translate="no">version.json</code>（v2.13.4，2026-08-17）與 <code translate="no">Samples/Phase4_5/README.md</code> 驗收紀錄。43&nbsp;→&nbsp;26 與 258&nbsp;KB 為單一排行榜 Package 的實例，不代表所有專案的固定比例；本報告未引用客戶名稱、使用人數或節省工時，因為目前沒有可公開查證的數據。</p>
       </div>
     </section>
   </main>
@@ -875,29 +1239,68 @@
     const sections = [...document.querySelectorAll("main > section")];
     const navLinks = [...document.querySelectorAll(".topnav a")];
     const progress = document.getElementById("progress");
+    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 
-    const updateScrollState = () => {
+    /* 進度條：用 rAF 收斂捲動事件，避免每個 scroll event 都讀版面。 */
+    let ticking = false;
+    const paintProgress = () => {
       const scrollable = document.documentElement.scrollHeight - innerHeight;
-      progress.style.width = `${scrollable > 0 ? (scrollY / scrollable) * 100 : 0}%`;
-      const current = sections.reduce((active, section) =>
-        Math.abs(section.getBoundingClientRect().top - 92) < Math.abs(active.getBoundingClientRect().top - 92) ? section : active
-      );
-      navLinks.forEach(link => link.toggleAttribute("aria-current", link.getAttribute("href") === `#${current.dataset.nav}`));
+      progress.style.width = `${scrollable > 0 ? Math.min(100, (scrollY / scrollable) * 100) : 0}%`;
+      ticking = false;
+    };
+    const requestProgress = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(paintProgress);
     };
 
-    addEventListener("scroll", updateScrollState, { passive: true });
-    addEventListener("resize", updateScrollState);
+    addEventListener("scroll", requestProgress, { passive: true });
+    addEventListener("resize", requestProgress);
+    requestProgress();
+
+    /* 目前章節：IntersectionObserver 取代逐次 getBoundingClientRect。 */
+    const setCurrent = navId => {
+      navLinks.forEach(link => {
+        if (link.getAttribute("href") === `#${navId}`) link.setAttribute("aria-current", "true");
+        else link.removeAttribute("aria-current");
+      });
+    };
+
+    if ("IntersectionObserver" in window) {
+      const visible = new Map();
+      const observer = new IntersectionObserver(entries => {
+        entries.forEach(entry => visible.set(entry.target, entry.isIntersecting ? entry.intersectionRatio : 0));
+        let best = null;
+        let bestRatio = 0;
+        visible.forEach((ratio, target) => {
+          if (ratio > bestRatio) { bestRatio = ratio; best = target; }
+        });
+        if (best) setCurrent(best.dataset.nav);
+      }, { threshold: [0, .12, .35, .6, 1], rootMargin: "-76px 0px -35% 0px" });
+      sections.forEach(section => observer.observe(section));
+    }
+
+    /* 簡報鍵盤操作：不劫持修飾鍵組合，也不干擾輸入或連結上的按鍵。 */
+    const jumpKeys = ["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End"];
     addEventListener("keydown", event => {
-      if (!["ArrowDown", "ArrowUp", "PageDown", "PageUp"].includes(event.key) || event.target.matches("a, button, input, textarea, select")) return;
-      event.preventDefault();
+      if (!jumpKeys.includes(event.key)) return;
+      if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+      if (event.target.closest("a, button, input, textarea, select, [contenteditable], pre")) return;
+
       const currentIndex = sections.reduce((best, section, index) =>
         Math.abs(section.getBoundingClientRect().top - 72) < Math.abs(sections[best].getBoundingClientRect().top - 72) ? index : best, 0
       );
-      const direction = event.key === "ArrowDown" || event.key === "PageDown" ? 1 : -1;
-      const behavior = matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
-      sections[Math.max(0, Math.min(sections.length - 1, currentIndex + direction))].scrollIntoView({ behavior });
+      let next = currentIndex;
+      if (event.key === "Home") next = 0;
+      else if (event.key === "End") next = sections.length - 1;
+      else next = currentIndex + (event.key === "ArrowDown" || event.key === "PageDown" ? 1 : -1);
+
+      next = Math.max(0, Math.min(sections.length - 1, next));
+      if (next === currentIndex && event.key !== "Home" && event.key !== "End") return;
+
+      event.preventDefault();
+      sections[next].scrollIntoView({ behavior: reducedMotion.matches ? "auto" : "smooth" });
     });
-    updateScrollState();
   </script>
 </body>
 </html>
