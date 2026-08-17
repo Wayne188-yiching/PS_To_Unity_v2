@@ -1,49 +1,59 @@
 {
-    "version":  "2.13.4",
-    "phase":  "MERGE alpha bounds and external draggable scrollbar acceptance",
-    "updated":  "2026-08-17",
-    "_notes":  "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
-    "surfaces":  [
-                     {
-                         "file":  "PhotoshopExporter/PhotoshopUiPackageExporter.jsx",
-                         "pattern":  "(?m)^var\\s+SCRIPT_VERSION\\s*=\\s*\"[^\"]+\";",
-                         "replacement":  "var SCRIPT_VERSION = \"{version}\";"
-                     },
-                     {
-                         "file":  "PhotoshopExporter/PhotoshopUiPackageUpdater.jsx",
-                         "pattern":  "(?m)^var\\s+SCRIPT_VERSION\\s*=\\s*\"[^\"]+\";",
-                         "replacement":  "var SCRIPT_VERSION = \"{version}\";",
-                         "optional":  true
-                     },
-                     {
-                         "file":  "Assets/Editor/PhotoshopUiImporter/PhotoshopUiImporterWindow.cs",
-                         "pattern":  "private\\s+const\\s+string\\s+ToolVersion\\s*=\\s*\"[^\"]+\";",
-                         "replacement":  "private const string ToolVersion = \"{version}\";"
-                     },
-                     {
-                         "file":  "README.md",
-                         "pattern":  "(?m)^v\\d+\\.\\d+\\.\\d+[ \\t\\r]*$",
-                         "replacement":  "v{version}"
-                     },
-                     {
-                         "file":  "README_zh.md",
-                         "pattern":  "目前版本：v\\d+\\.\\d+\\.\\d+",
-                         "replacement":  "目前版本：v{version}"
-                     },
-                     {
-                         "file":  "GUIDE_zh.html",
-                         "pattern":  "Photoshop → Unity UI 工具 v\\d+\\.\\d+ — 完整使用說明",
-                         "replacement":  "Photoshop → Unity UI 工具 v{majorMinor} — 完整使用說明"
-                     },
-                     {
-                         "file":  "GUIDE_zh.html",
-                         "pattern":  "\u003cspan class=\"badge\"\u003ev\\d+\\.\\d+\\.\\d+\u003c/span\u003e",
-                         "replacement":  "\u003cspan class=\"badge\"\u003ev{version}\u003c/span\u003e"
-                     },
-                     {
-                         "file":  "GUIDE_zh.html",
-                         "pattern":  "PS → Unity UI Tool \u0026nbsp;·\u0026nbsp; v\\d+\\.\\d+\\.\\d+ \u0026nbsp;·\u0026nbsp;",
-                         "replacement":  "PS → Unity UI Tool \u0026nbsp;·\u0026nbsp; v{version} \u0026nbsp;·\u0026nbsp;"
-                     }
-                 ]
+  "version": "2.13.5",
+  "phase": "MERGE alpha bounds and external draggable scrollbar acceptance",
+  "updated": "2026-08-17",
+  "_notes": "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
+  "surfaces": [
+    {
+      "file": "PhotoshopExporter/PhotoshopUiPackageExporter.jsx",
+      "pattern": "(?m)^var\\s+SCRIPT_VERSION\\s*=\\s*\"[^\"]+\";",
+      "replacement": "var SCRIPT_VERSION = \"{version}\";"
+    },
+    {
+      "file": "PhotoshopExporter/PhotoshopUiPackageUpdater.jsx",
+      "pattern": "(?m)^var\\s+SCRIPT_VERSION\\s*=\\s*\"[^\"]+\";",
+      "replacement": "var SCRIPT_VERSION = \"{version}\";",
+      "optional": true
+    },
+    {
+      "file": "Assets/Editor/PhotoshopUiImporter/PhotoshopUiImporterWindow.cs",
+      "pattern": "private\\s+const\\s+string\\s+ToolVersion\\s*=\\s*\"[^\"]+\";",
+      "replacement": "private const string ToolVersion = \"{version}\";"
+    },
+    {
+      "file": "README.md",
+      "pattern": "(?m)^v\\d+\\.\\d+\\.\\d+[ \\t\\r]*$",
+      "replacement": "v{version}"
+    },
+    {
+      "file": "README_zh.md",
+      "pattern": "目前版本：v\\d+\\.\\d+\\.\\d+",
+      "replacement": "目前版本：v{version}"
+    },
+    {
+      "file": "GUIDE_zh.html",
+      "pattern": "Photoshop → Unity UI 工具 v\\d+\\.\\d+ — 完整使用說明",
+      "replacement": "Photoshop → Unity UI 工具 v{majorMinor} — 完整使用說明"
+    },
+    {
+      "file": "GUIDE_zh.html",
+      "pattern": "<span class=\"badge\">v\\d+\\.\\d+\\.\\d+</span>",
+      "replacement": "<span class=\"badge\">v{version}</span>"
+    },
+    {
+      "file": "GUIDE_zh.html",
+      "pattern": "PS → Unity UI Tool &nbsp;·&nbsp; v\\d+\\.\\d+\\.\\d+ &nbsp;·&nbsp;",
+      "replacement": "PS → Unity UI Tool &nbsp;·&nbsp; v{version} &nbsp;·&nbsp;"
+    },
+    {
+      "file": "PS_To_Unity_Presentation_zh.html",
+      "pattern": "v\\d+\\.\\d+\\.\\d+(?=&nbsp;·&nbsp;\\d{4}\\.\\d{2}\\.\\d{2})",
+      "replacement": "v{version}"
+    },
+    {
+      "file": "PS_To_Unity_Presentation_zh.html",
+      "pattern": "v\\d+\\.\\d+\\.\\d+(?=，\\d{4}-\\d{2}-\\d{2}）)",
+      "replacement": "v{version}"
+    }
+  ]
 }
