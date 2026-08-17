@@ -514,7 +514,9 @@
     .tag-row p { margin: 0; color: var(--muted); font-size: 18px; }
     .tag-row p strong { color: var(--ink); }
     .naming-note { margin: var(--space-xl) 0 0; max-width: 38em; color: var(--muted); font-size: 18px; }
+    .naming-note + .naming-note { margin-top: var(--space-md); }
     .naming-note code { color: var(--ink); font-size: 17px; }
+    .naming-note strong { color: var(--ink); }
 
     /* ---- 技術：兩端與 Layout JSON ---- */
     .tech-rail {
@@ -936,7 +938,7 @@
         </div>
         <p class="loop-note">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 12a8 8 0 1 0 3-6.24M4 4v5h5" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span><strong>而且每改一次稿，01 到 05 就再走一次。</strong> 重工不是一次性成本，是整個專案期間持續付出的成本。</span>
+          <span><strong>每改一次稿，01 到 05 再走一次。</strong> 一個畫面改三輪，這五件事就做三遍。</span>
         </p>
         <div class="problem-summary">
           <strong>問題不是不會做，<br>而是<span class="accent">重做太多次。</span></strong>
@@ -948,8 +950,8 @@
     <section class="chapter chapter--panel" id="solution" data-nav="solution">
       <div class="wrap">
         <div class="section-head">
-          <h2>工具搬運的不是畫面，<br><span class="accent">是畫面的意思。</span></h2>
-          <p class="lead">它讀懂「這是文字、這是圖片、這裡要裁切、這一組要捲動」，再交給 Unity 建成對應元件。</p>
+          <h2>圖層類型，<br><span class="accent">決定 Unity 元件。</span></h2>
+          <p class="lead">匯出時讀取每個圖層的類型、遮罩與命名標記，Unity 端據此建立對應的 uGUI 元件。</p>
         </div>
 
         <div class="mapping">
@@ -1018,12 +1020,12 @@
     <section class="chapter" id="naming" data-nav="naming">
       <div class="wrap">
         <div class="section-head section-head--stack">
-          <h2>圖層名稱，<br><span class="accent">就是規格。</span></h2>
-          <p class="lead">不用寫設定檔，也不用在 Unity 手動接線。要什麼行為，就在 Photoshop 的圖層名稱上加標記——設計師改名字，開發者就得到對應元件。</p>
+          <h2>圖層名稱</h2>
+          <p class="lead">在 PS 的圖層名稱加標記，藉此在 Unity 新增對應的功能。</p>
         </div>
 
         <p class="specimen" translate="no"><span class="specimen-tag">[SCROLL_V]</span><span>&nbsp;ranking_list</span></p>
-        <p class="specimen-note">中括號裡面是給工具看的指令，外面是給人看的名字；兩者寫在同一行，不需要額外的對照表。</p>
+        <p class="specimen-note">中括號內是給工具讀的標記，其餘部分維持原本的圖層名稱。</p>
 
         <div class="tagbook">
           <div class="tag-row">
@@ -1060,6 +1062,7 @@
           </div>
         </div>
 
+        <p class="naming-note">Unity 的階層就是 PSD 的群組結構，一層對一層。工具只會多插入 <code translate="no">ScrollView</code> 底下的 <code translate="no">Viewport</code> 與 <code translate="no">Content</code> 兩層，<strong>這兩層不要在 Photoshop 建</strong>；捲動內容直接放在標了 <code translate="no">[SCROLL_V]</code> 的群組裡即可。</p>
         <p class="naming-note">其他圖層維持有意義的英文命名即可。中文命名的 PSD 請先跑 <code translate="no">PhotoshopLayerAutoNamer.jsx</code>，它以納入版控的 <code translate="no">naming_glossary.tsv</code> 做最長匹配翻譯；推不出來的圖層維持原名，並把未知詞寫進待辦表，補完再跑一次即可。</p>
       </div>
     </section>
@@ -1067,8 +1070,8 @@
     <section class="chapter" id="technology" data-nav="technology">
       <div class="wrap">
         <div class="section-head">
-          <h2>兩端工具，<br><span class="accent">一份共同語言。</span></h2>
-          <p class="lead">Photoshop 負責讀懂設計，Unity 負責重建元件；中間用 Layout JSON——一份記錄名稱、位置、大小與文字的清單檔——傳遞資料。</p>
+          <h2>兩端之間，<br><span class="accent">只傳一個檔案。</span></h2>
+          <p class="lead">Photoshop 端輸出 PNG 與 Layout JSON，Unity 端讀這份清單重建元件。JSON 記錄每個節點的名稱、座標、尺寸、文字與標記結果。</p>
         </div>
 
         <div class="tech-rail">
@@ -1148,7 +1151,7 @@
 
         <div class="rerun">
           <h3>改稿之後，只是再跑一次。</h3>
-          <p><strong>Photoshop 重新 Export，Unity 重新 Generate。</strong>命名與標記都留在 PSD 裡，所以捲動、排版、九宮格與遮罩的行為會跟著回來——這正是本頁開頭那個 01 → 05 迴圈真正被拆掉的地方。</p>
+          <p><strong>Photoshop 重新 Export，Unity 重新 Generate。</strong>命名與標記留在 PSD 裡，捲動、排版、九宮格與遮罩會照原樣重建，不必再設定一次。</p>
         </div>
       </div>
     </section>
@@ -1156,7 +1159,7 @@
     <section class="chapter" id="result" data-nav="result">
       <div class="wrap">
         <div class="section-head">
-          <h2>最後得到的，<br>是<mark>能繼續工作的 UI。</mark></h2>
+          <h2>產出的 Prefab，<br><mark>可以繼續編輯。</mark></h2>
           <p class="lead">輸出保留階層與元件語意，<strong>TMP 文字、Sprite 與 UI 元件都能在 Unity 繼續調整</strong>，不把整個畫面壓成一張不能維護的圖片。</p>
         </div>
 
@@ -1194,13 +1197,13 @@
       <div class="wrap">
         <div class="section-head section-head--stack">
           <h2>生成之後，<br><span class="accent">還能一直換。</span></h2>
-          <p class="lead">Prefab 不是終點。字型、皮膚與圖集各有專用工具，換的時候不會動到已經排好的版面。</p>
+          <p class="lead">字型、皮膚與圖集各有專用工具，替換時不會動到已經排好的版面。</p>
         </div>
 
         <dl class="ledger">
           <div class="ledger-row">
             <dt><span class="ledger-name">只換字型</span><span class="ledger-path" translate="no">Font Replacer</span></dt>
-            <dd>分析 Prefab 目前用到的 TMP 字型與材質，一鍵替換。只寫 <code translate="no">font</code> 與 <code translate="no">fontSharedMaterial</code> 兩個欄位——排版、字級、顏色與 Sprite 全部不動，描邊材質會自動克隆到新字型。</dd>
+            <dd>分析 Prefab 目前用到的 TMP 字型與材質，一鍵替換。只寫 <code translate="no">font</code> 與 <code translate="no">fontSharedMaterial</code> 兩個欄位；排版、字級、顏色與 Sprite 全部不動，描邊材質會自動克隆到新字型。</dd>
           </div>
           <div class="ledger-row">
             <dt><span class="ledger-name">整套換皮</span><span class="ledger-path" translate="no">SkinTheme</span></dt>
@@ -1222,7 +1225,7 @@
       <div class="wrap guardrail">
         <div>
           <h2>不確定的時候，<br><span class="accent">工具不硬做。</span></h2>
-          <p class="lead">可預測，比看似成功更重要。無法可靠重建時，工具會警告或降級，並在 Layout JSON 留下代碼，避免把錯誤悄悄帶進 Prefab。</p>
+          <p class="lead">無法可靠重建時，工具會警告或降級，並在 Layout JSON 留下代碼，不讓錯誤在無聲中進入 Prefab。</p>
         </div>
         <div class="guardrail-list">
           <article class="guardrail-item">
@@ -1266,7 +1269,7 @@
         <h3 class="openq-title">要先回答的問題</h3>
         <ul class="openq">
           <li><strong>兩端都是 GUI 程式。</strong>匯出腳本跑在 Photoshop 裡，生成工具跑在 Unity Editor 裡；要全自動，得先決定是讓兩邊常駐，還是仍由人開好再交給 agent。</li>
-          <li><strong>命名標記是語意決策，不是機械步驟。</strong>哪一組要捲動、哪張圖要九宮格、哪一組該烘成一張——目前由設計師判斷。交給 agent 之前，要先確認它猜錯時的代價由誰承擔。</li>
+          <li><strong>命名標記需要判斷。</strong>哪一組要捲動、哪張圖要九宮格、哪一組該烘成一張，目前由設計師決定；交給 agent 之前，要先確認猜錯的代價由誰承擔。</li>
           <li><strong>降級訊息需要有人讀。</strong>工具遇到不確定會保留原座標並回報代碼，這些訊息是要人看懂並決定怎麼處理的，不該被自動流程默默略過。</li>
           <li><strong>中文圖層仍需人工補詞。</strong>詞庫推不出來的圖層會維持原名並列進待辦，那份對照表目前只能由人補完。</li>
           <li><strong>責任邊界還沒畫。</strong>全自動之後，錯誤的版面在哪一步被攔下、由誰驗收，還沒有答案。</li>
@@ -1277,8 +1280,8 @@
 
     <section class="chapter chapter--panel closing" id="close" data-nav="result">
       <div class="wrap">
-        <h2>讓設計只做一次，<br><span class="accent">讓團隊繼續往前。</span></h2>
-        <p class="lead">Photoshop To Unity V2 把重複搬運變成可驗證、可重跑的轉換流程；交付的終點不再是平面稿，而是能繼續製作的 Unity UI。</p>
+        <h2>同一個畫面，<br><span class="accent">只做一次。</span></h2>
+        <p class="lead">Photoshop 排好的畫面，經由 Layout JSON 重建成 Unity Prefab。改稿只要重跑同一條流程，交付的是能繼續製作的 UI。</p>
         <div class="closing-actions">
           <a class="button primary" href="GUIDE_zh.html">開啟完整使用說明</a>
           <a class="button" href="https://github.com/Wayne188-yiching/PS_To_Unity_v2">查看 GitHub 專案</a>
