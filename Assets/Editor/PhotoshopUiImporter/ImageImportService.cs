@@ -15,6 +15,11 @@ namespace PhotoshopToUnity.EditorImporter
         // v2.8.1 像素內容去重統計（解碼後 raw RGBA 相同的 PNG 合併到同一個 sprite）
         public int dedupedSpriteCount;
         public long dedupedSpriteBytes;
+        // 本次匯入由工具「複製」進 Assets 的檔案（來源本來就在 Assets 內、直接沿用的不算）。
+        // 只有這些檔案可以在去重後安全刪除——來源 Package 仍保有完整檔案，重複匯入不受影響。
+        public readonly HashSet<string> copiedAssetPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // 來源即目的地（PS 直接輸出到 Assets）時無法刪除的冗餘別名，交由呼叫端提示使用者。
+        public readonly List<string> redundantSourceImages = new List<string>();
 
         public bool IsValid => errors.Count == 0;
     }
@@ -158,17 +163,30 @@ namespace PhotoshopToUnity.EditorImporter
                     try
                     {
                         var fileLength = File.Exists(absPath) ? new FileInfo(absPath).Length : 0L;
-                        // Retain the alias PNG so the same layout JSON remains importable.
-                        // The atlas receives only canonical Sprite references downstream.
-                        if (File.Exists(absPath))
+                        if (!File.Exists(absPath))
                         {
-                            result.dedupedSpriteCount++;
-                            result.dedupedSpriteBytes += fileLength;
+                            continue;
+                        }
+
+                        result.dedupedSpriteCount++;
+                        result.dedupedSpriteBytes += fileLength;
+
+                        // Atlas 的 packables 指整個語系資料夾（[Client] 包圖規範），所以留在
+                        // 資料夾裡的別名 PNG 一定會被打進圖集。只刪本次由工具複製進來的檔案：
+                        // 來源 Package 仍保有原檔，同一份 layout JSON 重複匯入照樣找得到。
+                        if (result.copiedAssetPaths.Contains(PathUtility.NormalizeAssetKey(assetPath)))
+                        {
+                            AssetDatabase.DeleteAsset(assetPath);
+                        }
+                        else
+                        {
+                            // 來源即目的地（PS 直接輸出到 Assets）：刪了會破壞來源，只能回報。
+                            result.redundantSourceImages.Add(assetPath);
                         }
                     }
                     catch
                     {
-                        // 刪不掉就跳過，sprite 已經重指，留檔在 Atlas 內最多佔點空間，不影響行為
+                        // 刪不掉就跳過，sprite 已經重指，留檔最多讓圖集多佔點空間，不影響行為
                     }
                 }
             }
@@ -300,10 +318,14 @@ namespace PhotoshopToUnity.EditorImporter
                 return;
             }
 
-            if (!IsSameFilePath(sourcePath, destinationFullPath) &&
-                !TryCopyFile(sourcePath, destinationFullPath, result))
+            if (!IsSameFilePath(sourcePath, destinationFullPath))
             {
-                return;
+                if (!TryCopyFile(sourcePath, destinationFullPath, result))
+                {
+                    return;
+                }
+
+                result.copiedAssetPaths.Add(PathUtility.NormalizeAssetKey(destinationAssetPath));
             }
 
             AssetDatabase.ImportAsset(destinationAssetPath, ImportAssetOptions.ForceUpdate);

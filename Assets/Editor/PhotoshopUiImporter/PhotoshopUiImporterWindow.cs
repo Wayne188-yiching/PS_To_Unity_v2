@@ -59,7 +59,7 @@ namespace PhotoshopToUnity.EditorImporter
         private string reskinScannedSourceFolder;
         private string reskinScannedTargetFolder;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.13.5";
+        private const string ToolVersion = "2.14.0";
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -955,9 +955,7 @@ namespace PhotoshopToUnity.EditorImporter
 
             EditorUtility.DisplayProgressBar("生成 Prefab", "生成 Prefab 節點...", 0.75f);
             EditorUtility.DisplayProgressBar("Generate Prefab", "Create and pack SpriteAtlas...", 0.65f);
-            // importResult.sprites 的值已由 DedupSpritesByPixelContent 收斂成 canonical Sprite，
-            // 因此圖集只會收到真正被引用的圖，像素重複的別名 PNG 留在磁碟但不進包。
-            CreateOrUpdateSpriteAtlas(ResolveSpriteAtlasFolder(importFolder), importResult.sprites.Values);
+            CreateOrUpdateSpriteAtlases(ResolveSpriteAtlasFolder(importFolder));
 
             var skinResolver = new SkinResolver(skinMap, importResult.sprites);
             var generatedMaterialFolder = string.IsNullOrWhiteSpace(projectFolder)
@@ -989,10 +987,19 @@ namespace PhotoshopToUnity.EditorImporter
             Selection.activeObject = prefab;
             EditorGUIUtility.PingObject(prefab);
 
-            // v2.8.1 像素去重統計（解碼後 raw RGBA 相同 → 合併到同一個 sprite，PNG 實體被刪）
+            // v2.8.1 像素去重統計（解碼後 raw RGBA 相同 → 合併到同一個 sprite，複製進來的 PNG 實體被刪）
             var dedupHint = importResult.dedupedSpriteCount > 0
                 ? $"　像素去重合併：{importResult.dedupedSpriteCount} 張（省 {FormatByteSize(importResult.dedupedSpriteBytes)}）"
                 : string.Empty;
+
+            // 來源即目的地時刪不掉的冗餘別名：Atlas 指整個語系資料夾，這些檔案仍會被打進圖集。
+            if (importResult.redundantSourceImages.Count > 0)
+            {
+                Debug.LogWarning(
+                    $"[Atlas] {importResult.redundantSourceImages.Count} 張像素重複的 PNG 位於來源資料夾內，" +
+                    "無法自動刪除（刪了會破壞來源），它們仍會被打進圖集。建議在 Photoshop 端讓重複圖層共用同一個名稱：\n" +
+                    string.Join("\n", importResult.redundantSourceImages));
+            }
 
             // F3 + v2.10：把描邊超限與 fontToken 未對應警告聚合後一次顯示，並輸出至 Console 方便回查節點名稱。
             foreach (var w in tmpMapper.OutlineOverflowWarnings)
@@ -1076,7 +1083,7 @@ namespace PhotoshopToUnity.EditorImporter
             EnsureAssetFolder($"{root}/Fx/Texture");
 
             AssetDatabase.Refresh();
-            CreateOrUpdateSpriteAtlas(atlasFolder);
+            CreateOrUpdateSpriteAtlases(atlasFolder);
 
             importFolder = GetStandardImportFolder();
             prefabFolder = GetStandardPrefabFolder();
@@ -1104,34 +1111,87 @@ namespace PhotoshopToUnity.EditorImporter
                 : normalized;
         }
 
-        // packSprites = 這次 Generate 實際被引用的 canonical Sprite（像素去重後的結果）。
+        // [Client] 多語系字圖資料夾與 SpriteAtlas 包圖規範：每個語系一顆 atlas，且每顆
+        // atlas 的 packables 只指到「單一語系資料夾」，不逐張圖丟——美術之後補圖只要丟進
+        // 資料夾，不必回頭改 atlas。規範明文禁止一顆 atlas 直接指模組父夾（那會把 Base
+        // 與所有語系收進同一張貼圖）。
         //
-        // 舊版把整個資料夾當 packable，因此 PS Save for Web 對相同像素產生不同 bytes 而躲過
-        // 匯出器 bytes 雜湊去重的那些別名 PNG，雖然 Prefab 的 Sprite 參照已被 Unity 端的
-        // 像素去重收斂到同一張，檔案卻仍留在資料夾內 → 出包時整包被打進圖集。實測一份排行榜
-        // Package：43 張 PNG 只有 26 種不同像素，多出來的 17 張佔 258 KB 全部進了圖集。
-        // 改成只丟明確的 Sprite 清單，圖集就只含真正被引用的圖。
-        //
-        // packSprites 為 null（「建立專案資料夾」的鷹架路徑）時不動 packable 清單，
-        // 只更新 importer 設定 —— 鷹架不該清掉既有專案已經設定好的內容。
-        private static void CreateOrUpdateSpriteAtlas(
-            string atlasFolder,
-            System.Collections.Generic.ICollection<Sprite> packSprites = null)
+        // v2.13.1 曾改成只丟「這次被引用的 Sprite 清單」，用來擋掉像素重複的別名 PNG 進包。
+        // 規範要求指資料夾，故改由 ImageImportService 在像素去重後刪掉「本工具複製進來的」
+        // 別名 PNG，讓資料夾本身就不含冗餘檔案——去重回到它該在的層次，兩邊需求同時滿足。
+        private static readonly string[] AtlasLanguages = { "Base", "CHS", "CHT", "EN" };
+
+        private static void CreateOrUpdateSpriteAtlases(string atlasRootFolder)
         {
-            atlasFolder = PathUtility.NormalizeAssetKey(atlasFolder).TrimEnd('/');
-            EnsureAssetFolder(atlasFolder);
+            atlasRootFolder = PathUtility.NormalizeAssetKey(atlasRootFolder).TrimEnd('/');
+            EnsureAssetFolder(atlasRootFolder);
 
-            var atlasParent = Path.GetDirectoryName(atlasFolder)?.Replace('\\', '/');
+            var packed = new System.Collections.Generic.List<SpriteAtlas>();
+
+            foreach (var language in AtlasLanguages)
+            {
+                var languageFolder = $"{atlasRootFolder}/{language}";
+                var atlasPath = ResolveLanguageAtlasPath(atlasRootFolder, language);
+                if (string.IsNullOrEmpty(atlasPath))
+                    continue;
+
+                // 規範允許「資料夾先建好留空」，四個語系夾一律確保存在——順帶讓底下的
+                // FindAssets 不會對無效路徑發出 Unity 錯誤。
+                EnsureAssetFolder(languageFolder);
+
+                // 規範：語系還沒有圖時不要建空 atlas（空 atlas 會產生無意義的資產與警告）。
+                // 已存在的 atlas 仍會被重新設定，避免圖被清空後留下錯誤的 importer 設定。
+                var hasSprites = AssetDatabase.FindAssets("t:Texture2D", new[] { languageFolder }).Length > 0;
+                if (!hasSprites && SpriteAtlasAsset.Load(atlasPath) == null)
+                    continue;
+
+                var atlas = ConfigureLanguageAtlas(atlasPath, languageFolder);
+                if (atlas != null)
+                    packed.Add(atlas);
+            }
+
+            if (packed.Count > 0)
+                SpriteAtlasUtility.PackAtlases(packed.ToArray(), EditorUserBuildSettings.activeBuildTarget);
+
+            AssetDatabase.SaveAssets();
+        }
+
+        // Base -> "{模組名}_Atlas.spriteatlasv2"、其餘 -> "{模組名}_Atlas_{語系}.spriteatlasv2"，
+        // 與規範的 <AtlasName>_<lang> 後綴式命名一致。
+        private static string ResolveLanguageAtlasPath(string atlasRootFolder, string language)
+        {
+            atlasRootFolder = PathUtility.NormalizeAssetKey(atlasRootFolder).TrimEnd('/');
+            var atlasParent = Path.GetDirectoryName(atlasRootFolder)?.Replace('\\', '/');
             if (string.IsNullOrEmpty(atlasParent))
-                return;
+                return null;
 
-            var atlasPath = $"{atlasParent}/{Path.GetFileName(atlasFolder)}.spriteatlasv2";
+            var suffix = string.Equals(language, "Base", System.StringComparison.OrdinalIgnoreCase)
+                ? string.Empty
+                : "_" + language;
+            return $"{atlasParent}/{ResolveModuleName(atlasRootFolder)}_Atlas{suffix}.spriteatlasv2";
+        }
+
+        // Assets/Temp/<模組名>/Atlas/SpriteAtlas -> "<模組名>"
+        private static string ResolveModuleName(string atlasRootFolder)
+        {
+            var atlasParent = Path.GetDirectoryName(atlasRootFolder)?.Replace('\\', '/');
+            var moduleFolder = string.IsNullOrEmpty(atlasParent)
+                ? null
+                : Path.GetDirectoryName(atlasParent)?.Replace('\\', '/');
+
+            var name = string.IsNullOrEmpty(moduleFolder) ? null : Path.GetFileName(moduleFolder);
+            if (string.IsNullOrWhiteSpace(name))
+                name = string.IsNullOrEmpty(atlasParent) ? null : Path.GetFileName(atlasParent);
+            return string.IsNullOrWhiteSpace(name) ? "Module" : name;
+        }
+
+        private static SpriteAtlas ConfigureLanguageAtlas(string atlasPath, string languageFolder)
+        {
             var atlas = SpriteAtlasAsset.Load(atlasPath);
             if (atlas == null)
             {
-                // Save an empty atlas first. Adding the packable folder before importer
-                // settings exist makes Unity attempt a default 2048 px pack immediately,
-                // which fails for otherwise valid 4096 px source sprites.
+                // 先存一顆空的：importer 設定存在前就掛上 packable，Unity 會立刻用預設 2048
+                // 試打，對合法的 4096 來源圖會失敗。
                 atlas = new SpriteAtlasAsset();
                 SpriteAtlasAsset.Save(atlas, atlasPath);
                 AssetDatabase.ImportAsset(atlasPath, ImportAssetOptions.ForceUpdate);
@@ -1139,9 +1199,9 @@ namespace PhotoshopToUnity.EditorImporter
 
             var atlasImporter = AssetImporter.GetAtPath(atlasPath) as SpriteAtlasImporter;
             if (atlasImporter == null)
-                return;
+                return null;
 
-            var maxTextureSize = DetermineRequiredAtlasMaxTextureSize(atlasFolder);
+            var maxTextureSize = DetermineRequiredAtlasMaxTextureSize(languageFolder);
             var packing = atlasImporter.packingSettings;
             packing.enableRotation = false;
             packing.enableTightPacking = false;
@@ -1167,31 +1227,15 @@ namespace PhotoshopToUnity.EditorImporter
             atlasImporter.SetPlatformSettings(CreateAtlasPlatformSettings("iPhone", maxTextureSize));
             atlasImporter.SaveAndReimport();
 
-            if (packSprites != null)
-            {
-                // 同一顆 canonical Sprite 會被多個 imagePath 指到（像素去重的結果），必須先去重，
-                // 否則同一張圖會被重複加入 packable 清單。
-                var seen = new System.Collections.Generic.HashSet<int>();
-                var packables = new System.Collections.Generic.List<Object>();
-                foreach (var sprite in packSprites)
-                {
-                    if (sprite == null || !seen.Add(sprite.GetInstanceID()))
-                        continue;
-                    packables.Add(sprite);
-                }
+            // packables 指單一語系資料夾，不逐張圖加入。
+            atlas = new SpriteAtlasAsset();
+            var folderObject = AssetDatabase.LoadAssetAtPath<Object>(languageFolder);
+            if (folderObject != null)
+                atlas.Add(new Object[] { folderObject });
+            SpriteAtlasAsset.Save(atlas, atlasPath);
+            AssetDatabase.ImportAsset(atlasPath, ImportAssetOptions.ForceUpdate);
 
-                atlas = new SpriteAtlasAsset();
-                if (packables.Count > 0)
-                    atlas.Add(packables.ToArray());
-                SpriteAtlasAsset.Save(atlas, atlasPath);
-                AssetDatabase.ImportAsset(atlasPath, ImportAssetOptions.ForceUpdate);
-            }
-
-            var runtimeAtlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
-            if (runtimeAtlas != null)
-                SpriteAtlasUtility.PackAtlases(new[] { runtimeAtlas }, EditorUserBuildSettings.activeBuildTarget);
-
-            AssetDatabase.SaveAssets();
+            return AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
         }
 
         private static int DetermineRequiredAtlasMaxTextureSize(string atlasFolder)
@@ -1215,19 +1259,20 @@ namespace PhotoshopToUnity.EditorImporter
             return 8192;
         }
 
-        private static void DetachSpriteAtlasFolderForImageImport(string atlasFolder)
+        // Every language atlas is detached before TextureImporter work, otherwise each
+        // SaveAndReimport triggers a full repack. CreateOrUpdateSpriteAtlases reattaches
+        // the folders and packs exactly once at the end.
+        private static void DetachSpriteAtlasFolderForImageImport(string atlasRootFolder)
         {
-            atlasFolder = PathUtility.NormalizeAssetKey(atlasFolder).TrimEnd('/');
-            var atlasParent = Path.GetDirectoryName(atlasFolder)?.Replace('\\', '/');
-            if (string.IsNullOrEmpty(atlasParent))
-                return;
+            foreach (var language in AtlasLanguages)
+            {
+                var atlasPath = ResolveLanguageAtlasPath(atlasRootFolder, language);
+                if (string.IsNullOrEmpty(atlasPath) || SpriteAtlasAsset.Load(atlasPath) == null)
+                    continue;
 
-            var atlasPath = $"{atlasParent}/{Path.GetFileName(atlasFolder)}.spriteatlasv2";
-            if (SpriteAtlasAsset.Load(atlasPath) == null)
-                return;
-
-            SpriteAtlasAsset.Save(new SpriteAtlasAsset(), atlasPath);
-            AssetDatabase.ImportAsset(atlasPath, ImportAssetOptions.ForceUpdate);
+                SpriteAtlasAsset.Save(new SpriteAtlasAsset(), atlasPath);
+                AssetDatabase.ImportAsset(atlasPath, ImportAssetOptions.ForceUpdate);
+            }
         }
 
         private static TextureImporterPlatformSettings CreateAtlasPlatformSettings(string platformName, int maxTextureSize)

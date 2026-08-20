@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Photoshop → Unity UI 工具 v2.13 — 完整使用說明</title>
+  <title>Photoshop → Unity UI 工具 v2.14 — 完整使用說明</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
@@ -523,7 +523,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.13.5</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.14.0</span></h1>
     <p class="lead">在 Photoshop 排好的遊戲介面，一鍵搬進 Unity。圖自動切好、文字還能繼續改、位置自動對齊。</p>
   </header>
 
@@ -1007,18 +1007,56 @@ TXT_score_[THICK:2]</code></pre>
   </details>
 
   <details>
+    <summary>多語系字圖：資料夾、檔名與包圖規則<span class="hint">同一個介面要出簡中／繁中／英文時看這段</span></summary>
+    <div class="details-body">
+      <div class="plain">
+        規則只有一句話：<strong>圖上有字的，進語系資料夾；圖上沒字的，全部進 Base。</strong>其餘都是工具自動處理。
+      </div>
+
+      <h3>哪些圖該進哪個資料夾</h3>
+      <table>
+        <tr><th>圖的內容</th><th>放哪</th><th>檔名</th></tr>
+        <tr><td>沒有文字的中性圖（按鈕底、外框、特效、icon）</td><td><code>Base/</code></td><td>不帶語系後綴</td></tr>
+        <tr><td>圖上有簡體中文字</td><td><code>CHS/</code></td><td><code>xxx_CHS.png</code></td></tr>
+        <tr><td>圖上有繁體中文字</td><td><code>CHT/</code></td><td><code>xxx_CHT.png</code></td></tr>
+        <tr><td>圖上有英文字</td><td><code>EN/</code></td><td><code>xxx_EN.png</code></td></tr>
+      </table>
+
+      <div class="callout ok">
+        <strong>語系後綴由工具自動加</strong>，你不用自己在圖層名稱上打。在 PS 匯出視窗把「語言資料夾」選成 CHS，匯出的檔名就會自動變成 <code>btn_start_CHS.png</code>；選 Base 則不加後綴。
+      </div>
+
+      <h3>要注意的兩件事</h3>
+      <ul>
+        <li><strong>三個語系的同一張圖，去掉後綴後的名字必須一樣</strong>（<code>btn_start_CHS</code> / <code>btn_start_CHT</code> / <code>btn_start_EN</code>）。換圖工具是靠這個名字對應的，名字對不上就換不到。實務上就是：三份 PSD 的圖層名稱要保持一致。</li>
+        <li><strong>CHS/CHT/EN 底下不要再分子資料夾</strong>，圖就平鋪放在該語系夾裡。</li>
+      </ul>
+
+      <h3>怎麼產出三個語系</h3>
+      <p>目前是一次匯出一個語系：把 PSD 的文字改成該語系 → 在匯出視窗選對應的「語言資料夾」→ Export。三個語系就跑三次，輸出到同一個模組資料夾底下的三個語系夾。</p>
+
+      <div class="callout warn">
+        這份資料夾與包圖規則來自公司的<strong>多語系字圖規範</strong>，是強制的。工具的預設行為已經對齊，正常使用不會違規；但如果你手動搬動圖片或改 atlas 設定，請確認仍符合上面的規則。
+      </div>
+    </div>
+  </details>
+
+  <details>
     <summary>工具幫你建的資料夾長什麼樣<span class="hint">按「建立專案資料夾」之後會生出什麼</span></summary>
     <div class="details-body">
-      <p>點「<strong>建立專案資料夾</strong>」後，工具在 <code>Assets/Temp/{專案名稱}/</code> 下自動建立以下結構，並同步建立 SpriteAtlas asset：</p>
-      <pre><code>Assets/Temp/{專案名稱}/
+      <p>點「<strong>建立專案資料夾</strong>」後，工具在 <code>Assets/Temp/{模組名}/</code> 下自動建立以下結構。<strong>一個頁面就是一個模組</strong>（例如 <code>Hall_Ranking</code>）：</p>
+      <pre><code>Assets/Temp/{模組名}/
 ├── Animation/
 ├── Atlas/
-│   ├── SpriteAtlas.spriteatlasv2     ← 自動建立、更新並立即 Pack
+│   ├── {模組名}_Atlas.spriteatlasv2       ← packables 只指 Base/
+│   ├── {模組名}_Atlas_CHS.spriteatlasv2   ← packables 只指 CHS/（有圖才建）
+│   ├── {模組名}_Atlas_CHT.spriteatlasv2   ← 同上
+│   ├── {模組名}_Atlas_EN.spriteatlasv2    ← 同上
 │   └── SpriteAtlas/
-│       ├── Base/                      ← 美術圖（預設語言）
-│       ├── CHS/                       ← 簡體中文文字圖
-│       ├── CHT/                       ← 繁體中文文字圖
-│       └── EN/                        ← 英文文字圖
+│       ├── Base/                          ← 不含文字的中性圖（按鈕底、框、特效、icon）
+│       ├── CHS/                           ← 簡中含文字圖
+│       ├── CHT/                           ← 繁中含文字圖
+│       └── EN/                            ← 英文含文字圖
 ├── Font/
 ├── Fx/
 │   ├── Material/
@@ -1028,11 +1066,11 @@ TXT_score_[THICK:2]</code></pre>
 └── TimeLine/</code></pre>
 
       <div class="callout ok">
-        <strong>SpriteAtlas 自動設定 <span class="tag tag-new">v2.4.3</span></strong>：建立後 SpriteAtlas 自動套用專案標準設定——
-        Packing（無旋轉、無緊密排列、Padding 4）、
-        Texture（sRGB、Bilinear、無 Mip Maps）、
-        Default 以及 Android / iOS 平台（ASTC 6×6、Best）的最大尺寸會依來源圖自動選擇 2048／4096／8192。
-        生成 Prefab 時會以唯一 Sprite 引用更新 Objects for Packing，全部 TextureImporter 完成後只 Pack 一次，不需再手動點「Pack Preview」。像素相同的別名 PNG 仍會保留，確保同一 Package 可重複匯入。
+        <strong>SpriteAtlas 自動設定</strong>：每顆 atlas 的 packables <strong>只指到一個語系資料夾</strong>，不是逐張圖加入——所以之後美術補圖只要丟進資料夾，不用回頭改 atlas。設定會自動套用專案標準：Packing（無旋轉、無緊密排列、Padding 4）、Texture（sRGB、Bilinear、無 Mip Maps），Default 與 Android / iOS（ASTC 6×6、Best）的最大尺寸依來源圖自動選 2048／4096／8192。全部 TextureImporter 設定完成後才 Pack 一次，不需手動點「Pack Preview」。
+      </div>
+
+      <div class="callout warn">
+        <strong>沒有圖的語系不會建 atlas</strong>。CHT / EN 現階段通常還沒有圖，資料夾會先建好留空，但不會產生對應的空 atlas（空 atlas 會產生無意義的資產與警告）。等該語系的圖進來、再跑一次 Generate 就會自動補建。
       </div>
     </div>
   </details>
@@ -1122,7 +1160,20 @@ TXT_score_[THICK:2]</code></pre>
   <details>
     <summary>展開完整版本紀錄<span class="hint">每個版本改了什麼，想追來龍去脈再看</span></summary>
     <div class="details-body">
-<h3>v2.13.4（2026-08-17）— MERGE 透明邊界與外置滑軌回歸</h3>
+<h3>v2.14.0（2026-08-14）— 對齊公司多語系字圖與 SpriteAtlas 包圖規範</h3>
+  <div class="callout warn">
+    <strong>行為變更</strong>：圖集從「一顆」改為「每語系一顆」，且 packables 從「個別 Sprite」改為「單一資料夾」。既有專案的舊 <code>SpriteAtlas.spriteatlasv2</code> 不會被自動刪除，確認新 atlas 產生正確後請手動移除，否則同一批圖會被打包兩次。
+  </div>
+  <ul>
+    <li><strong>每語系一顆 atlas</strong>：<code>{模組名}_Atlas.spriteatlasv2</code>（Base）、<code>{模組名}_Atlas_CHS</code> / <code>_CHT</code> / <code>_EN</code>，命名採規範的 <code>&lt;AtlasName&gt;_&lt;lang&gt;</code> 後綴式。</li>
+    <li><strong>packables 指單一語系資料夾</strong>，不再逐張圖加入——美術之後補圖只要丟進資料夾，不必回頭改 atlas。規範禁止一顆 atlas 直接指模組父夾（會把 Base 與所有語系收進同一張貼圖），工具不會產生那種設定。</li>
+    <li><strong>沒有圖的語系不建空 atlas</strong>。四個語系資料夾一律先建好留空，但 CHT/EN 沒圖時不產生對應 atlas；等圖進來再跑一次 Generate 會自動補建。</li>
+    <li><strong>PNG 檔名自動帶語系後綴</strong>：匯出視窗選 CHS/CHT/EN 時，輸出檔名自動變成 <code>xxx_CHS.png</code>；Base 不加。後綴在唯一化命名之後才附加，因此三個語系的基底名保持一致，換圖工具才對得上。</li>
+    <li><strong>去重回到正確的層次</strong>：v2.13.1 為了擋掉像素重複的別名 PNG 進包，把 packables 改成個別 Sprite 清單——那與規範衝突。現在改回指資料夾，並在像素去重後<strong>刪掉本工具複製進 Assets 的別名 PNG</strong>，讓資料夾本身就不含冗餘檔案。只刪自己複製的檔案，來源 Package 完整保留，同一份 layout JSON 重複匯入不受影響（這正是 v2.12.5 當初回退刪除行為的原因）。</li>
+    <li>來源即目的地（PS 直接輸出到 Assets）時無法刪除的冗餘別名，改為在 Console 列出清單提示，讓人回 Photoshop 端把重複圖層改成同名。</li>
+  </ul>
+
+  <h3>v2.13.4（2026-08-17）— MERGE 透明邊界與外置滑軌回歸</h3>
   <ul>
     <li><strong>MERGE 透明邊界</strong>：輸出暫存文件一律依實際 alpha 像素裁切；MERGE 群組不再採用會被隱藏子層污染的群組陰影補償，並以 PS 無效果範圍中心回補 JSON 座標。匯出快取簽名升為 <code>fastalign_v3</code>，升級後會自動完整重匯一次，避免沿用舊座標。</li>
     <li><strong>外置 Scrollbar</strong>：直接子層仍優先；若整個 Prefab 只有一個方向相容、尚未接線的 ScrollRect，外置 <code>[SCROLLBAR_V/H]</code> 也會安全配對。多組時輸出 <code>SCROLLBAR_ORPHAN_UNRESOLVED</code>。</li>
@@ -1439,7 +1490,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.13.5 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.14.0 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

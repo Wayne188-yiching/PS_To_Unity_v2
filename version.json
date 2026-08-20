@@ -1,7 +1,7 @@
 {
-  "version": "2.13.5",
-  "phase": "MERGE alpha bounds and external draggable scrollbar acceptance",
-  "updated": "2026-08-17",
+  "version": "2.14.0",
+  "phase": "Multi-language sprite folders and per-language SpriteAtlas packing spec",
+  "updated": "2026-08-14",
   "_notes": "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
   "surfaces": [
     {

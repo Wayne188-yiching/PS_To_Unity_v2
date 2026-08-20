@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.13.5";
+var SCRIPT_VERSION = "2.14.0";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 // OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。
@@ -689,6 +689,11 @@ function exportUiPackage(sourceDoc, options) {
             // v2.10：使用者自訂 TMP 字型白名單（一行一關鍵字，比對 normalizeAsciiSlug 後 indexOf）
             tmpFontKeywords: loadUserTmpFontKeywords(),
             sourceModified: readDocumentModified(sourceDoc),
+            // [Client] SpriteAtlas packing spec: files in a language folder carry a
+            // language suffix (xxx_CHS.png); neutral art in Base/ carries none. The
+            // suffix is appended after unique-name resolution so the base name stays
+            // identical across languages, which is what the reskin tooling matches on.
+            atlasLanguageSuffix: resolveAtlasLanguageSuffix(options),
             exportCache: null,
             exportCacheDirty: false,
             counters: {},
@@ -1279,7 +1284,7 @@ function createImageNode(layer, context, parentBounds) {
     }
 
     var safeName = uniqueFileName(layer.name, context.counters, context);
-    var fileName = safeName + ".png";
+    var fileName = safeName + (context.atlasLanguageSuffix || "") + ".png";
     // v2.10：BTN_ 前綴保留在節點名（Unity 端據此自動掛 Button），PNG 檔名維持去前綴不變（匯出快取相容）。
     var nodeName = startsWith(String(layer.name || "").toUpperCase(), "BTN_") ? "BTN_" + safeName : safeName;
 
@@ -3893,6 +3898,15 @@ function resolveImageOutputFolder(options) {
 
     var language = normalizeAtlasLanguage(options.atlasLanguage);
     return new Folder(folder.fsName + "/Atlas/SpriteAtlas/" + language);
+}
+
+// "" for Base (or when the Unity atlas layout is off), "_CHS" / "_CHT" / "_EN" otherwise.
+function resolveAtlasLanguageSuffix(options) {
+    if (!options || !options.useUnityAtlasStructure) {
+        return "";
+    }
+    var language = normalizeAtlasLanguage(options.atlasLanguage);
+    return language === "Base" ? "" : "_" + language;
 }
 
 function normalizeAtlasLanguage(value) {
