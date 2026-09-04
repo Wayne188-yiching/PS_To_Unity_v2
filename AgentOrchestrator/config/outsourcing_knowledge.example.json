@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "outsourcing-knowledge@1",
+  "sources": [
+    {"name": "Unity 專案架構規範", "type": "curated_example"},
+    {"name": "UI 美術交付規範", "type": "curated_example"},
+    {"name": "動態與特效規範", "type": "curated_example"},
+    {"name": "多語系與包圖規範", "type": "curated_example"},
+    {"name": "外包驗收規範", "type": "curated_example"}
+  ],
+  "unityArchitecture": {
+    "projectChecks": [
+      "執行前確認 Unity 版本、目前分支、目標 Scene、Prefab 與工項資料夾。",
+      "共用 Prefab 與圖片只引用，不複製、不覆寫來源。"
+    ],
+    "atlasLocalization": [
+      "無文字圖片放 Base；有文字圖片依語系放 CHS、CHT、EN。",
+      "語系 Atlas 命名使用 <Module>_Atlas_CHS、<Module>_Atlas_CHT、<Module>_Atlas_EN。",
+      "每顆 Atlas 的 Packables 只指向單一資料夾，不指向共同父層。",
+      "語系圖片使用 Sprite Mode = Single，檔名保留語系後綴。"
+    ],
+    "psToUnityToolValidation": {
+      "status": "CONFIRMED_AGAINST_CURRENT_SOURCE",
+      "operatorConstraints": [
+        "匯出與匯入時一次選一個語系。",
+        "Atlas 預設上限為 2048；超出時先拆分素材，不直接提高尺寸。"
+      ]
+    }
+  },
+  "uiProduction": {
+    "layout": [
+      "依規格示意圖確認對齊、間距、資訊層級與寬螢幕安全範圍。",
+      "重複項目使用一致結構；可拉伸底圖設定 Sliced 並保留正確 Border。"
+    ],
+    "motion": [
+      "進場動態需標示觸發條件、起訖狀態、時長、曲線及可否中斷。",
+      "循環動態不可跳幀，結束時回到可預期的 Scale、Alpha 與 Active 狀態。"
+    ]
+  },
+  "outsourcingDocumentContract": [
+    "只列分支、專案與工項位置、共用資源、製作需求及驗收重點。",
+    "完整規格書另附時，不重複抄寫背景敘述。",
+    "缺少或互相衝突的資訊列為待確認，不自行補完。"
+  ],
+  "qcPolicy": {
+    "categories": ["must_fix", "recommended", "acceptable_difference", "discuss_with_user"],
+    "reviewAreas": ["requirements", "visual", "layout", "motion", "unity", "delivery"],
+    "feedbackStyle": [
+      "先寫可定位的事實，再寫影響與可執行的修改方式。",
+      "每點只處理一個問題，避免只寫感覺不對。",
+      "正式外包回覆、驗收或退件前必須先與使用者討論。"
+    ]
+  }
+}

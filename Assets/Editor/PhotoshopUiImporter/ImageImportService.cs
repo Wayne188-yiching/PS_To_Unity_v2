@@ -12,6 +12,7 @@ namespace PhotoshopToUnity.EditorImporter
         public readonly Dictionary<string, Sprite> sprites = new Dictionary<string, Sprite>();
         public readonly List<string> errors = new List<string>();
         public readonly List<string> missingSourceImages = new List<string>();
+        public readonly List<string> warnings = new List<string>();
         // v2.8.1 像素內容去重統計（解碼後 raw RGBA 相同的 PNG 合併到同一個 sprite）
         public int dedupedSpriteCount;
         public long dedupedSpriteBytes;
@@ -350,7 +351,14 @@ namespace PhotoshopToUnity.EditorImporter
                 // present, leave an artist-authored Sprite Editor border untouched.
                 if (node != null && node.RequestsSlicedImage)
                 {
-                    importer.spriteBorder = ClampSpriteBorder(importer, node.SpriteBorder);
+                    var requestedBorder = node.SpriteBorder;
+                    var appliedBorder = ClampSpriteBorder(importer, requestedBorder);
+                    importer.spriteBorder = appliedBorder;
+                    if ((requestedBorder - appliedBorder).sqrMagnitude > 0.0001f)
+                    {
+                        result.warnings.Add(
+                            $"SPRITE_BORDER_CLAMPED：{imagePath} requested={FormatBorder(requestedBorder)} applied={FormatBorder(appliedBorder)}");
+                    }
                 }
 
                 importer.SaveAndReimport();
@@ -376,6 +384,11 @@ namespace PhotoshopToUnity.EditorImporter
             ClampBorderPair(ref border.x, ref border.z, width);
             ClampBorderPair(ref border.y, ref border.w, height);
             return border;
+        }
+
+        private static string FormatBorder(Vector4 border)
+        {
+            return $"L{border.x:0.###},B{border.y:0.###},R{border.z:0.###},T{border.w:0.###}";
         }
 
         private static void ClampBorderPair(ref float first, ref float second, int availablePixels)

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "unity-layout-learning@1",
+  "source": {
+    "project": "sanitized-example",
+    "unityVersion": "6000.0",
+    "verifiedWith": "manual fixture review"
+  },
+  "approvalPolicy": "Only curated references may influence generation.",
+  "referencePrefabs": [
+    {
+      "path": "Assets/Shared/Prefabs/ExampleListPanel.prefab",
+      "confidence": "structural",
+      "learn": [
+        "Use LayoutGroup for dynamic repeated content.",
+        "Pair ScrollRect content with Mask or RectMask2D viewports."
+      ]
+    }
+  ],
+  "holdouts": [
+    {
+      "path": "Assets/Examples/SpecialEffectPanel.prefab",
+      "reason": "Specialized motion and effects require manual review."
+    }
+  ],
+  "rules": [
+    "Keep asset pixel size, layout target size, RectTransform size, and Sprite Border separate.",
+    "A dimension mismatch is never a failure by itself.",
+    "Do not use negative scale on text or semantic containers without explicit evidence.",
+    "Use LayoutGroup for dynamic content; fixed decoration may keep explicit positions."
+  ]
+}

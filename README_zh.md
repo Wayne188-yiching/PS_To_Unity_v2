@@ -4,7 +4,7 @@
 
 **目前版本：v2.14.0**
 
-> PNG 像素去重會先依檔案大小與圖片尺寸篩選候選者；只有可能重複的圖片才會讀取完整檔案計算雜湊，而且每個候選檔案最多只計算一次。這項最佳化不會改動版面 JSON、PNG 像素或 Unity 圖片引用結果。
+> PNG 像素去重會先依圖片尺寸篩選候選者，再只對 PNG 中會影響像素／色彩的區塊計算雜湊；Photoshop 每次可能不同的 iTXt/XMP 中繼資料不參與比對，因此完整 bytes 或檔案大小不同的相同圖片也會合併。這項處理不會改動 PNG 像素，layout 內的引用會自動重指到保留下來的單一檔案。
 
 > 可見滑軌自動化：滑軌群組使用 `[SCROLLBAR_V]` / `[SCROLLBAR_H]`，其直接圖片子圖層以英文命名並分別加上 `[TRACK]`、`[HANDLE]`。放在對應 `[SCROLL_*]` 群組內仍是最明確的結構；v2.13.4 起，若滑軌因 PS 排版需要放在外部，只要整個 Prefab 內剛好只有一個方向相容、尚未接線的 ScrollRect，也會安全自動配對。多組可能配對時不猜測，會輸出 `SCROLLBAR_ORPHAN_UNRESOLVED`。接線會保留 PS 匯出的 Content 初始位置，再讓 Handle 可拖動。
 
@@ -52,9 +52,9 @@
 
 > 圖片圖層可加 `[SLICED=32]` 使用四邊相同的九宮格，或 `[SLICED=左,上,右,下]` 分別指定 Border。Unity 會自動寫入 Sprite Border 並把生成的 Image 設為 `Sliced`；未加標記時，既有 Sprite Editor 手動 Border 仍會保留並自動使用 `Sliced`。
 
-> 生成 Prefab 時會自動建立／更新 `Atlas/SpriteAtlas.spriteatlasv2`，所有圖片完成匯入後只打包一次。Atlas 上限會依最大來源圖自動選擇 2048／4096／8192。
+> 生成 Prefab 時會依實際有圖的資料夾建立／更新獨立 Atlas：`<模組>_Atlas.spriteatlasv2`（Base）以及 `<模組>_Atlas_CHS/CHT/EN.spriteatlasv2`。每顆 Atlas 的 Packables 只掛對應的單一語系資料夾，所有圖片完成匯入後才統一打包一次；空語系資料夾不會新建空 Atlas。Default、Android 與 iOS 的 Atlas 最大貼圖尺寸固定上限為 2048。
 >
-> v2.13.1 起圖集改由「這次匯入**實際引用到的 Sprite 清單**」組成，不再掛整個資料夾。PS 的 Save for Web 對相同像素會產生不同 bytes，匯出器的 bytes 雜湊去重因此常抓不到；Unity 端的像素去重會抓到並把所有 `Image` 收斂到同一顆 canonical Sprite，但別名 PNG 會保留在磁碟上，讓同一份 layout JSON 仍可重複匯入。掛資料夾時那些別名仍會被打進圖集——實測一份排行榜 Package：43 張 PNG 只有 26 種不同像素，多出來的 258 KB 全部進了包。**副作用**：手動丟進圖集資料夾的 PNG 不再自動被收錄，要經過一次 Generate 才會進圖集。
+> v2.13.1 起圖集改由「這次匯入**實際引用到的 Sprite 清單**」組成，不再掛整個資料夾。目前 Photoshop 匯出端會忽略 Save for Web 產生的 iTXt/XMP 差異，直接刪除視覺內容相同的別名 PNG，並把 layout 的 `imagePath` 收斂到保留下來的 canonical 檔案；Unity 端的 decoded-pixel 去重仍保留作為不同壓縮流的第二道保險。**副作用**：手動丟進圖集資料夾的 PNG 不會自動被收錄，要經過一次 Generate 才會進圖集。
 >
 > 「只換字體」需求走 `Tools > Photoshop UI Importer > Font Replacer`：分析 Prefab 的 TMP 字型/材質使用 → 一鍵替換，只寫 `font`/`fontSharedMaterial` 兩欄位，排版/字級/顏色/Sprite 全不動；描邊材質自動克隆到新字型。字型資產工廠可從專案內 .ttf/.otf 一鍵建 Dynamic SDF Font Asset 並自動登記 TmpFontMap；Importer 的「掃描 Package 字型」按鈕會列出每個 fontToken 的資產狀態（已對應／缺 Font Asset 可一鍵建立／缺字型檔）。
 
@@ -89,3 +89,10 @@ Mac：    /Applications/Adobe Photoshop [版本]/Presets/Scripts/
 ## 文件
 
 → [完整使用說明（GUIDE_zh.html）](GUIDE_zh.html)（圖層命名規則、文字材質球、常見問題等）
+
+## UI 發包製作人
+
+要從規格書自動建立 Unity UI 外包交接草稿，直接點兩下 `Tools/啟動_UI發包製作人.bat`。只需選擇規格書；Agent 會自動讀取 Excel 後製流程，並查找已登錄專案的 Unity 資訊。
+
+→ [Agent 使用與資料夾說明](AgentOrchestrator/README.md)
+→ [工具分類](Tools/README.md)

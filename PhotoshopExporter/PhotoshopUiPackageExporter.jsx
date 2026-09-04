@@ -1315,13 +1315,7 @@ function createImageNode(layer, context, parentBounds) {
     node._parentBounds = parentBounds;
     node._rawName = layer.name;
 
-    var isMergedComposite = layer.typename === "LayerSet" && hasMergeGroupTag(layer.name);
-    if (isMergedComposite) {
-        // MERGE exports already contain the rendered layer effects. LayerSet
-        // boundsNoEffects can include non-rendering child bounds, so using it
-        // as extra padding creates transparent bands and shifts the JSON rect.
-        node._padding = zeroPadding();
-    } else if (insideScroll) {
+    if (insideScroll) {
         // Direct scroll items drop their viewport-preview mask; nested artwork keeps
         // its own design masks. The cache signature carries nomask only when removed.
         node._noMaskExport = removeMaskForScroll;
@@ -1329,15 +1323,6 @@ function createImageNode(layer, context, parentBounds) {
         var visibleBounds = readLayerBounds(layer);
         visibleBounds = visibleBounds ? clampBoundsToCanvas(visibleBounds, context.doc) : null;
         node._visibleBounds = visibleBounds || bounds;
-        // 有啟用遮色片時，boundsNoMask（全圖）與 boundsNoEffects（已套 mask）基準不一致，
-        // 陰影補償會算出錯誤 padding → 歸零，座標交給 trim 後的實際像素回寫。
-        if (removeMaskForScroll && layerHasEnabledMask(layer)) {
-            node._padding = zeroPadding();
-        } else {
-            node._padding = calculateShadowCompensation(bounds, noEffectsBounds);
-        }
-    } else {
-        node._padding = calculateShadowCompensation(bounds, noEffectsBounds);
     }
 
     applyLayoutMetadata(node, bounds, parentBounds, layer.name);
@@ -1470,7 +1455,7 @@ function exportNodeImageFastDuplicate(layer, node, context, exportDoc, file) {
         }
         alignActiveLayerToExportOrigin(exportDoc);
 
-        if (!trimTransparentPixelsAndApplyPadding(exportDoc, node)) {
+        if (!trimTransparentPixels(exportDoc, node)) {
             saved = false;
         } else {
             saved = savePngIfChanged(exportDoc, file);
@@ -1657,7 +1642,7 @@ function exportNodeImageReuse(layer, node, context, exportDoc, file) {
         exportDoc.selection.deselect();
         exportDoc.paste();
         exportDoc.selection.deselect(); // Fix bug1: anchor the floating selection before next resizeCanvas
-        if (!trimTransparentPixelsAndApplyPadding(exportDoc, node)) {
+        if (!trimTransparentPixels(exportDoc, node)) {
             saved = false;
         } else {
             saved = savePngIfChanged(exportDoc, file);
@@ -1671,12 +1656,19 @@ function exportNodeImageReuse(layer, node, context, exportDoc, file) {
     return saved;
 }
 
-function trimTransparentPixelsAndApplyPadding(doc, node) {
+function trimTransparentPixels(doc, node) {
     // Smart Objects can retain a document-sized transparent canvas even when
     // only a small decoration is visible. Rasterizing in the temporary export
-    // document and trimming its transparent canvas gives the real pixel rect.
-    // Two-stage trim preserves the removed left/top offset for Layout JSON.
+    // document and trimming its transparent canvas gives the real rendered rect,
+    // including visible effects. Two-stage trim preserves the left/top offset.
+    var isSmartObject = doc.activeLayer && doc.activeLayer.kind === LayerKind.SMARTOBJECT;
     var smartObjectTrim = trimActiveSmartObjectTransparency(doc);
+    // A linked Smart Object can occasionally duplicate into the temporary
+    // document without pixels. Returning false makes the caller use Copy Merged
+    // from the source document instead of accepting a blank PNG as successful.
+    if (isSmartObject && !smartObjectTrim) {
+        return false;
+    }
     var transparencyTrim = smartObjectTrim || trimDocumentTransparency(doc);
     var contentBounds = transparencyTrim || readLayerBounds(doc.activeLayer);
     if (!contentBounds || contentBounds.width <= 0 || contentBounds.height <= 0) {
@@ -1690,13 +1682,12 @@ function trimTransparentPixelsAndApplyPadding(doc, node) {
         node._nearTransparentRescue = transparencyTrim.nearTransparentRescue;
     }
 
-    var padding = node._padding || zeroPadding();
-    var padLeft = Math.max(0, Math.round(padding.left || 0));
-    var padTop = Math.max(0, Math.round(padding.top || 0));
-    var padRight = Math.max(0, Math.round(padding.right || 0));
-    var padBottom = Math.max(0, Math.round(padding.bottom || 0));
-    var finalWidth = Math.max(1, contentBounds.width + padLeft + padRight);
-    var finalHeight = Math.max(1, contentBounds.height + padTop + padBottom);
+    // The temporary document already contains the rendered layer effects.
+    // Re-applying the difference between bounds and boundsNoEffects here adds
+    // an empty border after the alpha trim and shifts the Layout JSON rect.
+    // Keep the exported canvas tight to the pixels that are actually visible.
+    var finalWidth = Math.max(1, contentBounds.width);
+    var finalHeight = Math.max(1, contentBounds.height);
 
     if (!transparencyTrim) {
         doc.crop([
@@ -1708,9 +1699,6 @@ function trimTransparentPixelsAndApplyPadding(doc, node) {
     }
 
     doc.resizeCanvas(finalWidth, finalHeight, AnchorPosition.TOPLEFT);
-    if (padLeft > 0 || padTop > 0) {
-        doc.activeLayer.translate(padLeft, padTop);
-    }
 
     var isMergedComposite = hasMergeGroupTag(node._rawName);
     var isOversizedSmartObject = smartObjectTrim &&
@@ -1722,11 +1710,11 @@ function trimTransparentPixelsAndApplyPadding(doc, node) {
         node.x = Math.round((node._noEffectsBounds.left + node._noEffectsBounds.right - finalWidth) * 0.5);
         node.y = Math.round((node._noEffectsBounds.top + node._noEffectsBounds.bottom - finalHeight) * 0.5);
     } else if (isOversizedSmartObject && typeof node._duplicateExportOriginX === "number") {
-        node.x = Math.round(node._duplicateExportOriginX + contentBounds.left - padLeft);
-        node.y = Math.round(node._duplicateExportOriginY + contentBounds.top - padTop);
+        node.x = Math.round(node._duplicateExportOriginX + contentBounds.left);
+        node.y = Math.round(node._duplicateExportOriginY + contentBounds.top);
     } else {
-        node.x = Math.round(node.x + contentBounds.left - padLeft);
-        node.y = Math.round(node.y + contentBounds.top - padTop);
+        node.x = Math.round(node.x + contentBounds.left);
+        node.y = Math.round(node.y + contentBounds.top);
     }
     node.width = finalWidth;
     node.height = finalHeight;
@@ -1922,6 +1910,14 @@ function trimActiveSmartObjectTransparency(doc) {
         var removedTop = Math.max(0, originalHeight - px(doc.height));
         doc.trim(TrimType.TRANSPARENT, true, true, true, true);
 
+        // Photoshop may report a successful trim for a fully transparent
+        // rasterized Smart Object. Verify that real pixels remain so the fast
+        // path can fall back instead of saving an empty bitmap.
+        selectActiveLayerTransparency();
+        var renderedBounds = doc.selection.bounds;
+        doc.selection.deselect();
+        if (!renderedBounds || renderedBounds.length < 4) return null;
+
         var width = Math.max(0, Math.round(px(doc.width)));
         var height = Math.max(0, Math.round(px(doc.height)));
         if (width <= 0 || height <= 0) return null;
@@ -1934,6 +1930,7 @@ function trimActiveSmartObjectTransparency(doc) {
             height: height
         };
     } catch (error) {
+        try { doc.selection.deselect(); } catch (ignoredDeselect) {}
         return null;
     }
 }
@@ -3052,37 +3049,6 @@ function restoreMaskStates(restore) {
     }
 }
 
-function calculateShadowCompensation(bounds, noEffectsBounds) {
-    if (!bounds || !noEffectsBounds) {
-        return zeroPadding();
-    }
-
-    var innerLeft = Math.max(bounds.left, noEffectsBounds.left);
-    var innerTop = Math.max(bounds.top, noEffectsBounds.top);
-    var innerRight = Math.min(bounds.right, noEffectsBounds.right);
-    var innerBottom = Math.min(bounds.bottom, noEffectsBounds.bottom);
-
-    if (innerRight <= innerLeft || innerBottom <= innerTop) {
-        return zeroPadding();
-    }
-
-    var effectLeft = Math.max(0, innerLeft - bounds.left);
-    var effectTop = Math.max(0, innerTop - bounds.top);
-    var effectRight = Math.max(0, bounds.right - innerRight);
-    var effectBottom = Math.max(0, bounds.bottom - innerBottom);
-
-    return {
-        left: effectRight,
-        top: effectBottom,
-        right: effectLeft,
-        bottom: effectTop
-    };
-}
-
-function zeroPadding() {
-    return { left: 0, top: 0, right: 0, bottom: 0 };
-}
-
 function hideAllLayers(container) {
     for (var i = 0; i < container.layers.length; i++) {
         var layer = container.layers[i];
@@ -3340,17 +3306,13 @@ function updateExportCacheRecord(entry, context, file) {
 
 function buildExportSignature(layer, node) {
     var parts = [];
-    // v3 invalidates pre-v2.13.4 records so every PNG receives the final
-    // alpha-trim pass and MERGE coordinate re-anchoring once after upgrade.
-    parts.push("fastalign_v3");
+    // v5 invalidates records created before tight alpha-bound export and blank
+    // Smart Object detection. Older records may point to padded or empty PNGs.
+    parts.push("fastalign_v5_tight");
     parts.push(safeLayerId(layer));
     parts.push(node._rawName || "");
     appendBoundsSignature(parts, node._exportBounds);
     appendBoundsSignature(parts, node._noEffectsBounds);
-    parts.push(Math.round((node._padding && node._padding.left) || 0));
-    parts.push(Math.round((node._padding && node._padding.top) || 0));
-    parts.push(Math.round((node._padding && node._padding.right) || 0));
-    parts.push(Math.round((node._padding && node._padding.bottom) || 0));
     // OPTIMIZATION_PLAN_zh.html#phase4-5-q9：scroll 內去 mask 匯出的圖，簽名帶 nomask flag——
     // 防「先以裁切版進 cache → 加 [SCROLL_V] 後 cache hit 沿用半張圖」。只在 true 時附加，不動既有快取。
     if (node._noMaskExport) {
@@ -3463,10 +3425,10 @@ function exportCacheFile(imageFolder) {
     return new File(imageFolder.fsName + "/.ps_to_unity_export_cache.tsv");
 }
 
-// Phase 3 像素雜湊去重：對匯出後的 PNG 做 FNV-1a 32-bit hash，同 hash 視為內容相同。
-// ES3 / ExtendScript 無 crypto，FNV-1a 雖然不是安全雜湊，但對 UI Package 的小檔案
-// 數量級（通常 < 200 張）內容完全相同才會撞值的機率極低，足以作為「同內容偵測」。
-function computeFileHash(file) {
+// Phase 3 像素雜湊去重：只 hash 會影響 PNG 顯示結果的 chunks，忽略 iTXt/tEXt 等中繼資料。
+// Photoshop Save for Web 會替相同像素寫入不同 XMP/iTXt，整檔 bytes hash 因而不同；
+// 但同一次匯出的 IHDR/IDAT 等顯示資料是穩定的，可用來辨識真正相同的圖片。
+function computePngVisualHash(file) {
     try {
         file.encoding = "BINARY";
         if (!file.open("r")) {
@@ -3474,19 +3436,80 @@ function computeFileHash(file) {
         }
         var content = file.read();
         file.close();
+        return computePngVisualHashFromBinary(content);
     } catch (e) {
         try { file.close(); } catch (e2) {}
         return null;
     }
+}
+
+// 保持純函式，讓 Photoshop 外的 Node 自我測試也能直接驗證去重規則。
+function computePngVisualHashFromBinary(content) {
+    if (!content || content.length < 20 ||
+        (content.charCodeAt(0) & 0xFF) !== 137 || content.substr(1, 3) !== "PNG") {
+        return null;
+    }
+
+    // 會改變解碼像素或色彩解讀的 chunks；刻意排除文字、時間、XMP 與 DPI metadata。
+    var visualChunks = {
+        IHDR: true,
+        PLTE: true,
+        tRNS: true,
+        cHRM: true,
+        gAMA: true,
+        iCCP: true,
+        sBIT: true,
+        sRGB: true,
+        IDAT: true
+    };
 
     var hash = 0x811C9DC5; // FNV-1a 32-bit offset basis
     var len = content.length;
-    for (var i = 0; i < len; i++) {
-        hash = hash ^ content.charCodeAt(i);
-        // FNV prime 0x01000193；| 0 強制 32-bit signed，下面 >>> 0 轉 unsigned
-        hash = Math.imul ? Math.imul(hash, 0x01000193) : (hash * 0x01000193) | 0;
+    var offset = 8;
+    var hashedLength = 0;
+    var hasHeader = false;
+    var hasImageData = false;
+
+    function readUint32(at) {
+        return ((content.charCodeAt(at) & 0xFF) * 0x1000000) +
+            ((content.charCodeAt(at + 1) & 0xFF) << 16) +
+            ((content.charCodeAt(at + 2) & 0xFF) << 8) +
+            (content.charCodeAt(at + 3) & 0xFF);
     }
-    return ((hash >>> 0).toString(16)) + "_" + len; // 串上長度進一步降低碰撞
+
+    function hashRange(start, end) {
+        for (var i = start; i < end; i++) {
+            hash = hash ^ content.charCodeAt(i);
+            // FNV prime 0x01000193；| 0 強制 32-bit signed，下面 >>> 0 轉 unsigned
+            hash = Math.imul ? Math.imul(hash, 0x01000193) : (hash * 0x01000193) | 0;
+        }
+        hashedLength += end - start;
+    }
+
+    while (offset + 12 <= len) {
+        var chunkLength = readUint32(offset);
+        var chunkType = content.substr(offset + 4, 4);
+        var dataEnd = offset + 8 + chunkLength;
+        var chunkEnd = dataEnd + 4; // CRC
+        if (chunkLength < 0 || chunkEnd > len) {
+            return null;
+        }
+
+        if (visualChunks[chunkType]) {
+            // Hash length + type + data, deliberately excluding CRC and non-visual chunks.
+            hashRange(offset, dataEnd);
+            if (chunkType === "IHDR") hasHeader = true;
+            if (chunkType === "IDAT") hasImageData = true;
+        }
+
+        offset = chunkEnd;
+        if (chunkType === "IEND") break;
+    }
+
+    if (!hasHeader || !hasImageData) {
+        return null;
+    }
+    return ((hash >>> 0).toString(16)) + "_" + hashedLength;
 }
 
 // Read only the fixed PNG header. This keeps singleton images out of the much
@@ -3553,7 +3576,9 @@ function dedupPngsByHash(pendingImages, imageFolder, context) {
             continue;
         }
 
-        var candidateKey = String(file.length) + "|" + readPngDimensionsKey(file);
+        // Metadata length is not pixel content. Group by dimensions only, then
+        // compute a visual-chunk hash so different iTXt/XMP cannot hide duplicates.
+        var candidateKey = readPngDimensionsKey(file);
         var record = {
             imagePath: imagePath,
             file: file,
@@ -3570,14 +3595,14 @@ function dedupPngsByHash(pendingImages, imageFolder, context) {
     for (var r = 0; r < records.length; r++) {
         var current = records[r];
 
-        // A different byte length or PNG size proves the files cannot be exact
-        // duplicates, so singleton candidates skip the full-file hash.
+        // Different PNG dimensions prove the files cannot be visual duplicates,
+        // so singleton dimension groups skip the full visual-chunk hash.
         if (candidateCounts[current.candidateKey] < 2) {
             stats.uniqueCount++;
             continue;
         }
 
-        current.hash = computeFileHash(current.file); // at most once per file
+        current.hash = computePngVisualHash(current.file); // at most once per file
         var hash = current.hash;
         if (!hash) {
             continue;

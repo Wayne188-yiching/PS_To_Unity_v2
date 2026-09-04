@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "outsourcing-projects@1",
+  "projects": {
+    "DemoGame": {
+      "unityProject": "C:/Projects/DemoGame",
+      "defaultFontAsset": "Assets/Fonts/MiSans-Demibold SDF.asset",
+      "sharedPrefabRoots": [
+        "Assets/Shared/Prefabs"
+      ],
+      "sharedImageRoots": [
+        "Assets/Shared/SpriteAtlas"
+      ],
+      "workProfiles": [
+        {
+          "name": "商城 UI",
+          "matchKeywords": ["商城", "商店", "store", "shop"],
+          "taskContext": [
+            "製作分支：feature/store-ui",
+            "工項資料夾：Assets/Temp/Shop",
+            "目標 Prefab：Assets/UI/Store/StorePanel.prefab",
+            "共用 Prefab：Assets/Shared/Prefabs",
+            "共用圖片：Assets/Shared/SpriteAtlas",
+            "字體：Assets/Fonts/MiSans-Demibold SDF.asset"
+          ]
+        }
+      ]
+    }
+  }
+}

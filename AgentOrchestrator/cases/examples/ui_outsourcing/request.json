@@ -1,0 +1,17 @@
+{
+  "case_id": "outsourcing_ui_sample",
+  "project_name": "DemoGame",
+  "task_title": "活動獎勵頁 UI",
+  "workflow": "brief",
+  "spec_paths": [
+    "AgentOrchestrator/cases/examples/ui_outsourcing/requirement.md"
+  ],
+  "qc_evidence_paths": [],
+  "user_context": [
+    "正式發包前必須先與我討論未決項目。",
+    "外包文件要簡短、具體，並可直接逐項估價。"
+  ],
+  "api_transmission_approved": false,
+  "user_approved_output": false,
+  "output_folder": "AgentOrchestrator/runs/outsourcing_ui_sample"
+}

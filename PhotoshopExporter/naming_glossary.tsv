@@ -23,6 +23,7 @@
 群組	group
 資料夾	folder
 圖層	layer
+图层	layer
 清單	list
 列表	list
 卡片	card
@@ -31,6 +32,7 @@
 
 # ── controls ────────────────────────────────────────────────────────
 按鈕	btn
+按钮	btn
 按键	btn
 關閉	close
 確定	confirm
@@ -76,6 +78,7 @@
 道具	item
 獎勵	reward
 獲得	get
+領取	claim
 角色	role
 等級	level
 經驗	exp
@@ -103,6 +106,16 @@
 特效	vfx
 動畫	anim
 底紋	pattern
+矩形	rect
+圓角矩形	roundedrect
+多邊形	polygon
+形狀	shape
+橢圓	ellipse
+星球	planet
+隕石坑	crater
+漸層填色	gradientfill
+色彩填色	solidfill
+颜色填充	solidfill
 
 # ── states ──────────────────────────────────────────────────────────
 選中	selected
@@ -120,6 +133,7 @@
 紅色	red
 藍色	blue
 綠色	green
+绿	green
 黃色	yellow
 紫色	purple
 橘色	orange
@@ -136,3 +150,15 @@
 小	small
 新	new
 舊	old
+當前	current
+預覽	preview
+拷貝	copy
+拷贝	copy
+
+# ── Peak Power / Level Review ──────────────────────────────────────
+巔峰神力	peakpower
+倍率突破	ratebreakthrough
+倍率	multiplier
+電擊	lightning
+賞金令	bountypass
+锁头	lock

@@ -7,6 +7,36 @@ QC_Output/
 *.bak
 Thumbs.db
 .DS_Store
+.env.local
+
+# Agent and Unity generated state
+TestArtifacts/**/Generated/
+AgentOrchestrator/.venv/
+AgentOrchestrator/runs/
+AgentOrchestrator/.test_tmp/
+AgentOrchestrator/**/__pycache__/
+AgentOrchestrator/**/*.pyc
+AgentOrchestrator/config/outsourcing_knowledge.json
+AgentOrchestrator/config/outsourcing_projects.json
+AgentOrchestrator/cases/examples/psd/
+AgentOrchestrator/data/psd_case_learning/
+AgentOrchestrator/data/psd_structure_learning.json
+AgentOrchestrator/data/unity_layout_audit.json
+AgentOrchestrator/data/unity_layout_learning.json
+AgentOrchestrator/tests/fixtures/psd_analysis/
+AgentOrchestrator/tests/test_psd_analysis.py
+AgentOrchestrator/tests/test_psd_structure_policy.py
+Tools/local.settings.psd1
+PhotoshopExporter/.obsidian/
+PhotoshopExporter/naming_glossary_todo.tsv
+TestProjects/**/[Ll]ibrary/
+TestProjects/**/[Tt]emp/
+TestProjects/**/[Oo]bj/
+TestProjects/**/[Ll]ogs/
+TestProjects/**/[Uu]ser[Ss]ettings/
+TestProjects/**/Assets/Temp.meta
+TestProjects/**/Assets/Editor/
+TestProjects/**/Assets/Editor.meta
 
 
 # Acceptance-run artifacts (local only)

@@ -41,7 +41,7 @@ Exporter speed notes:
 - First-time export uses fast layer duplicate export when possible, then falls back to the safer merged-copy path for layers Photoshop cannot duplicate directly.
 - Fast duplicate export no longer hides every PSD layer up front. The slower visibility-isolated path is prepared only when fallback is needed.
 - PNG saving uses Photoshop Save for Web first, then falls back to normal PNG save if needed.
-- Since v2.12.6, pixel dedup first groups PNGs by byte length and dimensions. Only possible duplicates receive a full-file hash, and each candidate file is hashed at most once.
+- Pixel dedup groups PNGs by dimensions, then hashes only pixel/color-bearing PNG chunks. Photoshop's varying iTXt/XMP metadata is ignored, so visually identical exports collapse to one file even when their complete PNG bytes or file lengths differ.
 
 Unity Atlas output:
 
@@ -64,8 +64,8 @@ Unity Atlas output:
 - Add `[SOFTMASK_BOTTOM=64]` to a scroll group when the viewport should feather only its bottom edge by 64 pixels. Unity builds the effect from nested native `RectMask2D` components; no extra runtime package is required. `[SOFTMASK_Y=64]` remains an accepted alias.
 - Tag a direct child layer of a group with `[MASK]` to use its shape as a clipping mask for the whole group. Unity mounts `Image` + `Mask` (`showMaskGraphic` off, so the shape itself is not drawn) on the group and sizes the group to the mask layer's bounds; the mask layer produces no node of its own. Use it only for non-rectangular shapes — a plain rectangular Photoshop layer mask already becomes a cheaper `RectMask2D` automatically, and `Mask` costs two extra draw calls per level. Not supported on `[SCROLL_*]` groups, which build their own viewport mask.
 - Tag an image layer `[SLICED=32]` for a uniform nine-slice border, or `[SLICED=left,top,right,bottom]` for explicit borders. Unity writes the Sprite Editor border and sets the generated `Image` to `Sliced`. Existing manual Sprite Editor borders are preserved when the tag is absent.
-- Prefab generation automatically creates or updates `Atlas/SpriteAtlas.spriteatlasv2` and packs it once after all TextureImporters are ready. Atlas max size is selected from 2048/4096/8192 according to the largest source image.
-- Since v2.13.1 the atlas is built from an **explicit list of the Sprites this import actually references**, not from the packable folder. Photoshop's Save for Web produces different bytes for identical pixels, so the exporter's byte-hash dedup misses many duplicates; Unity's pixel dedup catches them and points every `Image` at one canonical Sprite, but the alias PNGs stay on disk so the same layout JSON remains importable. With a folder packable those aliases were still packed into the atlas — one real ranking package shipped 43 PNGs for 26 distinct images, wasting 258 KB. Note the trade-off: a PNG dropped into the atlas folder by hand is no longer picked up automatically, it takes one Generate to enter the atlas.
+- Prefab generation creates or updates separate atlases for folders that contain sprites: `<Module>_Atlas.spriteatlasv2` for Base and `<Module>_Atlas_CHS/CHT/EN.spriteatlasv2` for language images. Each atlas packs exactly one corresponding language folder; empty language folders do not create new empty atlases. Packing runs once after all TextureImporters are ready, with max texture size capped at 2048 for Default, Android, and iOS.
+- Since v2.13.1 the atlas is built from an **explicit list of the Sprites this import actually references**, not from the packable folder. The Photoshop exporter now removes duplicate aliases itself by hashing visual PNG chunks and rewrites every affected `imagePath` to the retained canonical file. Unity's decoded-pixel dedup remains as a safety net for PNGs produced with different compression streams. Note the trade-off: a PNG dropped into the atlas folder by hand is not picked up automatically; it takes one Generate to enter the atlas.
 
 Batch font replacement (`Tools > Photoshop UI Importer > Font Replacer`):
 
@@ -84,3 +84,7 @@ Batch font replacement (`Tools > Photoshop UI Importer > Font Replacer`):
 
 - [中文 README](README_zh.md)
 - [完整使用說明 GUIDE_zh.html](GUIDE_zh.html)
+
+## UI outsourcing agent
+
+Double-click `Tools/啟動_UI發包製作人.bat` to select a specification and create a Unity-aware vendor handoff draft. See [AgentOrchestrator/README.md](AgentOrchestrator/README.md) and [Tools/README.md](Tools/README.md) for the categorized layout.

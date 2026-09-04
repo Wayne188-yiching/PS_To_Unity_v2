@@ -1,0 +1,31 @@
+{
+  "version": "public-example@1",
+  "learnedFrom": ["sanitized reference cases"],
+  "purpose": "Separate Photoshop visual organization from Unity runtime structure before renaming.",
+  "productionRootTemplate": ["<PageName>", "UIWindow", "Animation"],
+  "invariants": {
+    "noLayerDuplication": true,
+    "renameByStableLayerId": true,
+    "hiddenLayerPolicy": "Ignore effectively hidden layers unless the user explicitly includes them.",
+    "autoNamerScope": "Lexical translation and formatting only; structure and Unity behavior require evidence.",
+    "unsafeDecision": "Return NEEDS_REVIEW and preserve the original hierarchy and coordinates."
+  },
+  "sharedAssetPolicy": {
+    "exportPolicy": "Use a confirmed project dependency instead of exporting a duplicate PNG.",
+    "unsafeDecision": "Return NEEDS_REVIEW until the asset identity is confirmed."
+  },
+  "unityNaming": {
+    "Btn_": "Interactive button.",
+    "TMP_": "Runtime TextMeshPro text.",
+    "Frame_": "Visual frame or panel image.",
+    "Icon_": "Visual icon.",
+    "Bar_": "Progress or fill presentation."
+  },
+  "semanticTags": {
+    "[MERGE]": "Composite decorative children into one image.",
+    "[H]|[V]|[GRID]": "Layout intent supported by deterministic geometry evidence.",
+    "[SLICED=value]": "Explicit stretch intent with an approved numeric border.",
+    "[MASK]": "Explicit mask source and owned content group.",
+    "[SCROLL_H]|[SCROLL_V]": "Scroll group whose Viewport and Content are generated in Unity."
+  }
+}
