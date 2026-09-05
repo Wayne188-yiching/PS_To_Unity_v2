@@ -52,9 +52,9 @@
 
 > 圖片圖層可加 `[SLICED=32]` 使用四邊相同的九宮格，或 `[SLICED=左,上,右,下]` 分別指定 Border。Unity 會自動寫入 Sprite Border 並把生成的 Image 設為 `Sliced`；未加標記時，既有 Sprite Editor 手動 Border 仍會保留並自動使用 `Sliced`。
 
-> 生成 Prefab 時會自動建立／更新 `Atlas/SpriteAtlas.spriteatlasv2`，所有圖片完成匯入後只打包一次。Atlas 上限會依最大來源圖自動選擇 2048／4096／8192。
+> v2.14.0 起，生成 Prefab 時會依語系建立／更新獨立圖集：`{模組名}_Atlas.spriteatlasv2`（Base）以及有圖片時才建立的 `_CHS`、`_CHT`、`_EN` 圖集。每顆 Atlas 的 packable 只指向對應的單一語系資料夾，所有 TextureImporter 設定完成後才打包一次；Atlas 上限依最大來源圖自動選擇 2048／4096／8192。既有專案若仍有舊 `SpriteAtlas.spriteatlasv2`，確認新圖集正確後需手動移除，避免重複打包。
 >
-> v2.13.1 起圖集改由「這次匯入**實際引用到的 Sprite 清單**」組成，不再掛整個資料夾。PS 的 Save for Web 對相同像素會產生不同 bytes，匯出器的 bytes 雜湊去重因此常抓不到；Unity 端的像素去重會抓到並把所有 `Image` 收斂到同一顆 canonical Sprite，但別名 PNG 會保留在磁碟上，讓同一份 layout JSON 仍可重複匯入。掛資料夾時那些別名仍會被打進圖集——實測一份排行榜 Package：43 張 PNG 只有 26 種不同像素，多出來的 258 KB 全部進了包。**副作用**：手動丟進圖集資料夾的 PNG 不再自動被收錄，要經過一次 Generate 才會進圖集。
+> 像素去重仍會把 Prefab 中的 `Image` 收斂到 canonical Sprite。若圖片是由工具複製進 Unity，重複的別名 PNG 會在重新指向後從目的地移除，來源 Package 保持完整，因此同一份 layout JSON 可重複匯入；若來源資料夾本來就在 Unity `Assets` 內，工具不刪原檔，只在 Console 列出需回 Photoshop 整理的重複項目。美術直接補進 Base／CHS／CHT／EN 資料夾的圖片會由該語系的資料夾 packable 自動收錄。
 >
 > 「只換字體」需求走 `Tools > Photoshop UI Importer > Font Replacer`：分析 Prefab 的 TMP 字型/材質使用 → 一鍵替換，只寫 `font`/`fontSharedMaterial` 兩欄位，排版/字級/顏色/Sprite 全不動；描邊材質自動克隆到新字型。字型資產工廠可從專案內 .ttf/.otf 一鍵建 Dynamic SDF Font Asset 並自動登記 TmpFontMap；Importer 的「掃描 Package 字型」按鈕會列出每個 fontToken 的資產狀態（已對應／缺 Font Asset 可一鍵建立／缺字型檔）。
 
