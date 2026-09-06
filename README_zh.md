@@ -4,7 +4,7 @@
 
 **目前版本：v2.14.0**
 
-> PNG 像素去重會先依檔案大小與圖片尺寸篩選候選者；只有可能重複的圖片才會讀取完整檔案計算雜湊，而且每個候選檔案最多只計算一次。這項最佳化不會改動版面 JSON、PNG 像素或 Unity 圖片引用結果。
+> PNG 像素去重會先依圖片尺寸篩選候選者，再只對 PNG 中會影響像素／色彩的區塊計算雜湊；Photoshop 每次可能不同的 iTXt/XMP 中繼資料不參與比對，因此完整 bytes 或檔案大小不同的相同圖片也會合併。這項處理不會改動 PNG 像素，layout 內的引用會自動重指到保留下來的單一檔案。
 
 > 可見滑軌自動化：滑軌群組使用 `[SCROLLBAR_V]` / `[SCROLLBAR_H]`，其直接圖片子圖層以英文命名並分別加上 `[TRACK]`、`[HANDLE]`。放在對應 `[SCROLL_*]` 群組內仍是最明確的結構；v2.13.4 起，若滑軌因 PS 排版需要放在外部，只要整個 Prefab 內剛好只有一個方向相容、尚未接線的 ScrollRect，也會安全自動配對。多組可能配對時不猜測，會輸出 `SCROLLBAR_ORPHAN_UNRESOLVED`。接線會保留 PS 匯出的 Content 初始位置，再讓 Handle 可拖動。
 
@@ -89,3 +89,10 @@ Mac：    /Applications/Adobe Photoshop [版本]/Presets/Scripts/
 ## 文件
 
 → [完整使用說明（GUIDE_zh.html）](GUIDE_zh.html)（圖層命名規則、文字材質球、常見問題等）
+
+## UI 發包製作人
+
+要從規格書自動建立 Unity UI 外包交接草稿，直接點兩下 `Tools/啟動_UI發包製作人.bat`。只需選擇規格書；Agent 會自動讀取 Excel 後製流程，並查找已登錄專案的 Unity 資訊。
+
+→ [Agent 使用與資料夾說明](AgentOrchestrator/README.md)
+→ [工具分類](Tools/README.md)

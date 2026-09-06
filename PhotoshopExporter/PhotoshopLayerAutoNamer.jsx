@@ -101,6 +101,9 @@ function collectNonAsciiLayerNames(container, found) {
     }
     for (var i = 0; i < container.layers.length; i++) {
         var layer = container.layers[i];
+        if (!layerIsVisible(layer)) {
+            continue;
+        }
         if (/[^\x00-\x7F]/.test(String(layer.name))) {
             found.push(layer.name);
         }
@@ -213,6 +216,9 @@ function buildPlan(doc, glossary) {
 function collectLayers(container, parentPath, plan, glossary) {
     for (var i = container.layers.length - 1; i >= 0; i--) {
         var layer = container.layers[i];
+        if (!layerIsVisible(layer)) {
+            continue;
+        }
         var parsed = parseName(layer.name, glossary);
 
         var entry = {
@@ -492,7 +498,7 @@ function isAsciiWordChar(ch) {
 }
 
 function isSeparator(ch) {
-    return /[\s_\-.,/\\()]/.test(ch);
+    return /[\s_\-.,\/\\()]/.test(ch);
 }
 
 function isTextLayer(layer) {
@@ -500,6 +506,14 @@ function isTextLayer(layer) {
         return layer.kind === LayerKind.TEXT;
     } catch (e) {
         return false;
+    }
+}
+
+function layerIsVisible(layer) {
+    try {
+        return !!layer.visible;
+    } catch (e) {
+        return true;
     }
 }
 

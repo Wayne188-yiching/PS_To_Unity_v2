@@ -41,7 +41,7 @@ Exporter speed notes:
 - First-time export uses fast layer duplicate export when possible, then falls back to the safer merged-copy path for layers Photoshop cannot duplicate directly.
 - Fast duplicate export no longer hides every PSD layer up front. The slower visibility-isolated path is prepared only when fallback is needed.
 - PNG saving uses Photoshop Save for Web first, then falls back to normal PNG save if needed.
-- Since v2.12.6, pixel dedup first groups PNGs by byte length and dimensions. Only possible duplicates receive a full-file hash, and each candidate file is hashed at most once.
+- Pixel dedup groups PNGs by dimensions, then hashes only pixel/color-bearing PNG chunks. Photoshop's varying iTXt/XMP metadata is ignored, so visually identical exports collapse to one file even when their complete PNG bytes or file lengths differ.
 
 Unity Atlas output:
 
@@ -84,3 +84,7 @@ Batch font replacement (`Tools > Photoshop UI Importer > Font Replacer`):
 
 - [中文 README](README_zh.md)
 - [完整使用說明 GUIDE_zh.html](GUIDE_zh.html)
+
+## UI outsourcing agent
+
+Double-click `Tools/啟動_UI發包製作人.bat` to select a specification and create a Unity-aware vendor handoff draft. See [AgentOrchestrator/README.md](AgentOrchestrator/README.md) and [Tools/README.md](Tools/README.md) for the categorized layout.

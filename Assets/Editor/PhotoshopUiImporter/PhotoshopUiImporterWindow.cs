@@ -1090,7 +1090,7 @@ namespace PhotoshopToUnity.EditorImporter
             SetStatus($"已建立專案資料夾並設定 SpriteAtlas：{root}", MessageType.Info);
         }
 
-        private static void EnsureAssetFolder(string assetPath)
+        internal static void EnsureAssetFolder(string assetPath)
         {
             if (string.IsNullOrEmpty(assetPath) || AssetDatabase.IsValidFolder(assetPath))
                 return;
@@ -1101,13 +1101,19 @@ namespace PhotoshopToUnity.EditorImporter
             AssetDatabase.CreateFolder(parent, Path.GetFileName(assetPath));
         }
 
-        private static string ResolveSpriteAtlasFolder(string imageImportFolder)
+        internal static string ResolveSpriteAtlasFolder(string imageImportFolder)
         {
             var normalized = PathUtility.NormalizeAssetKey(imageImportFolder).TrimEnd('/');
             const string marker = "/SpriteAtlas";
             var markerIndex = normalized.IndexOf(marker, System.StringComparison.OrdinalIgnoreCase);
-            return markerIndex >= 0
-                ? normalized.Substring(0, markerIndex + marker.Length)
+            if (markerIndex >= 0)
+                return normalized.Substring(0, markerIndex + marker.Length);
+
+            // The advanced import path may point at the Atlas parent. Never treat that
+            // parent as the SpriteAtlas root, or Base/CHS/CHT/EN will be created beside
+            // the real SpriteAtlas folder.
+            return normalized.EndsWith("/Atlas", System.StringComparison.OrdinalIgnoreCase)
+                ? normalized + marker
                 : normalized;
         }
 
@@ -1121,7 +1127,7 @@ namespace PhotoshopToUnity.EditorImporter
         // 別名 PNG，讓資料夾本身就不含冗餘檔案——去重回到它該在的層次，兩邊需求同時滿足。
         private static readonly string[] AtlasLanguages = { "Base", "CHS", "CHT", "EN" };
 
-        private static void CreateOrUpdateSpriteAtlases(string atlasRootFolder)
+        internal static void CreateOrUpdateSpriteAtlases(string atlasRootFolder)
         {
             atlasRootFolder = PathUtility.NormalizeAssetKey(atlasRootFolder).TrimEnd('/');
             EnsureAssetFolder(atlasRootFolder);
@@ -1190,8 +1196,7 @@ namespace PhotoshopToUnity.EditorImporter
             var atlas = SpriteAtlasAsset.Load(atlasPath);
             if (atlas == null)
             {
-                // 先存一顆空的：importer 設定存在前就掛上 packable，Unity 會立刻用預設 2048
-                // 試打，對合法的 4096 來源圖會失敗。
+                // 先存一顆空的，讓 importer 設定可以在掛上 packable 前完整套用。
                 atlas = new SpriteAtlasAsset();
                 SpriteAtlasAsset.Save(atlas, atlasPath);
                 AssetDatabase.ImportAsset(atlasPath, ImportAssetOptions.ForceUpdate);
@@ -1201,7 +1206,7 @@ namespace PhotoshopToUnity.EditorImporter
             if (atlasImporter == null)
                 return null;
 
-            var maxTextureSize = DetermineRequiredAtlasMaxTextureSize(languageFolder);
+            const int maxTextureSize = 2048;
             var packing = atlasImporter.packingSettings;
             packing.enableRotation = false;
             packing.enableTightPacking = false;
@@ -1238,31 +1243,10 @@ namespace PhotoshopToUnity.EditorImporter
             return AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
         }
 
-        private static int DetermineRequiredAtlasMaxTextureSize(string atlasFolder)
-        {
-            var largestDimension = 0;
-            foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { atlasFolder }))
-            {
-                var assetPath = AssetDatabase.GUIDToAssetPath(guid);
-                var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
-                if (importer == null)
-                    continue;
-
-                importer.GetSourceTextureWidthAndHeight(out var width, out var height);
-                largestDimension = Mathf.Max(largestDimension, width, height);
-            }
-
-            if (largestDimension <= 2048)
-                return 2048;
-            if (largestDimension <= 4096)
-                return 4096;
-            return 8192;
-        }
-
         // Every language atlas is detached before TextureImporter work, otherwise each
         // SaveAndReimport triggers a full repack. CreateOrUpdateSpriteAtlases reattaches
         // the folders and packs exactly once at the end.
-        private static void DetachSpriteAtlasFolderForImageImport(string atlasRootFolder)
+        internal static void DetachSpriteAtlasFolderForImageImport(string atlasRootFolder)
         {
             foreach (var language in AtlasLanguages)
             {
