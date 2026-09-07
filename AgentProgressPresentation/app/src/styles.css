@@ -1312,6 +1312,9 @@ h2 {
 .three-rules {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* The bottom card row ends exactly at the graph edge, so without this the cards look
+     clipped by the bar rather than sitting above it. */
+  margin-top: 12px;
   gap: 1px;
   max-width: 1400px;
   background: var(--line);
