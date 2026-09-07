@@ -135,6 +135,43 @@ for (const [width, height] of VIEWPORTS) {
     });
   }
 
+  const coveredByFixedUi = [];
+  for (const group of GROUPS) {
+    await page.evaluate(
+      ([id, px]) => {
+        const chapter = document.getElementById(id);
+        window.scrollTo(0, chapter.getBoundingClientRect().top + window.scrollY + px);
+      },
+      [group.chapter, group.offset]
+    );
+    await page.waitForTimeout(400);
+    const covered = await page.evaluate((id) => {
+      const hint = document.querySelector(".keyboard-help");
+      if (!hint) return [];
+      const bar = hint.getBoundingClientRect();
+      const carriesText = (el) =>
+        [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+      const hits = [];
+      for (const el of document.querySelectorAll(`#${id} .scene *`)) {
+        if (!carriesText(el)) continue;
+        const box = el.getBoundingClientRect();
+        if (box.width < 2 || box.height < 2) continue;
+        if (getComputedStyle(el).visibility === "hidden") continue;
+        const overlapX = Math.min(box.right, bar.right) - Math.max(box.left, bar.left);
+        const overlapY = Math.min(box.bottom, bar.bottom) - Math.max(box.top, bar.top);
+        if (overlapX > 1 && overlapY > 1) {
+          hits.push({
+            text: el.textContent.trim().slice(0, 24),
+            overlapX: Math.round(overlapX),
+            overlapY: Math.round(overlapY),
+          });
+        }
+      }
+      return hits;
+    }, group.chapter);
+    if (covered.length) coveredByFixedUi.push({ chapter: group.chapter, covered });
+  }
+
   const overflow = await page.evaluate(() => ({
     horizontal:
       document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -143,8 +180,12 @@ for (const [width, height] of VIEWPORTS) {
   results.push({
     viewport: `${width}x${height}`,
     horizontalOverflow: overflow.horizontal,
+    coveredByFixedUi,
     groups,
-    passed: groups.every((g) => g.passed) && !overflow.horizontal,
+    passed:
+      groups.every((g) => g.passed) &&
+      !overflow.horizontal &&
+      coveredByFixedUi.length === 0,
   });
   await ctx.close();
 }

@@ -1232,7 +1232,9 @@ h2 {
 .direction-scene {
   background: var(--base-deep);
   padding-top: calc(var(--header-h) + 6px);
-  padding-bottom: 20px;
+  /* The keyboard hint is fixed at bottom:12px and about 28px tall, so anything under
+     ~48px of bottom padding gets covered by it. */
+  padding-bottom: 48px;
 }
 
 /* The heading sits directly above a bordered card here, so 18px read as collision.
@@ -1253,7 +1255,7 @@ h2 {
      three content-sized cards. Below roughly 340px the middle and bottom rows collide,
      which is what happened on 1366x768. There is 200px+ of unused scene below the graph,
      so give it the height it needs and stop the parent shrinking it away. */
-  height: clamp(345px, 46vh, 430px);
+  height: clamp(345px, 43vh, 410px);
   min-height: 345px;
 }
 
@@ -1399,7 +1401,7 @@ h2 {
   .psd-flow-board,
   .evidence-console { height: clamp(340px, 46vh, 390px); }
   .evidence-panel { padding: 24px; }
-  .direction-scene { padding-top: calc(var(--header-h) + 4px); padding-bottom: 12px; }
+  .direction-scene { padding-top: calc(var(--header-h) + 4px); padding-bottom: 44px; }
   .direction-scene .scene-heading { margin-bottom: 24px; }
   /* No height override here: min-height on .multi-agent-graph outranks it, and going
      below that is what let the three rows overlap on 1366x768. */

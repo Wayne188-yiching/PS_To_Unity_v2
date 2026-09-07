@@ -35,6 +35,27 @@ html = html
   .replace(stylesheetMatch[0], () => `<style>${css}</style>`)
   .replace(scriptMatch[0], () => `<script type="module">${javascript}</script>`);
 
+const imageMime = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+};
+
+// <img src="./assets/x.png"> has to become a data URI too, or the single-file build
+// ships broken images. Anything already inline or remote is left alone.
+html = await replaceAsync(html, /(<img\b[^>]*?\ssrc=")([^"]+)(")/g, async (match, before, reference, after) => {
+  if (/^(data:|https?:|\/\/)/i.test(reference)) return match;
+  const assetPath = resolveAsset(reference);
+  const extension = extname(assetPath).toLowerCase();
+  const mime = imageMime[extension];
+  if (!mime) throw new Error(`Unsupported image type in offline build: ${reference}`);
+  const data = await readFile(assetPath);
+  return `${before}data:${mime};base64,${data.toString("base64")}${after}`;
+});
+
 await writeFile(offlinePath, html, "utf8");
 console.log(`Offline presentation: ${offlinePath}`);
 
