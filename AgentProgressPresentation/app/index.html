@@ -64,8 +64,8 @@
       <section class="chapter chapter--previous" id="previous" data-index="01" data-label="PREVIOUS STATE">
         <div class="scene scene--opening">
           <div class="opening-copy">
-            <h1>從 Deterministic Automation<br>到 Agent / Multi-Agent</h1>
-            <p class="lead">規則已經能可靠執行。下一步，是把無法安全寫成規則的判斷留給 Agent。</p>
+            <h1>Photoshop 排好的 UI，<br>直接變成 Unity 畫面</h1>
+            <p class="lead">以前後製美術要照著設定美術的示意圖，在 Unity 裡一個一個重排。現在這段由工具產生。</p>
             <div class="evidence-line"><span class="status status--pass">COMPLETED</span><span>PSDtoUnity deterministic Core</span><code>v2.14.0 branch snapshot</code></div>
           </div>
 
@@ -91,7 +91,7 @@
             </div>
           </div>
 
-          <blockquote>Deterministic Automation<br><span>「把重複工作交給規則。」</span></blockquote>
+          <blockquote>已完成的部分<br><span>「規則寫得出來的，每次跑出來都一樣。」</span></blockquote>
           <p class="scroll-cue"><span></span>SCROLL TO TRACE</p>
         </div>
       </section>
@@ -100,8 +100,8 @@
         <div class="scene split-scene">
           <div class="scene-heading">
             <p class="section-id">SECTION 02</p>
-            <h2>執行規則，不等於理解意圖。</h2>
-            <p>原 pipeline 保留不動；問題發生在規則開始之前。</p>
+            <h2>工具照規則做事，<br>但看不懂圖層想表達什麼。</h2>
+            <p>原本的流程不動。問題出在規則開始之前。</p>
           </div>
 
           <div class="ambiguity-board">
@@ -113,26 +113,26 @@
             </div>
             <div class="ambiguity-list">
               <article class="ambiguity-item" data-ambiguity>
-                <span>STRUCTURE</span><strong>Group 是普通 Group，還是 Scroll？</strong><code>ambiguous hierarchy</code>
+                <span>STRUCTURE</span><strong>這個群組只是普通群組，還是要做成可捲動的清單？</strong><code>ambiguous hierarchy</code>
               </article>
               <article class="ambiguity-item" data-ambiguity>
-                <span>RENDER</span><strong>Sprite 是 Simple，還是 Sliced？</strong><code>numeric border required</code>
+                <span>RENDER</span><strong>這張圖直接放，還是要做成可拉伸的九宮格？</strong><code>numeric border required</code>
               </article>
               <article class="ambiguity-item" data-ambiguity>
-                <span>SEMANTICS</span><strong>中文 Layer 的 Unity Role 是什麼？</strong><code>name ≠ intent</code>
+                <span>SEMANTICS</span><strong>中文圖層名，對應到 Unity 的哪一種元件？</strong><code>name ≠ intent</code>
               </article>
               <article class="ambiguity-item" data-ambiguity>
-                <span>RUNTIME</span><strong>State siblings 是同時存在，還是互斥？</strong><code>runtime rule unknown</code>
+                <span>RUNTIME</span><strong>這幾個狀態圖層會同時出現，還是一次只顯示一個？</strong><code>runtime rule unknown</code>
               </article>
               <article class="ambiguity-item" data-ambiguity>
-                <span>OWNERSHIP</span><strong>Layer 是 reference，還是 production content？</strong><code>unsafe to infer</code>
+                <span>OWNERSHIP</span><strong>這個圖層是參考用的，還是要真的做進遊戲？</strong><code>unsafe to infer</code>
               </article>
             </div>
           </div>
 
           <div class="limitation-statement">
-            <strong>Deterministic tools can execute rules.</strong>
-            <span>They should not guess unresolved design intent.</span>
+            <strong>規則講清楚的事，工具做得又快又準。</strong>
+            <span>但圖層沒說清楚的地方，只能問人，不能猜。</span>
           </div>
         </div>
       </section>
@@ -141,7 +141,7 @@
         <div class="scene agent-stack-scene">
           <div class="scene-heading scene-heading--wide">
             <p class="section-id">SECTION 03</p>
-            <h2>Agent 是判斷層，<br>不是新的 Exporter。</h2>
+            <h2>Agent 只做判斷，<br>動手的還是原本的工具。</h2>
           </div>
 
           <div class="stack-diagram" aria-label="Agent reasoning layer above deterministic core">
@@ -172,7 +172,7 @@
           <div class="psd-agent-header">
             <div>
               <p class="section-id">SECTION 04 · CURRENT</p>
-              <h2>PSD Agent v1：<br>先證據，後修改。</h2>
+              <h2>PSD Agent v1：<br>先把檔案看清楚，才准動它。</h2>
             </div>
             <div class="evidence-summary">
               <span class="status status--pass">56 / 56 TESTS PASS</span>
@@ -210,16 +210,16 @@
             <aside class="evidence-console" aria-live="polite">
               <div class="console-bar"><span>EVIDENCE TRACE</span><code id="evidenceCounter">01 / 10</code></div>
               <div class="evidence-panels">
-                <article class="evidence-panel is-visible" data-evidence-step="0"><span class="status status--pass">LOCAL ONLY</span><h3>PSD bytes 不進模型</h3><p>模型只取得 deterministic inspector 產生的結構化 evidence。</p><code>privacy: structured evidence only</code></article>
-                <article class="evidence-panel" data-evidence-step="1"><span class="status status--pass">READ ONLY</span><h3>Inspect visible layers</h3><p>讀取 stable layer ID、name、parent、kind 與 visibility；不修改原檔。</p><code>sourceFingerprint = SHA-256</code></article>
-                <article class="evidence-panel" data-evidence-step="2"><span class="status status--pass">BOUND</span><h3>Evidence 有版本</h3><p>PSD、inspection 與後續 plan 都以 fingerprint 綁定，舊證據不能沿用。</p><code>stale evidence → BLOCKED</code></article>
-                <article class="evidence-panel" data-evidence-step="3"><span class="status status--review">NEEDS_REVIEW</span><h3>不猜 unresolved intent</h3><p>Simple / Sliced / Mask / Scroll / LayoutGroup 未確認時，必須升級人工判斷。</p><code>ambiguity ≠ error</code></article>
-                <article class="evidence-panel" data-evidence-step="4"><span class="status status--current">PROPOSAL</span><h3>Model proposal 永遠未核准</h3><p>即使 model 回傳 true，Controller 寫入磁碟時仍強制改為 false。</p><code>approved = false</code></article>
-                <article class="evidence-panel" data-evidence-step="5"><span class="status status--review">HUMAN GATE</span><h3>Evidence 改變，核准失效</h3><p>套用前重新 inspection；PSD、inspection 或 plan 任一改變就回到 review。</p><code>APPROVAL_INVALIDATED</code></article>
-                <article class="evidence-panel" data-evidence-step="6"><span class="status status--pass">CHECKPOINT</span><h3>先寫 APPLYING，再 mutation</h3><p>主程序中斷後可判斷目前狀態，而不是盲目重做。</p><code>stage = APPLYING</code></article>
-                <article class="evidence-panel" data-evidence-step="7"><span class="status status--pass">DETERMINISTIC</span><h3>Controller 才能 Apply</h3><p>動作綁定 layer ID 與原 name / parent / kind 前置條件。</p><code>precondition conflict → BLOCKED</code></article>
-                <article class="evidence-panel" data-evidence-step="8"><span class="status status--pass">IDEMPOTENT</span><h3>Retry 不重複 Rename / Move</h3><p>相同 plan 重跑只確認 final state，不再建立群組或移動已完成圖層。</p><code>alreadyAppliedCount</code></article>
-                <article class="evidence-panel" data-evidence-step="9"><span class="status status--current">PACKAGE GATE</span><h3>Fresh export，不是 end-to-end PASS</h3><p>重新檢查後輸出 Images + layout.json；下一步仍需 Unity Agent 與完整 Validator。</p><code>→ NEEDS_REVIEW / PIPELINE_VALIDATOR</code></article>
+                <article class="evidence-panel is-visible" data-evidence-step="0"><span class="status status--pass">LOCAL ONLY</span><h3>PSD 檔案不會傳給模型</h3><p>模型只拿到工具讀出來的圖層清單，不是檔案本身。</p><code>privacy: structured evidence only</code></article>
+                <article class="evidence-panel" data-evidence-step="1"><span class="status status--pass">READ ONLY</span><h3>先讀，不動原檔</h3><p>記下每個圖層的編號、名稱、所屬群組、類型和顯示狀態。PSD 本身完全沒被改到。</p><code>sourceFingerprint = SHA-256</code></article>
+                <article class="evidence-panel" data-evidence-step="2"><span class="status status--pass">BOUND</span><h3>讀到的內容綁定當下的檔案</h3><p>PSD 一改，先前讀到的內容就作廢，不能拿舊資料繼續做。</p><code>stale evidence → BLOCKED</code></article>
+                <article class="evidence-panel" data-evidence-step="3"><span class="status status--review">NEEDS_REVIEW</span><h3>看不出來的就不猜</h3><p>圖層該做成九宮格、遮罩還是捲動清單，判斷不出來時交給人決定，不自己選一個。</p><code>ambiguity ≠ error</code></article>
+                <article class="evidence-panel" data-evidence-step="4"><span class="status status--current">PROPOSAL</span><h3>模型說可以，也不算數</h3><p>模型回報已核准也沒用，存檔時一律改回未核准。只有人能核准。</p><code>approved = false</code></article>
+                <article class="evidence-panel" data-evidence-step="5"><span class="status status--review">HUMAN GATE</span><h3>檔案動過，核准就失效</h3><p>動手前會再讀一次 PSD。只要跟核准當下不一樣，就退回重新確認。</p><code>APPROVAL_INVALIDATED</code></article>
+                <article class="evidence-panel" data-evidence-step="6"><span class="status status--pass">CHECKPOINT</span><h3>動手前先記錄狀態</h3><p>中途當掉時可以查出做到哪一步，不必整個重來。</p><code>stage = APPLYING</code></article>
+                <article class="evidence-panel" data-evidence-step="7"><span class="status status--pass">DETERMINISTIC</span><h3>只有工具能動檔案，模型不行</h3><p>每個動作都先確認目標圖層的編號、名稱、群組、類型跟預期一致，對不上就停。</p><code>precondition conflict → BLOCKED</code></article>
+                <article class="evidence-panel" data-evidence-step="8"><span class="status status--pass">IDEMPOTENT</span><h3>重跑不會做第二次</h3><p>同一份計畫再跑一次，只檢查結果對不對，不會重複建群組或搬圖層。</p><code>alreadyAppliedCount</code></article>
+                <article class="evidence-panel" data-evidence-step="9"><span class="status status--current">PACKAGE GATE</span><h3>輸出完成，但還不算驗收通過</h3><p>重新檢查後產出圖片和版面檔。要確認 Unity 那端做對，還缺 Unity Agent 和完整驗證。</p><code>→ NEEDS_REVIEW / PIPELINE_VALIDATOR</code></article>
               </div>
             </aside>
           </div>
@@ -230,8 +230,8 @@
         <div class="scene real-case-scene">
           <div class="scene-heading scene-heading--wide">
             <p class="section-id">SECTION 05 · REPO-TRACKED DEMO</p>
-            <h2>安全樣本已備妥，<br>Agent 驗收尚未跑完。</h2>
-            <p>使用公開追蹤的 <code>scroll_v_basic.psd</code>；不使用 production case。</p>
+            <h2>測試檔案準備好了，<br>但還沒真的跑過一輪。</h2>
+            <p>用的是 repo 裡公開的 <code>scroll_v_basic.psd</code>，不是正式專案的檔案。</p>
           </div>
 
           <div class="case-trace">
@@ -279,7 +279,7 @@
         <div class="scene progress-scene">
           <div class="scene-heading">
             <p class="section-id">SECTION 06 · EVIDENCE SNAPSHOT</p>
-            <h2>完成的是安全骨架。<br>目前正在證明它能碰真實 PSD。</h2>
+            <h2>防呆的部分做完了，<br>還沒拿真檔案驗證過。</h2>
           </div>
 
           <div class="roadmap" aria-label="Agent architecture development roadmap">
@@ -307,7 +307,7 @@
         <div class="scene direction-scene">
           <div class="scene-heading scene-heading--center">
             <p class="section-id">SECTION 07 · DIRECTION</p>
-            <h2>只有需要判斷的地方，<br>才增加 Agent。</h2>
+            <h2>只有真的需要判斷的地方，<br>才放 Agent。</h2>
           </div>
 
           <div class="multi-agent-graph" aria-label="Future PS_To_Unity multi-agent architecture">
@@ -331,8 +331,8 @@
             <p><span>UNSAFE</span><strong>→ HUMAN REVIEW</strong></p>
           </div>
 
-          <blockquote class="closing-quote">「目標不是增加 Agent 數量，<br>而是讓每個 Agent 只負責真正需要判斷的工作。」</blockquote>
-          <p class="future-note"><span>FUTURE WORK</span> Production Automation 與 Outsource QC 是兩條獨立發展的 Agent 系統。</p>
+          <blockquote class="closing-quote">「Agent 只放在需要判斷的地方。<br>其他地方用規則，結果才能預期。」</blockquote>
+          <p class="future-note"><span>FUTURE WORK</span> Production Automation 和 Outsource QC 是另外兩套系統，跟這條線分開走。</p>
         </div>
       </section>
     </main>
