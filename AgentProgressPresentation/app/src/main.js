@@ -76,6 +76,31 @@ const getRenderedLength = (path, samples = 240) => {
   return total || userLength;
 };
 
+// Where a node sits along the path, as a fraction of its length. The flow path snakes
+// through two rows joined by a long connector, so nodes are nowhere near evenly spaced
+// along it: revealing them on an even cadence let the line run up to 15% of the path
+// ahead of the node it was supposed to be arriving at. Node geometry and the path share
+// the SVG user space and the viewBox scales uniformly, so this is viewport-independent.
+const fractionAlongPath = (path, node, samples = 1200) => {
+  const total = path.getTotalLength();
+  const matrix = path.getScreenCTM();
+  const rect = node.getBoundingClientRect();
+  if (!matrix || !rect.width) return 0;
+  const point = path.ownerSVGElement.createSVGPoint();
+  const centreX = rect.left + rect.width / 2;
+  const centreY = rect.top + rect.height / 2;
+  let best = { distance: Infinity, fraction: 0 };
+  for (let index = 0; index <= samples; index += 1) {
+    const at = path.getPointAtLength((total * index) / samples);
+    point.x = at.x;
+    point.y = at.y;
+    const screen = point.matrixTransform(matrix);
+    const distance = Math.hypot(screen.x - centreX, screen.y - centreY);
+    if (distance < best.distance) best = { distance, fraction: index / samples };
+  }
+  return best.fraction;
+};
+
 // Called again from each trace tween's function-based start value, so ScrollTrigger's
 // invalidateOnRefresh re-measures after a resize instead of keeping a stale dash unit.
 const setPathReady = (path) => {
@@ -226,6 +251,11 @@ const buildPsdAgentScene = () => {
     node.classList.contains("flow-node--gate") ? "#e8c66a" : "#2ee6b2"
   );
 
+  // Each node lights as the drawn line reaches it, so the trace and the evidence panel
+  // it belongs to stay together.
+  const traceDuration = 9;
+  const nodeTimes = nodes.map((node) => fractionAlongPath(path, node) * traceDuration);
+
   gsap.set([board, consolePanel], { opacity: 0.55, y: 10 });
   gsap.set(nodes, { opacity: 0.3, scale: 0.96, transformOrigin: "center" });
   gsap.set(nodes[0], { opacity: 1 });
@@ -242,8 +272,15 @@ const buildPsdAgentScene = () => {
   const timeline = gsap.timeline({
     defaults: { duration: 0.34, ease: "expo.out" },
     onUpdate() {
-      const active = Math.min(9, Math.max(0, Math.round(timeline.progress() * 9)));
-      counter.textContent = `${String(active).padStart(2, "0")} / 09`;
+      // Count the nodes the trace has reached. Panel 0 is on screen at rest, so the
+      // readout is 1-based, and it steps with the panel crossfade at nodeTime + 0.04.
+      const time = timeline.progress() * timeline.duration();
+      let step = 1;
+      nodeTimes.forEach((nodeTime, index) => {
+        if (time >= nodeTime + 0.04) step = index + 1;
+      });
+      const total = String(nodeTimes.length).padStart(2, "0");
+      counter.textContent = `${String(step).padStart(2, "0")} / ${total}`;
     },
     scrollTrigger: {
       trigger: chapter,
@@ -262,12 +299,12 @@ const buildPsdAgentScene = () => {
     .fromTo(
       path,
       { strokeDashoffset: () => setPathReady(path) },
-      { strokeDashoffset: 0, duration: 9, ease: "none" },
+      { strokeDashoffset: 0, duration: traceDuration, ease: "none" },
       0
     );
 
   nodes.forEach((node, index) => {
-    const position = index;
+    const position = nodeTimes[index];
     const rect = node.querySelector("rect");
     timeline
       .to(node, { opacity: 1, scale: 1, duration: 0.3 }, position)
@@ -358,7 +395,15 @@ const buildProgressScene = () => {
     },
   });
 
-  timeline.to(spine, { scaleY: 0.55, duration: 4.6, ease: "none" }, 0);
+  // The spine marks work that is done, so it has to reach item 05 exactly as item 05
+  // settles. Running it over the whole timeline left it trailing the revealed items by
+  // more than half the list for most of the scroll.
+  const completedItems = 5;
+  timeline.to(
+    spine,
+    { scaleY: 0.55, duration: completedItems * 0.48, ease: "none" },
+    0
+  );
   items.forEach((item, index) => {
     timeline.to(item, { opacity: index < 5 ? 1 : 0.48, x: 0 }, index * 0.48);
   });

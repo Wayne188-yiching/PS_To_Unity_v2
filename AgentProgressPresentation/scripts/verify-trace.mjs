@@ -167,7 +167,86 @@ for (const trace of TRACES) {
   });
 }
 
-report.passed = report.traces.every((t) => t.passed) && errors.length === 0;
+// The flow trace must arrive at a node as that node lights, not before it. Nodes sit at
+// uneven intervals along the snaking path, so an even reveal cadence silently desynced
+// them: the line ran up to 15% of the path ahead of the node it was drawing towards.
+await page.evaluate(() => window.scrollTo(0, 0));
+await page.waitForTimeout(500);
+
+const nodeFractions = await page.evaluate(() => {
+  const path = document.getElementById("psdFlowPath");
+  const nodes = [...document.querySelectorAll("#psd-agent [data-flow-step]")];
+  const total = path.getTotalLength();
+  const matrix = path.getScreenCTM();
+  const point = path.ownerSVGElement.createSVGPoint();
+  return nodes.map((node) => {
+    const rect = node.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    let best = { d: Infinity, f: 0 };
+    for (let i = 0; i <= 1200; i += 1) {
+      const p = path.getPointAtLength((total * i) / 1200);
+      point.x = p.x;
+      point.y = p.y;
+      const s = point.matrixTransform(matrix);
+      const d = Math.hypot(s.x - cx, s.y - cy);
+      if (d < best.d) best = { d, f: i / 1200 };
+    }
+    return best.f;
+  });
+});
+
+const syncSamples = [];
+for (let offset = 500; offset <= 6200; offset += 475) {
+  await scrollPastChapter("psd-agent", offset);
+  const sample = await page.evaluate(() => {
+    const path = document.getElementById("psdFlowPath");
+    const style = getComputedStyle(path);
+    const dash = parseFloat(style.strokeDasharray.split(/[ ,]+/)[0]);
+    const lit = 1 - parseFloat(style.strokeDashoffset) / dash;
+    const nodes = [...document.querySelectorAll("#psd-agent [data-flow-step]")];
+    let lastLit = -1;
+    nodes.forEach((node, index) => {
+      if (parseFloat(getComputedStyle(node).opacity) > 0.95) lastLit = index;
+    });
+    const readout = document.getElementById("evidenceCounter").textContent;
+    return { lit, lastLit, readout };
+  });
+  syncSamples.push({ offset, ...sample });
+}
+
+// The invariant is not that the line sits on the last lit node — between two nodes it
+// legitimately runs on, and the connector between Human Approval and PSD Controller is a
+// fifth of the path with no node on it. What must never happen is the line sweeping past
+// a node that has not lit yet.
+const TOLERANCE = 0.08;
+const overruns = syncSamples
+  .filter((s) => s.lastLit >= 0 && s.lastLit + 1 < nodeFractions.length)
+  .map((s) => ({
+    offset: s.offset,
+    lastLitNode: s.lastLit,
+    lineAt: Number(s.lit.toFixed(3)),
+    nextNodeAt: Number(nodeFractions[s.lastLit + 1].toFixed(3)),
+    overrun: Number(Math.max(0, s.lit - nodeFractions[s.lastLit + 1]).toFixed(3)),
+    readout: s.readout,
+    // Never behind the lit nodes (the original defect); one ahead is the node still
+    // fading in, which is what the crossfading panel shows too.
+    readoutMatchesNodes:
+      parseInt(s.readout, 10) >= s.lastLit + 1 && parseInt(s.readout, 10) <= s.lastLit + 2,
+  }));
+const worstOverrun = overruns.reduce((max, o) => Math.max(max, o.overrun), 0);
+
+report.flowSync = {
+  nodeFractions: nodeFractions.map((f) => Number(f.toFixed(3))),
+  worstOverrun: Number(worstOverrun.toFixed(3)),
+  tolerance: TOLERANCE,
+  samples: overruns,
+  readoutMismatches: overruns.filter((o) => !o.readoutMatchesNodes).length,
+  passed: worstOverrun <= TOLERANCE && overruns.every((o) => o.readoutMatchesNodes),
+};
+
+report.passed =
+  report.traces.every((t) => t.passed) && report.flowSync.passed && errors.length === 0;
 console.log(JSON.stringify(report, null, 2));
 
 await browser.close();

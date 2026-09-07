@@ -1247,8 +1247,12 @@ h2 {
 .multi-agent-graph {
   position: relative;
   width: min(100%, 1400px);
-  height: clamp(300px, 39vh, 410px);
-  min-height: 0;
+  /* Rows are pinned to top 0 / 36% / bottom 0, so the gaps are whatever is left after
+     three content-sized cards. Below roughly 340px the middle and bottom rows collide,
+     which is what happened on 1366x768. There is 200px+ of unused scene below the graph,
+     so give it the height it needs and stop the parent shrinking it away. */
+  height: clamp(345px, 46vh, 430px);
+  min-height: 345px;
 }
 
 .multi-lines {

@@ -49,16 +49,22 @@ AgentProgressPresentation/
 npm run verify        # dist/ 掛在網域根目錄 + file:// 離線版
 npm run verify:pages  # GitHub Pages 專案子路徑（/PS_To_Unity_v2/）
 npm run verify:trace  # scroll 驅動的三條連線
+npm run verify:layout # 六種視窗尺寸下的卡片重疊與間距
 ```
 
-三者都需要系統已安裝 Chrome。`verify:pages` 以正式網域與 base path 重播三個入口
+四者都需要系統已安裝 Chrome。`verify:pages` 以正式網域與 base path 重播三個入口
 （`AgentProgressPresentation/`、`.../index.html`、`.../dist/`），
 任何 404、失敗請求、console 錯誤或外部連線都會讓它失敗。
 
 `verify:trace` 檢查三條 scroll 驅動的連線：靜止時完全不亮、填充隨捲動單調遞增、
 最終確實填滿、改變視窗大小後仍正確。這些線用 `vector-effect: non-scaling-stroke`，
 dash 單位是螢幕像素而非 viewBox 單位；混用 `getTotalLength()` 的 viewBox 單位會讓
-虛線蓋不滿線段，圖樣重複後在右端露出跑在前面的亮段。
+虛線蓋不滿線段，圖樣重複後在右端露出跑在前面的亮段。它同時檢查連線不會超前尚未點亮的
+節點：flow 的節點沿路徑分布並不平均，用平均時間點亮會讓線領先它正要抵達的節點達 15%。
+
+`verify:layout` 在六種視窗尺寸下檢查各章卡片是否重疊、堆疊的卡片是否保有最小間距。
+多 Agent 架構圖把三列釘在 top 0 / 36% / bottom 0，間距是固定高度扣掉三張內容決定高度的
+卡片後的餘數，在 1366x768 上曾經是負的、卡片直接重疊。
 
 ## 操作
 
