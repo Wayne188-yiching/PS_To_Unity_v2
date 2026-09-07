@@ -51,10 +51,39 @@ motionToggle?.addEventListener("click", () => {
   window.location.reload();
 });
 
+// stroke-dasharray is resolved in the space the stroke is generated in. These paths set
+// vector-effect: non-scaling-stroke inside SVGs stretched by preserveAspectRatio="none",
+// so that space is screen pixels rather than viewBox units. getTotalLength() reports
+// viewBox units, which makes the dash shorter than the line it has to cover: the pattern
+// repeats, so a lit segment shows near the right edge before the scroll even starts and
+// the trace never reaches the last node.
+const getRenderedLength = (path, samples = 240) => {
+  const userLength = path.getTotalLength();
+  const svg = path.ownerSVGElement;
+  const matrix = path.getScreenCTM();
+  if (!svg || !matrix) return userLength;
+  const point = svg.createSVGPoint();
+  let total = 0;
+  let previous = null;
+  for (let index = 0; index <= samples; index += 1) {
+    const at = path.getPointAtLength((userLength * index) / samples);
+    point.x = at.x;
+    point.y = at.y;
+    const screen = point.matrixTransform(matrix);
+    if (previous) total += Math.hypot(screen.x - previous.x, screen.y - previous.y);
+    previous = screen;
+  }
+  return total || userLength;
+};
+
+// Called again from each trace tween's function-based start value, so ScrollTrigger's
+// invalidateOnRefresh re-measures after a resize instead of keeping a stale dash unit.
 const setPathReady = (path) => {
   if (!path) return 0;
-  const length = path.getTotalLength();
-  gsap.set(path, { strokeDasharray: length, strokeDashoffset: length });
+  const length = getRenderedLength(path);
+  // Gap is twice the dash so the pattern can never repeat inside the line, even when a
+  // scene scales its container mid-scroll and the rendered length drifts from the measured one.
+  gsap.set(path, { strokeDasharray: `${length} ${length * 2}`, strokeDashoffset: length });
   return length;
 };
 
@@ -89,13 +118,19 @@ const buildPreviousScene = () => {
       pin: scene,
       scrub: 0.65,
       anticipatePin: 1,
+      invalidateOnRefresh: true,
       id: "previous-state",
     },
   });
 
   timeline
     .to(nodes[0], { opacity: 1, scale: 1 }, 0)
-    .to(path, { strokeDashoffset: 0, duration: 4, ease: "none" }, 0.25)
+    .fromTo(
+      path,
+      { strokeDashoffset: () => setPathReady(path) },
+      { strokeDashoffset: 0, duration: 4, ease: "none" },
+      0.25
+    )
     .to(quote, { opacity: 1, duration: 0.7 }, 3.65)
     .to(cue, { opacity: 1, duration: 0.5 }, 4.05);
 
@@ -185,7 +220,7 @@ const buildPsdAgentScene = () => {
   const counter = chapter.querySelector("#evidenceCounter");
   const board = chapter.querySelector(".psd-flow-board");
   const consolePanel = chapter.querySelector(".evidence-console");
-  const pathLength = setPathReady(path);
+  setPathReady(path);
 
   const nodeColors = nodes.map((node) =>
     node.classList.contains("flow-node--gate") ? "#e8c66a" : "#2ee6b2"
@@ -217,13 +252,19 @@ const buildPsdAgentScene = () => {
       pin: scene,
       scrub: 0.7,
       anticipatePin: 1,
+      invalidateOnRefresh: true,
       id: "psd-agent-flow",
     },
   });
 
   timeline
     .to([board, consolePanel], { opacity: 1, y: 0, duration: 0.55, stagger: 0.08 }, 0)
-    .to(path, { strokeDashoffset: 0, duration: 9, ease: "none" }, 0);
+    .fromTo(
+      path,
+      { strokeDashoffset: () => setPathReady(path) },
+      { strokeDashoffset: 0, duration: 9, ease: "none" },
+      0
+    );
 
   nodes.forEach((node, index) => {
     const position = index;
@@ -251,7 +292,17 @@ const buildPsdAgentScene = () => {
   timeline
     .to(checkpoint, { opacity: 1, duration: 0.35 }, 6.05)
     .to(retryLoop, { opacity: 1, duration: 0.5 }, 7.15)
-    .to(path, { strokeDasharray: `${pathLength} ${pathLength}`, duration: 0.01 }, 8.9);
+    .to(
+      path,
+      {
+        strokeDasharray: () => {
+          const length = getRenderedLength(path);
+          return `${length} ${length * 2}`;
+        },
+        duration: 0.01,
+      },
+      8.9
+    );
 };
 
 const buildRealCaseScene = () => {
@@ -348,6 +399,7 @@ const buildDirectionScene = () => {
       pin: scene,
       scrub: 0.7,
       anticipatePin: 1,
+      invalidateOnRefresh: true,
       id: "multi-agent-direction",
     },
   });
@@ -355,7 +407,12 @@ const buildDirectionScene = () => {
   timeline
     .to(graph, { scale: 1, duration: 4.2, ease: "none" }, 0)
     .to(director, { opacity: 1, scale: 1 }, 0)
-    .to(path, { strokeDashoffset: 0, duration: 4.2, ease: "none" }, 0.2)
+    .fromTo(
+      path,
+      { strokeDashoffset: () => setPathReady(path) },
+      { strokeDashoffset: 0, duration: 4.2, ease: "none" },
+      0.2
+    )
     .to(agents, { opacity: 1, scale: 1, stagger: 0.28 }, 0.75)
     .to(cores, { opacity: 1, scale: 1, stagger: 0.24 }, 1.8)
     .to(rules, { opacity: 1 }, 2.7)

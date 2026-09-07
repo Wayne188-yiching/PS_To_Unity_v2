@@ -29,6 +29,37 @@ dist/PS_To_Unity_Agent_Report_Offline.html
 
 根目錄的 `index.html` 以 `file://` 開啟時，也會自動轉到這個單檔離線版本。
 
+## 目錄結構
+
+```text
+AgentProgressPresentation/
+  index.html   轉址頁：GitHub Pages 的資料夾入口，只含 inline script
+  app/         Vite root：簡報原始碼（index.html 與 src/）
+  dist/        build 產物，實際對外發布的版本
+  scripts/     離線打包與驗收腳本
+```
+
+入口 `index.html` 刻意不引用任何外部 script、stylesheet 或圖片。瀏覽器的 preload scanner
+會在轉址生效前先抓取子資源，因此只要這個檔案出現一個 `<script src>`，每位訪客都會多出一個
+被取消的請求；把 Vite 進入點放進 `app/` 就是為了讓轉址頁保持乾淨。
+
+## 驗證
+
+```powershell
+npm run verify        # dist/ 掛在網域根目錄 + file:// 離線版
+npm run verify:pages  # GitHub Pages 專案子路徑（/PS_To_Unity_v2/）
+npm run verify:trace  # scroll 驅動的三條連線
+```
+
+三者都需要系統已安裝 Chrome。`verify:pages` 以正式網域與 base path 重播三個入口
+（`AgentProgressPresentation/`、`.../index.html`、`.../dist/`），
+任何 404、失敗請求、console 錯誤或外部連線都會讓它失敗。
+
+`verify:trace` 檢查三條 scroll 驅動的連線：靜止時完全不亮、填充隨捲動單調遞增、
+最終確實填滿、改變視窗大小後仍正確。這些線用 `vector-effect: non-scaling-stroke`，
+dash 單位是螢幕像素而非 viewBox 單位；混用 `getTotalLength()` 的 viewBox 單位會讓
+虛線蓋不滿線段，圖樣重複後在右端露出跑在前面的亮段。
+
 ## 操作
 
 - 滑鼠滾輪或 trackpad：推進／倒帶動畫。

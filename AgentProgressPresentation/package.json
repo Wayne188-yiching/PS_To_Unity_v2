@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build && node scripts/make-offline.mjs",
     "preview": "vite preview --host 127.0.0.1",
-    "verify": "node scripts/verify.mjs"
+    "verify": "node scripts/verify.mjs",
+    "verify:pages": "node scripts/verify-pages.mjs",
+    "verify:trace": "node scripts/verify-trace.mjs"
   },
   "dependencies": {
     "gsap": "^3.13.0"
