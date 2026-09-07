@@ -136,7 +136,7 @@
 
           <div class="limitation-statement">
             <strong>規則講清楚的事，工具做得又快又準。</strong>
-            <span>但圖層沒說清楚的地方，現在是人一層一層決定，再手動改名。</span>
+            <span>但圖層沒說清楚的地方，現在要人一層一層決定結構與功能，再手動改名。</span>
           </div>
         </div>
       </section>
@@ -165,7 +165,7 @@
           </div>
 
           <div class="responsibility-rule">
-            <p><span>01</span><strong>Agent</strong> 把人講的意圖，展開成每一層的改名計畫。</p>
+            <p><span>01</span><strong>Agent</strong> 決定群組怎麼重組、哪些要在 Unity 有功能，再據此命名。</p>
             <p><span>02</span><strong>Core</strong> 處理可計算、可重複、安全執行的工作。</p>
           </div>
         </div>
@@ -176,7 +176,7 @@
           <div class="psd-agent-header">
             <div>
               <p class="section-id">SECTION 04 · CURRENT</p>
-              <h2>PSD Agent v1：<br>讀懂圖層，提出整份改名計畫。</h2>
+              <h2>PSD Agent v1：<br>把 PS 的分組，整理成 Unity 的結構。</h2>
             </div>
             <div class="evidence-summary">
               <span class="status status--pass">56 / 56 TESTS PASS</span>
@@ -289,14 +289,14 @@
           <div class="roadmap" aria-label="Agent architecture development roadmap">
             <div class="roadmap-spine" aria-hidden="true"><span id="roadmapProgress"></span></div>
             <article class="roadmap-item roadmap-item--pass"><span>01</span><div><strong>PSDtoUnity deterministic Core</strong><p>Exporter + layout.json + Unity Importer + editable Prefab</p></div><em>COMPLETED</em></article>
-            <article class="roadmap-item roadmap-item--pass"><span>02</span><div><strong>Agent Orchestrator</strong><p>bounded roles + terminal-state gate</p></div><em>COMPLETED</em></article>
-            <article class="roadmap-item roadmap-item--pass"><span>03</span><div><strong>PSD Agent v1</strong><p>evidence-first semantic planning</p></div><em>CODE READY</em></article>
-            <article class="roadmap-item roadmap-item--pass"><span>04</span><div><strong>PSD Controller / Evidence / Structure Plan</strong><p>approval binding + checkpoint + idempotent apply</p></div><em>CODE READY</em></article>
-            <article class="roadmap-item roadmap-item--current"><span>05</span><div><strong>PSD Agent real-world validation</strong><p>safe demo prepared; Photoshop evidence incomplete</p></div><em>CURRENT</em></article>
-            <article class="roadmap-item roadmap-item--planned"><span>06</span><div><strong>Unity Agent</strong><p>callable deterministic entry point exists; Agent does not</p></div><em>PLANNED</em></article>
-            <article class="roadmap-item roadmap-item--partial"><span>07</span><div><strong>Pipeline Validator</strong><p>PSD package gate only; no generated-Prefab comparison</p></div><em>PARTIAL</em></article>
-            <article class="roadmap-item roadmap-item--partial"><span>08</span><div><strong>Director orchestration</strong><p>skeleton and PASS guard; no closed loop</p></div><em>SKELETON</em></article>
-            <article class="roadmap-item roadmap-item--planned"><span>09</span><div><strong>Multi-Agent end-to-end validation</strong><p>waiting for Unity Agent + full Validator</p></div><em>PLANNED</em></article>
+            <article class="roadmap-item roadmap-item--pass"><span>02</span><div><strong>Agent Orchestrator</strong><p>限定每個 Agent 能做什麼，並規定何時算結束</p></div><em>COMPLETED</em></article>
+            <article class="roadmap-item roadmap-item--pass"><span>03</span><div><strong>PSD Agent v1</strong><p>先讀出證據，再規劃結構</p></div><em>CODE READY</em></article>
+            <article class="roadmap-item roadmap-item--pass"><span>04</span><div><strong>PSD Controller / Evidence / Structure Plan</strong><p>綁定核准、記錄進度、重跑不會重複執行</p></div><em>CODE READY</em></article>
+            <article class="roadmap-item roadmap-item--current"><span>05</span><div><strong>PSD Agent real-world validation</strong><p>測試檔案已備妥；Photoshop 端還沒跑完一輪</p></div><em>CURRENT</em></article>
+            <article class="roadmap-item roadmap-item--planned"><span>06</span><div><strong>Unity Agent</strong><p>判斷 Unity 生成的元件對不對；目前只有可呼叫的入口，Agent 還沒做</p></div><em>PLANNED</em></article>
+            <article class="roadmap-item roadmap-item--partial"><span>07</span><div><strong>Pipeline Validator</strong><p>比對 PS 的意圖與 Unity 的結果；目前只驗 PSD 封包，還不比對 Prefab</p></div><em>PARTIAL</em></article>
+            <article class="roadmap-item roadmap-item--partial"><span>08</span><div><strong>Director orchestration</strong><p>決定誰先做、何時該停、何時退回人工；目前只有骨架</p></div><em>SKELETON</em></article>
+            <article class="roadmap-item roadmap-item--planned"><span>09</span><div><strong>Multi-Agent end-to-end validation</strong><p>整條流程自動跑通；等 Unity Agent 與完整 Validator</p></div><em>PLANNED</em></article>
           </div>
 
           <div class="verification-strip">
@@ -335,7 +335,7 @@
             <p><span>UNSAFE</span><strong>→ HUMAN REVIEW</strong></p>
           </div>
 
-          <blockquote class="closing-quote">「PSD、Unity、驗證各由一個 Agent 負責。<br>目標是整條流程自動跑，人只在最後做 QC。」</blockquote>
+          <blockquote class="closing-quote">「人只在最後 QC，中間就沒有人盯著。<br>要確認意圖真的變成結果，得同時看懂 PS 和 Unity 兩端。」</blockquote>
           <p class="future-note"><span>FUTURE WORK</span> Production Automation 和 Outsource QC 是另外兩套系統，跟這條線分開走。</p>
         </div>
       </section>
