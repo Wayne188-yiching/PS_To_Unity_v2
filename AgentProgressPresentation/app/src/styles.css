@@ -1231,12 +1231,14 @@ h2 {
 
 .direction-scene {
   background: var(--base-deep);
-  padding-top: calc(var(--header-h) + 14px);
-  padding-bottom: 28px;
+  padding-top: calc(var(--header-h) + 6px);
+  padding-bottom: 20px;
 }
 
+/* The heading sits directly above a bordered card here, so 18px read as collision.
+   The extra room comes off this scene own padding, not out of the graph. */
 .direction-scene .scene-heading {
-  margin-bottom: 18px;
+  margin-bottom: 36px;
 }
 
 .direction-scene .scene-heading h2 {
@@ -1394,9 +1396,10 @@ h2 {
   .psd-flow-board,
   .evidence-console { height: clamp(340px, 46vh, 390px); }
   .evidence-panel { padding: 24px; }
-  .direction-scene { padding-top: calc(var(--header-h) + 8px); padding-bottom: 18px; }
-  .direction-scene .scene-heading { margin-bottom: 12px; }
-  .multi-agent-graph { height: clamp(270px, 37vh, 310px); }
+  .direction-scene { padding-top: calc(var(--header-h) + 4px); padding-bottom: 12px; }
+  .direction-scene .scene-heading { margin-bottom: 24px; }
+  /* No height override here: min-height on .multi-agent-graph outranks it, and going
+     below that is what let the three rows overlap on 1366x768. */
   .graph-node { min-height: 70px; padding: 8px 14px; }
   .three-rules p { padding: 9px 13px; }
   .closing-quote { margin-top: 7px; font-size: clamp(1.2rem, 2.15vw, 1.85rem); }
