@@ -21,7 +21,7 @@
         }
 
         const isLocalDev = location.hostname === "localhost" || location.hostname === "127.0.0.1";
-        const isBuiltEntry = /\/dist(?:\/index\.html)?$/i.test(pathname);
+        const isBuiltEntry = /\/dist(?:\/index\.html|\/)?$/i.test(pathname);
         if (/^https?:$/.test(location.protocol) && !isLocalDev && !isBuiltEntry) {
           window.stop();
           location.replace(new URL("dist/", location.href).href);
