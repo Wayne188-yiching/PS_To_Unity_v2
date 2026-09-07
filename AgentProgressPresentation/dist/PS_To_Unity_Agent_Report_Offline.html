@@ -69,7 +69,7 @@
         <div class="scene scene--opening">
           <div class="opening-copy">
             <h1>Photoshop 排好的 UI，<br>直接變成 Unity 畫面</h1>
-            <p class="lead">以前後製美術要照著設定美術的示意圖，在 Unity 裡一個一個重排。現在這段由工具產生。</p>
+            <p class="lead">以前後製美術要照著設定美術的示意圖，在 Unity 裡一個一個重排。現在這段由工具產生。目標是整條流程自動跑，人只在最後做 QC。</p>
             <div class="evidence-line"><span class="status status--pass">COMPLETED</span><span>PSDtoUnity deterministic Core</span><code>v2.14.0 branch snapshot</code></div>
           </div>
 
@@ -136,7 +136,7 @@
 
           <div class="limitation-statement">
             <strong>規則講清楚的事，工具做得又快又準。</strong>
-            <span>但圖層沒說清楚的地方，只能問人，不能猜。</span>
+            <span>但圖層沒說清楚的地方，現在是人一層一層決定，再手動改名。</span>
           </div>
         </div>
       </section>
@@ -165,7 +165,7 @@
           </div>
 
           <div class="responsibility-rule">
-            <p><span>01</span><strong>Agent</strong> 處理不確定與需要語意判斷的工作。</p>
+            <p><span>01</span><strong>Agent</strong> 把人講的意圖，展開成每一層的改名計畫。</p>
             <p><span>02</span><strong>Core</strong> 處理可計算、可重複、安全執行的工作。</p>
           </div>
         </div>
@@ -176,7 +176,7 @@
           <div class="psd-agent-header">
             <div>
               <p class="section-id">SECTION 04 · CURRENT</p>
-              <h2>PSD Agent v1：<br>先把檔案看清楚，才准動它。</h2>
+              <h2>PSD Agent v1：<br>讀懂圖層，提出整份改名計畫。</h2>
             </div>
             <div class="evidence-summary">
               <span class="status status--pass">56 / 56 TESTS PASS</span>
@@ -335,7 +335,7 @@
             <p><span>UNSAFE</span><strong>→ HUMAN REVIEW</strong></p>
           </div>
 
-          <blockquote class="closing-quote">「PSD、Unity、驗證各由一個 Agent 負責。<br>Agent 只放在需要判斷的地方，其他地方用規則。」</blockquote>
+          <blockquote class="closing-quote">「PSD、Unity、驗證各由一個 Agent 負責。<br>目標是整條流程自動跑，人只在最後做 QC。」</blockquote>
           <p class="future-note"><span>FUTURE WORK</span> Production Automation 和 Outsource QC 是另外兩套系統，跟這條線分開走。</p>
         </div>
       </section>
