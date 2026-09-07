@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#07131a" />
+    <meta name="description" content="PS_To_Unity_v2 Agent architecture development progress — scroll-driven technical presentation." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2307131a'/%3E%3Cpath d='M6 6h8v8H6zM18 18h8v8h-8zM14 10h4M22 14v4' fill='none' stroke='%232ee6b2' stroke-width='2'/%3E%3C/svg%3E" />
+    <title>PS_To_Unity_v2 — Agent Architecture Progress</title>
+    <script>
+      (() => {
+        const offlineName = "PS_To_Unity_Agent_Report_Offline.html";
+        const pathname = decodeURIComponent(location.pathname);
+        if (location.protocol === "file:" && !pathname.endsWith(offlineName)) {
+          const target = /\/dist\/index\.html$/i.test(pathname)
+            ? offlineName
+            : `dist/${offlineName}`;
+          window.stop();
+          location.replace(new URL(target, location.href).href);
+          return;
+        }
+
+        const isLocalDev = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+        const isBuiltEntry = /\/dist(?:\/index\.html)?$/i.test(pathname);
+        if (/^https?:$/.test(location.protocol) && !isLocalDev && !isBuiltEntry) {
+          window.stop();
+          location.replace(new URL("dist/", location.href).href);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <!--
+    THESIS: Agent 不取代 deterministic core；架構圖隨證據逐層展開，拒絕 AI 行銷式卡片牆。
+    OWN-WORLD: 深墨工作台、深藍分區、細線節點圖；薄荷、琥珀、灰藍、紅只標示狀態。
+    STORY: 先回顧規則型 pipeline，再定位 ambiguity，最後證明 PSD Agent 的人工 gate 與未完成邊界。
+    FIRST VIEWPORT: 標題與完整 deterministic trace 共用畫面，scroll 直接驅動連線，不另做裝飾性 hero。
+    FORM: brief-pinned architecture trace；seed key brief-pinned/no-seed。
+    FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+    -->
+    <a class="skip-link" href="#main">跳到簡報內容</a>
+
+    <header class="presentation-header" aria-label="簡報狀態列">
+      <a class="brand" href="#previous" aria-label="回到第一章">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="4" width="9" height="9"/><rect x="19" y="19" width="9" height="9"/><path d="M13 8.5h6M23.5 13v6"/></svg>
+        <span>PS_TO_UNITY_V2</span>
+      </a>
+      <div class="header-status">
+        <span class="status-dot status-dot--current"></span>
+        <span>AGENT DEVELOPMENT REPORT</span>
+        <button class="motion-toggle" id="motionToggle" type="button" aria-label="切換簡報動畫模式">
+          <span>MOTION</span><strong id="motionModeLabel">SYSTEM</strong>
+        </button>
+      </div>
+      <div class="chapter-readout" aria-live="polite">
+        <span id="currentIndex">01</span><span class="readout-divider">/</span><span>07</span>
+        <strong id="currentLabel">PREVIOUS STATE</strong>
+      </div>
+    </header>
+
+    <div class="global-progress" aria-hidden="true"><span id="globalProgressBar"></span></div>
+    <nav class="chapter-rail" aria-label="報告章節">
+      <a href="#previous" aria-label="第一章 Previous State"><span>01</span><i></i></a>
+      <a href="#limitation" aria-label="第二章 Limitation"><span>02</span><i></i></a>
+      <a href="#agent-layer" aria-label="第三章 Agent Layer"><span>03</span><i></i></a>
+      <a href="#psd-agent" aria-label="第四章 Current PSD Agent"><span>04</span><i></i></a>
+      <a href="#real-case" aria-label="第五章 Real Case"><span>05</span><i></i></a>
+      <a href="#progress" aria-label="第六章 Current Progress"><span>06</span><i></i></a>
+      <a href="#direction" aria-label="第七章 Multi-Agent Direction"><span>07</span><i></i></a>
+    </nav>
+
+    <main id="main">
+      <section class="chapter chapter--previous" id="previous" data-index="01" data-label="PREVIOUS STATE">
+        <div class="scene scene--opening">
+          <div class="opening-copy">
+            <h1>從 Deterministic Automation<br>到 Agent / Multi-Agent</h1>
+            <p class="lead">規則已經能可靠執行。下一步，是把無法安全寫成規則的判斷留給 Agent。</p>
+            <div class="evidence-line"><span class="status status--pass">COMPLETED</span><span>PSDtoUnity deterministic Core</span><code>v2.14.0 branch snapshot</code></div>
+          </div>
+
+          <div class="core-trace" aria-label="上一階段 Photoshop 到 Unity deterministic pipeline">
+            <svg class="trace-lines" viewBox="0 0 1160 180" preserveAspectRatio="none" aria-hidden="true">
+              <path class="trace-line trace-line--base" d="M104 90 H1056" />
+              <path class="trace-line trace-line--active" id="previousTrace" d="M104 90 H1056" />
+            </svg>
+            <div class="trace-node trace-node--source" data-trace-node>
+              <span class="node-icon">PS</span><strong>Photoshop</strong><small>PSD hierarchy</small>
+            </div>
+            <div class="trace-node" data-trace-node>
+              <span class="node-icon">EX</span><strong>Exporter</strong><small>rules + geometry</small>
+            </div>
+            <div class="trace-node" data-trace-node>
+              <span class="node-icon">IR</span><strong>layout.json</strong><small>intermediate representation</small>
+            </div>
+            <div class="trace-node" data-trace-node>
+              <span class="node-icon">UI</span><strong>Unity Importer</strong><small>deterministic backend</small>
+            </div>
+            <div class="trace-node trace-node--result" data-trace-node>
+              <span class="node-icon">PF</span><strong>Editable Prefab</strong><small>uGUI + TMP</small>
+            </div>
+          </div>
+
+          <blockquote>Deterministic Automation<br><span>「把重複工作交給規則。」</span></blockquote>
+          <p class="scroll-cue"><span></span>SCROLL TO TRACE</p>
+        </div>
+      </section>
+
+      <section class="chapter chapter--limitation" id="limitation" data-index="02" data-label="LIMITATION">
+        <div class="scene split-scene">
+          <div class="scene-heading">
+            <p class="section-id">SECTION 02</p>
+            <h2>執行規則，不等於理解意圖。</h2>
+            <p>原 pipeline 保留不動；問題發生在規則開始之前。</p>
+          </div>
+
+          <div class="ambiguity-board">
+            <div class="ambiguity-core" aria-hidden="true">
+              <div class="mini-pipeline">
+                <span>PSD</span><i></i><span>EXPORTER</span><i></i><span>IR</span><i></i><span>UNITY</span><i></i><span>PREFAB</span>
+              </div>
+              <div class="ambiguity-anchor"></div>
+            </div>
+            <div class="ambiguity-list">
+              <article class="ambiguity-item" data-ambiguity>
+                <span>STRUCTURE</span><strong>Group 是普通 Group，還是 Scroll？</strong><code>ambiguous hierarchy</code>
+              </article>
+              <article class="ambiguity-item" data-ambiguity>
+                <span>RENDER</span><strong>Sprite 是 Simple，還是 Sliced？</strong><code>numeric border required</code>
+              </article>
+              <article class="ambiguity-item" data-ambiguity>
+                <span>SEMANTICS</span><strong>中文 Layer 的 Unity Role 是什麼？</strong><code>name ≠ intent</code>
+              </article>
+              <article class="ambiguity-item" data-ambiguity>
+                <span>RUNTIME</span><strong>State siblings 是同時存在，還是互斥？</strong><code>runtime rule unknown</code>
+              </article>
+              <article class="ambiguity-item" data-ambiguity>
+                <span>OWNERSHIP</span><strong>Layer 是 reference，還是 production content？</strong><code>unsafe to infer</code>
+              </article>
+            </div>
+          </div>
+
+          <div class="limitation-statement">
+            <strong>Deterministic tools can execute rules.</strong>
+            <span>They should not guess unresolved design intent.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter chapter--agent-layer" id="agent-layer" data-index="03" data-label="AGENT LAYER">
+        <div class="scene agent-stack-scene">
+          <div class="scene-heading scene-heading--wide">
+            <p class="section-id">SECTION 03</p>
+            <h2>Agent 是判斷層，<br>不是新的 Exporter。</h2>
+          </div>
+
+          <div class="stack-diagram" aria-label="Agent reasoning layer above deterministic core">
+            <div class="stack-layer stack-layer--agent" id="agentReasoningLayer">
+              <div class="stack-title"><span class="status status--current">AGENT LAYER</span><strong>PSD Agent</strong></div>
+              <div class="stack-capabilities">
+                <span>AMBIGUITY</span><span>SEMANTIC JUDGMENT</span><span>PLANNING</span><span>TOOL SELECTION</span><span>HUMAN ESCALATION</span>
+              </div>
+            </div>
+            <div class="stack-connector" aria-hidden="true"><span></span><b>calls bounded tools</b><span></span></div>
+            <div class="stack-layer stack-layer--core">
+              <div class="stack-title"><span class="status status--pass">DETERMINISTIC CORE</span><strong>Photoshop + Unity Tools</strong></div>
+              <div class="stack-capabilities">
+                <span>GEOMETRY</span><span>SPRITE / 9-SLICE</span><span>TMP</span><span>SCROLLRECT</span><span>ATLAS</span><span>PREFAB</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="responsibility-rule">
+            <p><span>01</span><strong>Agent</strong> 處理不確定與需要語意判斷的工作。</p>
+            <p><span>02</span><strong>Core</strong> 處理可計算、可重複、安全執行的工作。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter chapter--psd-agent" id="psd-agent" data-index="04" data-label="CURRENT PSD AGENT">
+        <div class="scene psd-agent-scene">
+          <div class="psd-agent-header">
+            <div>
+              <p class="section-id">SECTION 04 · CURRENT</p>
+              <h2>PSD Agent v1：<br>先證據，後修改。</h2>
+            </div>
+            <div class="evidence-summary">
+              <span class="status status--pass">56 / 56 TESTS PASS</span>
+              <span class="status status--current">REAL-WORLD ACCEPTANCE CURRENT</span>
+            </div>
+          </div>
+
+          <div class="psd-flow-layout">
+            <div class="psd-flow-board">
+              <svg id="psdFlowSvg" viewBox="0 0 1200 530" role="img" aria-label="PSD Agent inspection, planning, approval, apply and export flow">
+                <defs>
+                  <marker id="arrowBase" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#416070"/></marker>
+                  <marker id="arrowActive" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0L8 4L0 8Z" fill="#2ee6b2"/></marker>
+                </defs>
+                <path class="psd-path psd-path--base" d="M70 135 H1125 V390 H155" marker-end="url(#arrowBase)"/>
+                <path class="psd-path psd-path--progress" id="psdFlowPath" d="M70 135 H1125 V390 H155" marker-end="url(#arrowActive)"/>
+
+                <g class="flow-node" data-flow-step="0" transform="translate(38 98)"><rect width="98" height="74"/><text x="49" y="31">PSD</text><text class="flow-node-sub" x="49" y="53">SOURCE</text></g>
+                <g class="flow-node" data-flow-step="1" transform="translate(190 98)"><rect width="124" height="74"/><text x="62" y="31">Inspect</text><text class="flow-node-sub" x="62" y="53">READ ONLY</text></g>
+                <g class="flow-node" data-flow-step="2" transform="translate(356 98)"><rect width="124" height="74"/><text x="62" y="31">Evidence</text><text class="flow-node-sub" x="62" y="53">JSON</text></g>
+                <g class="flow-node" data-flow-step="3" transform="translate(522 98)"><rect width="150" height="74"/><text x="75" y="31">Semantic</text><text class="flow-node-sub" x="75" y="53">ANALYSIS</text></g>
+                <g class="flow-node" data-flow-step="4" transform="translate(714 98)"><rect width="150" height="74"/><text x="75" y="31">Structure Plan</text><text class="flow-node-sub" x="75" y="53">approved=false</text></g>
+                <g class="flow-node flow-node--gate" data-flow-step="5" transform="translate(906 92)"><rect width="170" height="86"/><text x="85" y="34">Human Approval</text><text class="flow-node-sub" x="85" y="59">GATE</text></g>
+                <g class="flow-node" data-flow-step="6" transform="translate(965 353)"><rect width="150" height="74"/><text x="75" y="31">PSD Controller</text><text class="flow-node-sub" x="75" y="53">CHECKPOINT</text></g>
+                <g class="flow-node" data-flow-step="7" transform="translate(706 353)"><rect width="124" height="74"/><text x="62" y="31">Apply</text><text class="flow-node-sub" x="62" y="53">BOUNDED TOOL</text></g>
+                <g class="flow-node" data-flow-step="8" transform="translate(431 353)"><rect width="172" height="74"/><text x="86" y="31">Reinspect</text><text class="flow-node-sub" x="86" y="53">FRESH EVIDENCE</text></g>
+                <g class="flow-node" data-flow-step="9" transform="translate(175 353)"><rect width="172" height="74"/><text x="86" y="31">Export</text><text class="flow-node-sub" x="86" y="53">IMAGES + LAYOUT</text></g>
+
+                <g class="checkpoint-mark" transform="translate(1028 238)"><rect width="88" height="38"/><text x="44" y="24">APPLYING</text></g>
+                <g class="retry-loop"><path d="M770 443 C770 500 1038 500 1038 443"/><text x="902" y="514">RETRY: VERIFY FINAL STATE · DO NOT DUPLICATE</text></g>
+              </svg>
+              <div class="flow-legend"><span><i class="legend-signal"></i>active trace</span><span><i class="legend-gate"></i>human gate</span><span><i class="legend-retry"></i>idempotent retry</span></div>
+            </div>
+
+            <aside class="evidence-console" aria-live="polite">
+              <div class="console-bar"><span>EVIDENCE TRACE</span><code id="evidenceCounter">00 / 09</code></div>
+              <div class="evidence-panels">
+                <article class="evidence-panel is-visible" data-evidence-step="0"><span class="status status--pass">LOCAL ONLY</span><h3>PSD bytes 不進模型</h3><p>模型只取得 deterministic inspector 產生的結構化 evidence。</p><code>privacy: structured evidence only</code></article>
+                <article class="evidence-panel" data-evidence-step="1"><span class="status status--pass">READ ONLY</span><h3>Inspect visible layers</h3><p>讀取 stable layer ID、name、parent、kind 與 visibility；不修改原檔。</p><code>sourceFingerprint = SHA-256</code></article>
+                <article class="evidence-panel" data-evidence-step="2"><span class="status status--pass">BOUND</span><h3>Evidence 有版本</h3><p>PSD、inspection 與後續 plan 都以 fingerprint 綁定，舊證據不能沿用。</p><code>stale evidence → BLOCKED</code></article>
+                <article class="evidence-panel" data-evidence-step="3"><span class="status status--review">NEEDS_REVIEW</span><h3>不猜 unresolved intent</h3><p>Simple / Sliced / Mask / Scroll / LayoutGroup 未確認時，必須升級人工判斷。</p><code>ambiguity ≠ error</code></article>
+                <article class="evidence-panel" data-evidence-step="4"><span class="status status--current">PROPOSAL</span><h3>Model proposal 永遠未核准</h3><p>即使 model 回傳 true，Controller 寫入磁碟時仍強制改為 false。</p><code>approved = false</code></article>
+                <article class="evidence-panel" data-evidence-step="5"><span class="status status--review">HUMAN GATE</span><h3>Evidence 改變，核准失效</h3><p>套用前重新 inspection；PSD、inspection 或 plan 任一改變就回到 review。</p><code>APPROVAL_INVALIDATED</code></article>
+                <article class="evidence-panel" data-evidence-step="6"><span class="status status--pass">CHECKPOINT</span><h3>先寫 APPLYING，再 mutation</h3><p>主程序中斷後可判斷目前狀態，而不是盲目重做。</p><code>stage = APPLYING</code></article>
+                <article class="evidence-panel" data-evidence-step="7"><span class="status status--pass">DETERMINISTIC</span><h3>Controller 才能 Apply</h3><p>動作綁定 layer ID 與原 name / parent / kind 前置條件。</p><code>precondition conflict → BLOCKED</code></article>
+                <article class="evidence-panel" data-evidence-step="8"><span class="status status--pass">IDEMPOTENT</span><h3>Retry 不重複 Rename / Move</h3><p>相同 plan 重跑只確認 final state，不再建立群組或移動已完成圖層。</p><code>alreadyAppliedCount</code></article>
+                <article class="evidence-panel" data-evidence-step="9"><span class="status status--current">PACKAGE GATE</span><h3>Fresh export，不是 end-to-end PASS</h3><p>重新檢查後輸出 Images + layout.json；下一步仍需 Unity Agent 與完整 Validator。</p><code>→ NEEDS_REVIEW / PIPELINE_VALIDATOR</code></article>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter chapter--real-case" id="real-case" data-index="05" data-label="REAL CASE">
+        <div class="scene real-case-scene">
+          <div class="scene-heading scene-heading--wide">
+            <p class="section-id">SECTION 05 · REPO-TRACKED DEMO</p>
+            <h2>安全樣本已備妥，<br>Agent 驗收尚未跑完。</h2>
+            <p>使用公開追蹤的 <code>scroll_v_basic.psd</code>；不使用 production case。</p>
+          </div>
+
+          <div class="case-trace">
+            <section class="case-column case-column--source">
+              <header><span class="status status--pass">REPOSITORY</span><strong>Original PSD Structure</strong></header>
+              <div class="tree">
+                <p><i></i><strong>MainPage</strong><code>GROUP</code></p>
+                <p class="depth-1"><i></i><strong>List[SCROLL_V]</strong><code>GROUP</code></p>
+                <p class="depth-2"><i></i><span>Row_01</span><code>400×100</code></p>
+                <p class="depth-2"><i></i><span>Row_02</span><code>400×100</code></p>
+                <p class="depth-2"><i></i><span>Row_03</span><code>400×100</code></p>
+                <p class="depth-2"><i></i><span>Row_04</span><code>400×100</code></p>
+              </div>
+            </section>
+
+            <div class="case-link" aria-hidden="true"><span></span><b>prepared</b></div>
+
+            <section class="case-column case-column--evidence">
+              <header><span class="status status--current">CURRENT</span><strong>Acceptance Evidence</strong></header>
+              <dl>
+                <div><dt>sample copy</dt><dd>HASH MATCH</dd></div>
+                <div><dt>request</dt><dd>PREPARED</dd></div>
+                <div><dt>inspection</dt><dd class="not-run">NOT RUN</dd></div>
+                <div><dt>approved plan</dt><dd class="not-run">NOT RUN</dd></div>
+                <div><dt>re-export</dt><dd class="not-run">NOT RUN</dd></div>
+              </dl>
+            </section>
+
+            <div class="case-link case-link--blocked" aria-hidden="true"><span></span><b>human gate</b></div>
+
+            <section class="case-column case-column--result">
+              <header><span class="status status--planned">EXPECTED CORE OUTPUT</span><strong>Deterministic Target</strong></header>
+              <div class="tree tree--dimmed">
+                <p><i></i><strong>List</strong><code>ScrollRect</code></p>
+                <p class="depth-1"><i></i><span>Viewport</span><code>RectMask2D</code></p>
+                <p class="depth-2"><i></i><span>Content</span><code>4 rows</code></p>
+              </div>
+              <p class="case-disclaimer">這是既有 Phase 4.5 deterministic acceptance 的預期結構，不是本次 Agent run 的完成證據。</p>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter chapter--progress" id="progress" data-index="06" data-label="CURRENT PROGRESS">
+        <div class="scene progress-scene">
+          <div class="scene-heading">
+            <p class="section-id">SECTION 06 · EVIDENCE SNAPSHOT</p>
+            <h2>完成的是安全骨架。<br>目前正在證明它能碰真實 PSD。</h2>
+          </div>
+
+          <div class="roadmap" aria-label="Agent architecture development roadmap">
+            <div class="roadmap-spine" aria-hidden="true"><span id="roadmapProgress"></span></div>
+            <article class="roadmap-item roadmap-item--pass"><span>01</span><div><strong>PSDtoUnity deterministic Core</strong><p>Exporter + layout.json + Unity Importer + editable Prefab</p></div><em>COMPLETED</em></article>
+            <article class="roadmap-item roadmap-item--pass"><span>02</span><div><strong>Agent Orchestrator</strong><p>bounded roles + terminal-state gate</p></div><em>COMPLETED</em></article>
+            <article class="roadmap-item roadmap-item--pass"><span>03</span><div><strong>PSD Agent v1</strong><p>evidence-first semantic planning</p></div><em>CODE READY</em></article>
+            <article class="roadmap-item roadmap-item--pass"><span>04</span><div><strong>PSD Controller / Evidence / Structure Plan</strong><p>approval binding + checkpoint + idempotent apply</p></div><em>CODE READY</em></article>
+            <article class="roadmap-item roadmap-item--current"><span>05</span><div><strong>PSD Agent real-world validation</strong><p>safe demo prepared; Photoshop evidence incomplete</p></div><em>CURRENT</em></article>
+            <article class="roadmap-item roadmap-item--planned"><span>06</span><div><strong>Unity Agent</strong><p>callable deterministic entry point exists; Agent does not</p></div><em>PLANNED</em></article>
+            <article class="roadmap-item roadmap-item--partial"><span>07</span><div><strong>Pipeline Validator</strong><p>PSD package gate only; no generated-Prefab comparison</p></div><em>PARTIAL</em></article>
+            <article class="roadmap-item roadmap-item--partial"><span>08</span><div><strong>Director orchestration</strong><p>skeleton and PASS guard; no closed loop</p></div><em>SKELETON</em></article>
+            <article class="roadmap-item roadmap-item--planned"><span>09</span><div><strong>Multi-Agent end-to-end validation</strong><p>waiting for Unity Agent + full Validator</p></div><em>PLANNED</em></article>
+          </div>
+
+          <div class="verification-strip">
+            <span><b>56 / 56</b> Python regression tests</span>
+            <span><b>26 / 26</b> Photoshop naming checks</span>
+            <span><b>0</b> fresh Photoshop Agent acceptance results</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="chapter chapter--direction" id="direction" data-index="07" data-label="MULTI-AGENT DIRECTION">
+        <div class="scene direction-scene">
+          <div class="scene-heading scene-heading--center">
+            <p class="section-id">SECTION 07 · DIRECTION</p>
+            <h2>只有需要判斷的地方，<br>才增加 Agent。</h2>
+          </div>
+
+          <div class="multi-agent-graph" aria-label="Future PS_To_Unity multi-agent architecture">
+            <svg class="multi-lines" viewBox="0 0 1200 600" preserveAspectRatio="none" aria-hidden="true">
+              <path class="multi-line multi-line--base" d="M600 96 V176 M600 176 H235 V268 M600 176 V268 M600 176 H965 V268"/>
+              <path class="multi-line multi-line--base" d="M235 362 V474 M600 362 V474 M965 362 V474"/>
+              <path class="multi-line multi-line--active" id="multiAgentPath" d="M600 96 V176 M600 176 H235 V268 M600 176 V268 M600 176 H965 V268 M235 362 V474 M600 362 V474 M965 362 V474"/>
+            </svg>
+            <article class="graph-node graph-node--director"><span class="status status--current">SKELETON</span><strong>Director</strong><small>route · gate · terminal state</small></article>
+            <article class="graph-node graph-node--psd"><span class="status status--pass">V1</span><strong>PSD Agent</strong><small>ambiguity · plan · approval</small></article>
+            <article class="graph-node graph-node--unity"><span class="status status--planned">PLANNED</span><strong>Unity Agent</strong><small>deterministic pipeline selection</small></article>
+            <article class="graph-node graph-node--validator"><span class="status status--review">PARTIAL</span><strong>Pipeline Validator</strong><small>intent → IR → Prefab</small></article>
+            <article class="graph-node graph-node--ps-core"><span class="status status--pass">CORE</span><strong>Photoshop Tools</strong><small>inspect · apply · export</small></article>
+            <article class="graph-node graph-node--unity-core"><span class="status status--pass">CORE</span><strong>Unity Importer</strong><small>sprite · TMP · layout · prefab</small></article>
+            <article class="graph-node graph-node--evidence"><span class="status status--pass">CORE</span><strong>Deterministic Validators</strong><small>preconditions · package · geometry</small></article>
+          </div>
+
+          <div class="three-rules">
+            <p><span>RULE-BASED</span><strong>→ CORE</strong></p>
+            <p><span>AMBIGUOUS</span><strong>→ AGENT</strong></p>
+            <p><span>UNSAFE</span><strong>→ HUMAN REVIEW</strong></p>
+          </div>
+
+          <blockquote class="closing-quote">「目標不是增加 Agent 數量，<br>而是讓每個 Agent 只負責真正需要判斷的工作。」</blockquote>
+          <p class="future-note"><span>FUTURE WORK</span> Production Automation 與 Outsource QC 是兩條獨立發展的 Agent 系統。</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="keyboard-help" aria-label="操作說明">
+      <span>SCROLL / WHEEL</span><span>↑ ↓</span><span>PAGE ↑ ↓</span><span>SPACE</span><span>HOME / END</span>
+    </footer>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
