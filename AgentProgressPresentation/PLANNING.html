@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Agent 開發進度報告：實作前規劃</title>
+  <style>
+    :root{color-scheme:dark;--bg:#07131a;--panel:#0b1e2a;--surface:#12314a;--ink:#f2f8f7;--muted:#a8bec3;--line:rgba(168,190,195,.25);--pass:#2ee6b2;--current:#f0bc5e;--planned:#7f96a3;--review:#e8c66a;--blocked:#ef6b73}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.65 "Microsoft JhengHei","Noto Sans TC",sans-serif}main{width:min(1160px,calc(100% - 40px));margin:auto;padding:72px 0 120px}h1,h2{line-height:1.18;letter-spacing:-.02em}h1{font-size:clamp(2.3rem,5vw,4.6rem);max-width:12em;margin:0 0 24px}h2{margin:72px 0 18px;font-size:clamp(1.5rem,3vw,2.4rem)}p{max-width:72em;color:var(--muted)}code{font-family:"Cascadia Mono",Consolas,monospace;color:var(--pass)}table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line)}th,td{padding:14px 16px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:var(--surface)}.status{display:inline-block;padding:3px 8px;border:1px solid currentColor;border-radius:6px;font-size:14px;font-weight:800}.pass{color:var(--pass)}.current{color:var(--current)}.planned{color:var(--planned)}.review{color:var(--review)}.blocked{color:var(--blocked)}.flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line)}.flow div{min-width:0;padding:18px;background:var(--panel)}ol,ul{padding-left:1.35em}li+li{margin-top:8px}.note{padding:18px 20px;background:var(--surface);border-radius:12px}.mono{font-family:"Cascadia Mono",Consolas,monospace}@media(max-width:760px){main{width:min(100% - 28px,1160px);padding-top:42px}.flow{grid-template-columns:1fr}table{font-size:16px}th,td{padding:11px}}
+  </style>
+</head>
+<body>
+<main>
+  <h1>從 Deterministic Automation 到 Agent / Multi-Agent</h1>
+  <p>實作前規劃與 repository 狀態稽核。這份文件先固定事實、敘事與動畫責任，再開始製作 Scroll-Driven Presentation。</p>
+
+  <h2>1. 目前真實狀態</h2>
+  <table>
+    <thead><tr><th>元件</th><th>驗證結論</th><th>repo 證據與限制</th></tr></thead>
+    <tbody>
+      <tr><td>PSDtoUnity deterministic Core</td><td><span class="status pass">COMPLETED</span></td><td>Photoshop exporter 與 Unity importer/backend 已存在；公開 Phase 4.5 樣本有 Photoshop + Unity 實機驗收紀錄。今日另跑 Photoshop 端 26 checks 與 PNG visual dedup regression，皆通過。</td></tr>
+      <tr><td>Agent Orchestrator 骨架</td><td><span class="status pass">COMPLETED</span></td><td>存在 Director、PSD、Unity、Pipeline Validator 角色與 terminal-state gate；位於 Agent branch，不在 main。</td></tr>
+      <tr><td>PSD Agent v1</td><td><span class="status pass">CODE READY</span></td><td>具備 structured evidence、semantic plan 與 tool calling；目前 worktree 有尚未提交的 acceptance-hardening 變更。</td></tr>
+      <tr><td>PSD Controller / Evidence / Structure Plan</td><td><span class="status pass">CODE READY</span></td><td>具備 approved=false、指紋綁定、前置條件、APPLYING checkpoint、冪等 retry、re-inspect/export/package gate。今日 AgentOrchestrator 56/56 tests 通過。</td></tr>
+      <tr><td>PSD Agent 實機驗收</td><td><span class="status current">CURRENT</span></td><td>安全 demo PSD 已複製並建立 request，但目前 run 中沒有 inspection、apply、re-inspection 或 export result；不能宣稱完成。</td></tr>
+      <tr><td>Unity Agent</td><td><span class="status planned">PLANNED</span></td><td>已抽出可程式呼叫的 deterministic <code>PhotoshopUiImportService</code> 與 batch entry point；Agent 本體仍未開發。</td></tr>
+      <tr><td>Pipeline Validator</td><td><span class="status review">PARTIAL</span></td><td>只有 PSD package validation；尚未完成 semantic intent → IR → Unity import → generated Prefab 的全鏈比較。</td></tr>
+      <tr><td>Director orchestration</td><td><span class="status review">SKELETON</span></td><td>可調度角色並強制未完成 validator 不得 PASS；尚未形成 Unity + Validator 閉環。</td></tr>
+      <tr><td>Multi-Agent end-to-end validation</td><td><span class="status planned">PLANNED</span></td><td>必要角色未齊，沒有端到端實機證據。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>2. Presentation information architecture</h2>
+  <ol>
+    <li><strong>Previous State</strong>：用一條 20 秒內可讀完的固定 pipeline recap 建立共同上下文。</li>
+    <li><strong>Limitation</strong>：原 pipeline 保留不動；四個語意歧義逐一附著到節點，最後停在「工具不應猜設計意圖」。</li>
+    <li><strong>Agent Layer</strong>：架構向上長出 reasoning layer，底層 deterministic core 不位移、不消失。</li>
+    <li><strong>Current PSD Agent</strong>：全報告主段，以一個 pinned timeline 走完 inspect → evidence → plan → human gate → apply → re-inspect/export。</li>
+    <li><strong>Real Case</strong>：使用 repo 追蹤的 <code>scroll_v_basic.psd</code> 作「安全 demo」；只展示已知結構與 acceptance intent，不假造尚未產生的 Agent result。</li>
+    <li><strong>Current Progress</strong>：以單一路線圖呈現 completed / current / partial / planned，並標示 evidence 層級。</li>
+    <li><strong>Multi-Agent Direction</strong>：最後才展開 Director、PSD Agent、Unity Agent、Pipeline Validator 與兩側 deterministic core 的責任邊界。</li>
+  </ol>
+
+  <h2>3. Animation storyboard</h2>
+  <div class="flow">
+    <div><strong>Trace</strong><br>SVG path 隨 scroll 畫出已驗證 pipeline。</div>
+    <div><strong>Attach</strong><br>ambiguity 以 evidence callout 貼到相關節點，不飛入畫面。</div>
+    <div><strong>Layer</strong><br>Agent layer 由 core 上方展開，core 保持固定。</div>
+    <div><strong>Gate</strong><br>approved=false 停在 Human Approval；通過後才讓 path 穿越 Controller。</div>
+    <div><strong>Expand</strong><br>結尾把單一 PSD Agent 展開為 Director 多角色圖，但 planned 節點維持低亮度。</div>
+  </div>
+  <ul>
+    <li>只使用 transform、opacity、SVG stroke progress 與 node state；不移動大量文字。</li>
+    <li>Section 04 使用唯一長 pinned ScrollTrigger timeline；其餘段落短 pin 或一般閱讀，避免 pin 疲勞。</li>
+    <li>快速滾動由 scrub timeline 的 deterministic state 承接；resize debounce 後 refresh。</li>
+    <li>reduced-motion 時取消 pin/scrub，所有資訊改為靜態順序顯示。</li>
+  </ul>
+
+  <h2>4. Repository assets / diagrams / demo evidence</h2>
+  <table>
+    <thead><tr><th>用途</th><th>來源</th><th>使用方式</th></tr></thead>
+    <tbody>
+      <tr><td>deterministic pipeline</td><td><code>PhotoshopUiPackageExporter.jsx</code>、Unity importer/backend</td><td>轉為節點與連線；不貼大段程式。</td></tr>
+      <tr><td>Agent safety flow</td><td><code>README.md</code>、<code>docs/prompt.md</code>、Controller / Evidence / Structure Plan</td><td>用真實狀態碼、approved=false、fingerprint、checkpoint 當 evidence。</td></tr>
+      <tr><td>安全 demo</td><td><code>Samples/Phase4_5/scroll_v_basic.psd</code> 與 README</td><td>標示 DEMO / REPO-TRACKED；只呈現 MainPage → List[SCROLL_V] → 4 rows 與既有預期 Prefab。</td></tr>
+      <tr><td>現況證據</td><td>今日 56/56 Python tests、26 JS checks、PNG dedup regression</td><td>放在 roadmap evidence ledger；不等同 Photoshop 真機驗收。</td></tr>
+      <tr><td>離線字型</td><td>上一份報告既有嵌入式 Report CJK</td><td>抽成 local WOFF2，由 Vite build 收入 dist。</td></tr>
+    </tbody>
+  </table>
+
+  <h2>5. Sensitive-information gate</h2>
+  <div class="note">
+    <ul>
+      <li>不顯示本機絕對路徑、使用者名稱、API key、本機設定、內部 production PSD 名稱或公司資產。</li>
+      <li>不讀取或嵌入 PSD/image bytes；示意圖只使用 repo 文件已公開的結構文字。</li>
+      <li>不把 QC_Agent、UI 外包製作人或 vendor workflow 畫進 runtime；結尾只保留「兩條獨立 Agent 系統」一句。</li>
+      <li>branch / worktree 的未提交狀態只用「acceptance hardening in progress」描述，不顯示機器路徑。</li>
+    </ul>
+  </div>
+
+  <h2>6. Implementation acceptance</h2>
+  <p class="mono">Vite + Vanilla HTML/CSS/JS + local GSAP / ScrollTrigger · npm run build · console 0 errors · 1920×1080 · 1366×768 · keyboard navigation · reduced motion · offline assets only</p>
+</main>
+</body>
+</html>
