@@ -1042,9 +1042,11 @@ commit → push → 交由使用者/Codex 在 Unity 專案實機驗收。</pre>
     <p><strong>目前：PSD Agent 安全性與復原流程驗收中。</strong>已補強人工核准指紋、動作前置條件、計畫重複套用、過期證據、人工 render 決策與重試終態。開發使用 GPT-6 Astra／中等推理，獨立程式驗收使用 GPT-5.6 Sol／中等推理。</p>
     <p>乾淨 Photoshop 副本已完成首次套用：8 → 9 層，新增 1 群組、改名 1 層、移動 2 層；同計畫第二次套用：9 → 9 層，新增／改名／移動均為 0，4 個動作全部辨識為已完成。原始受控 PSD SHA-256 保持不變。</p>
     <p>76 項自動測試通過；Controller 已由模擬中斷的 checkpoint 恢復至 PACKAGE_READY，package 驗證通過（7 nodes／4 PNG）。樣本空滑動群組保留 SCROLL_EMPTY，終態為 NEEDS_REVIEW。模型 Runner 語意驗收尚缺本機 API 設定，尚未宣告 PSD Agent 全面通過。詳見 <a href="AgentOrchestrator/docs/psd_acceptance_20260912.md">2026-09-12 驗收紀錄</a>及 <a href="AgentOrchestrator/docs/psd_agent_acceptance.md">驗收條件</a>。</p>
+    <p>2026-09-13 收尾：六份 Phase4.5 Photoshop 輸出樣本已由 Sol 獨立複核通過；文字樣本的 15 個文字圖層保留為 text 節點，8 種字體的內容與 token 比對差異為 0，來源與輸出雜湊相符。這些是 PS／IR 證據，不代表 Unity TMP、排版或拖曳驗收通過。</p>
+    <p><strong>下一個最小交付：</strong>以最終程式重新建立一份核准、套用、零修改重跑與匯出回執自洽的 Controller 證據包。其後補受控中斷與實際 Runner 語意驗收。API 設定只影響 Runner 模型呼叫，不阻擋 Photoshop 工具及既有計畫驗收；不再擴大素材矩陣。</p>
     <table>
       <tr><th>項目</th><th>狀態</th></tr>
-      <tr><td>PSD Agent／Controller／Evidence／Structure Plan</td><td>已實作，回歸與真機驗收中</td></tr>
+      <tr><td>PSD Agent／Controller／Evidence／Structure Plan</td><td>已實作，回歸與真機驗收中；尚未結案</td></tr>
       <tr><td>Pipeline Validator</td><td>已有 PSD package 檢查；PSD → IR → Unity → Prefab 全面一致性驗證未完成</td></tr>
       <tr><td>Unity Agent</td><td>等待 PSD 階段通過；先抽離可程式呼叫的 deterministic pipeline</td></tr>
       <tr><td>Director／Multi-Agent 閉環</td><td>骨架；全流程 PASS gate 維持關閉</td></tr>

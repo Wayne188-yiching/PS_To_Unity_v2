@@ -25,6 +25,22 @@ PSD Agent 只負責處理不確定語意、提出結構計畫與選擇既有 Pho
 - `photoshop_result.json.psdSha256` 等於完成匯出時 PSD 的實際 SHA-256。
 - 原始受版本控制 PSD 的 SHA-256 在驗收前後相同。
 
+## 結案缺口與下一個最小交付（2026-09-12）
+
+以下是剩餘結案門檻，不以增加樣本數或單元測試數取代：
+
+| 門檻 | 已有證據 | 尚缺證據／處理 |
+|---|---|---|
+| 人工核准與新鮮證據 | 強制 unapproved、PSD/plan/inspection 變更失效及過期 package 回歸通過 | 以最終程式建立全新正式 run，核准前後回執自洽；現有歷史 run 留有修復前 validation 快照 |
+| 修改範圍與冪等 | 真機 create/rename/move 及第二次零修改；原始 PSD 未變 | 在上述全新 run 保存完整前後 layer ID、parent、名稱、排序對照，作為同一包結案證據 |
+| checkpoint／retry | APPLYING checkpoint fault injection 與實際續跑；busy/RPC/timeout 分類回歸通過 | 受控 host 中斷的整合驗證尚缺；不能稱已驗證 Photoshop crash 或任意中斷復原 |
+| 語意判斷 | 規則與 plan validator 測試，不是模型推論證據 | 真實 Runner：明確 intent、模糊 intent、hidden、rename/hierarchy、MERGE／文字角色案例；模糊項不得猜測或自動套用 |
+| deterministic 匯出 | 六份 Phase4.5 真機 matrix、逐圖 receipt SHA 與 package 檢查通過 | 附掛 axis-mismatch／cache tag 往返仍未測；不要擴張為 Unity 驗收通過 |
+
+下一個最小交付是「一包由最終程式重新產生的 PSD Controller 核准／套用／重跑／匯出證據」，不先開發 Unity Agent，也不再任意擴大素材矩陣。接著才完成受控中斷與 Runner 語意案例，逐項關閉上述缺口。
+
+API 的範圍：`main.py` 的新計畫分支呼叫 `Runner.run`，目前會要求 `OPENAI_API_KEY`；既有計畫的 `--approve-plan` 分支不需 Runner。Photoshop inspection/export、package validator 及既有回歸測試也不需 API Key。`agent_roles/pipeline_agents.py` 目前將模型寫死為 `gpt-5.6-terra`；此字串只是程式設定，不代表已驗證帳號可用性。實測前須確認模型／provider 設定與可用性，不能把缺 Key 說成整個 PSD 驗收無法進行。
+
 ## 尚不屬於 PSD Agent 通過範圍
 
 - Unity Prefab 生成與 Unity Editor headless pipeline。

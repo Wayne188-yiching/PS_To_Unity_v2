@@ -41,6 +41,32 @@ PSD deterministic automation 與 Controller 復原流程已取得真機證據。
 - layout：`9f573f6ace3bff2f16aad6269c3332406f6bfb81b0b6c20715b9a90de359c9d3`
 - 最終 export run ID：`f21dc26028544586a7763a4372f915f2`
 
+## Phase4.5 Photoshop 輸出矩陣補驗
+
+在程式基準 `e9f1533`，以六份受版本控制 PSD 的全新副本執行正式 inspection/export wrappers。證據位於本機忽略路徑 `AgentOrchestrator/runs/phase45_matrix_20260912/`。GPT-5.6 Sol／medium 獨立唯讀複核六份來源與副本 SHA、inspection run ID／PSD SHA、export run ID、PSD／layout／逐張 PNG receipt SHA，全部相符；六份 package validation 均 PASS、零 issues。76 項回歸測試再次通過。
+
+| 樣本 | Photoshop／IR 實測 | PNG 結果 |
+|---|---|---|
+| scroll_v_basic | vertical；viewport = content 400 × 460 | 4 張，均 400 × 100 |
+| scroll_v_rowmask | viewport 400 × 530；content 400 × 580 | 5 張，均 400 × 100；Row 05 完整，cache signature 含 nomask |
+| scroll_v_groupmask | viewport 400 × 350；content 400 × 580 | 5 張，均 400 × 100 |
+| scroll_grid_combo | vertical grid；constraint 2；cell 150 × 150；spacing 10 × 10 | 8 張，均 150 × 150 |
+| scroll_h_grid | horizontal grid；constraint 2；cell 100 × 100；spacing 10 × 10 | 6 張，均 100 × 100 |
+| prescrolled | viewport y=250、content y=130，相差 120；尺寸 400 × 350／400 × 580 | 5 張，均 400 × 100 |
+
+此矩陣只證明 Photoshop inspection／export 符合樣本 README，不代表 Unity Prefab、anchoredPosition、滑軌 Handle 拖曳或 reskin guard 通過。未執行附掛的 SCROLL_AXIS_MISMATCH 暫改名案例及移除／加回 scroll tag 的 cache 往返。矩陣未獨立保存 SCROLL_EMPTY warning 文字，只確認空群組在 inspection 存在、在 layout 被降級移除。
+
+## 文字樣本複核（2026-09-13）
+
+使用 `系統字-test.psd` 的全新副本，正式 Photoshop inspection/export 均 PASS。2026-09-13 本任務以唯讀資料核對收尾，非另一輪 Sol 獨立驗收：inspection 的 15 個文字圖層均在 layout 保留為 text 節點；以換行正規化後的「文字內容＋font token」多重集合比對，差異 0，涵蓋 8 種字體。另有 2 張 PNG。來源、副本及 receipt 的 PSD SHA 相同，layout 與逐 PNG SHA 均匹配。
+
+- 證據：`AgentOrchestrator/runs/phase45_matrix_20260912/system_words/`（本機忽略路徑）。
+- 原始 PSD SHA：`5caa72240907b9b9b9af8b447f00514a5d9b3404077ffdca8b7e200c20171d54`。
+- export run ID：`2117a54d9da142e3a3d56bd62ac5c3c5`。
+- layout SHA：`6e8a803059b6de7f5d81463f0f30e37fbd26231dbaffbb4129301f53680a1ed2`。
+
+上述比對不證明文字位置、顏色、描邊、Unity Font Asset／材質／TMP 視覺效果，也不涵蓋 hidden／MERGE 的模型語意判斷。
+
 ## 已修復的實際缺陷
 
 1. Pipeline Director 誤用獨立外包 approval gate。
@@ -56,7 +82,7 @@ PSD deterministic automation 與 Controller 復原流程已取得真機證據。
 ## 未完成項目
 
 - 實際模型 Runner 的語意規劃、模糊 intent escalation、真實 PSD 多案例與文字／hidden／MERGE 語意驗收。本次環境與兩個 checkout 均未設定 OPENAI_API_KEY；不以工具層測試替代模型驗收。
-- 完整程序中斷 fault injection 與更廣 Photoshop fixture matrix。
+- 完整程序中斷 fault injection；六份 Photoshop fixture matrix 已完成，附掛的 axis-mismatch／cache 往返及模型語意案例尚未完成。
 - PSD 階段通過後才進行 Unity headless pipeline、Unity Agent、Pipeline Validator 與 Director end-to-end。
 
 本次不改動 Unity importer，不宣告 Multi-Agent end-to-end PASS，也不發布為正式完成版。
