@@ -5,8 +5,9 @@ from pathlib import Path
 
 from PIL import Image
 
-from ps_to_unity_agents.evidence import prepare_case, qa_manifest
+from ps_to_unity_agents.evidence import prepare_case, validate_psd_package_manifest
 from ps_to_unity_agents.models import PipelineRequest
+from ps_to_unity_agents.reviewer import save_decision
 
 TEST_TEMP_ROOT = Path(__file__).resolve().parents[1] / ".test_tmp"
 TEST_TEMP_ROOT.mkdir(exist_ok=True)
@@ -70,7 +71,7 @@ class EvidenceTests(unittest.TestCase):
         temporary, request = self.make_case(True, border=4)
         try:
             prepare_case(request)
-            self.assertEqual("PASS", qa_manifest(request)["status"])
+            self.assertEqual("PASS", validate_psd_package_manifest(request)["status"])
         finally:
             temporary.cleanup()
 
@@ -78,11 +79,85 @@ class EvidenceTests(unittest.TestCase):
         temporary, request = self.make_case(True, border=6)
         try:
             prepare_case(request)
-            result = qa_manifest(request)
+            result = validate_psd_package_manifest(request)
             self.assertEqual("BLOCKED", result["status"])
             self.assertTrue(any(issue["code"] == "SPRITE_BORDER_EXCEEDS_ASSET" for issue in result["issues"]))
         finally:
             temporary.cleanup()
+
+    def test_approved_sliced_review_is_applied_to_prepared_layout(self):
+        temporary, request = self.make_case(False)
+        try:
+            prepare_case(request)
+            manifest_path = request.output_folder / "semantic_manifest.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            save_decision(request.output_folder, manifest, {
+                "nodePath": "panel",
+                "decision": "approved",
+                "mode": "sliced",
+                "spriteBorder": {"left": 4, "right": 4, "top": 0, "bottom": 0},
+            })
+            result = prepare_case(request)
+            prepared = json.loads(Path(result["layoutPath"]).read_text(encoding="utf-8"))
+            self.assertEqual("PASS", result["status"])
+            self.assertEqual("sliced", prepared["nodes"][0]["imageType"])
+            self.assertEqual(4, prepared["nodes"][0]["spriteBorderLeft"])
+        finally:
+            temporary.cleanup()
+
+    def test_pixel_changes_invalidate_approval_even_when_sizes_and_proposals_match(self):
+        for folder in ("artist_asset_folder", "exporter_asset_folder"):
+            with self.subTest(folder=folder):
+                temporary, request = self.make_case(False)
+                try:
+                    prepare_case(request)
+                    path = request.output_folder / "semantic_manifest.json"
+                    manifest = json.loads(path.read_text(encoding="utf-8"))
+                    save_decision(request.output_folder, manifest, {
+                        "nodePath": "panel", "decision": "approved", "mode": "simple",
+                    })
+                    asset = getattr(request, folder) / "panel.png"
+                    with Image.open(asset) as original:
+                        changed = original.copy()
+                    changed.putpixel((0, 0), (21, 80, 160, 255))
+                    changed.save(asset)
+                    self.assertEqual("NEEDS_REVIEW", prepare_case(request)["status"])
+                    current = json.loads(path.read_text(encoding="utf-8"))
+                    self.assertNotEqual(manifest["reviewFingerprint"], current["reviewFingerprint"])
+                    self.assertEqual(0, current["appliedReviewDecisionCount"])
+                finally:
+                    temporary.cleanup()
+
+    def test_nonfinite_and_negative_explicit_borders_are_blocked(self):
+        for value in (float("nan"), float("inf"), -1):
+            with self.subTest(value=value):
+                temporary, request = self.make_case(True, border=value)
+                try:
+                    prepare_case(request)
+                    self.assertEqual("BLOCKED", validate_psd_package_manifest(request)["status"])
+                finally:
+                    temporary.cleanup()
+
+    def test_invalid_persisted_approval_never_mutates_layout(self):
+        for value in (float("nan"), float("inf"), -1, 11, "bad"):
+            with self.subTest(value=value):
+                temporary, request = self.make_case(False)
+                try:
+                    prepare_case(request)
+                    path = request.output_folder / "semantic_manifest.json"
+                    manifest = json.loads(path.read_text(encoding="utf-8"))
+                    (request.output_folder / "review_decisions.json").write_text(json.dumps({
+                        "reviewFingerprint": manifest["reviewFingerprint"],
+                        "decisions": {"panel": {"decision": "approved", "mode": "sliced",
+                            "spriteBorder": {"left": value}}},
+                    }), encoding="utf-8")
+                    result = prepare_case(request)
+                    self.assertEqual("BLOCKED", result["status"])
+                    prepared = json.loads(Path(result["layoutPath"]).read_text(encoding="utf-8"))
+                    self.assertNotIn("imageType", prepared["nodes"][0])
+                    self.assertEqual(0, json.loads(path.read_text(encoding="utf-8"))["appliedReviewDecisionCount"])
+                finally:
+                    temporary.cleanup()
 
 
 if __name__ == "__main__":

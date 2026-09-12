@@ -19,6 +19,8 @@
         createdGroupCount: 0,
         renamedCount: 0,
         movedCount: 0,
+        alreadyAppliedCount: 0,
+        planFingerprint: String(options.planFingerprint || ""),
         saved: false,
         errors: []
     };
@@ -75,6 +77,12 @@ function validateActions(plan, index, mode) {
     if (mode === "apply" && !plan.approved) throw new Error("Plan is not approved.");
     var refs = {};
     var actions = plan.actions || [];
+    var plannedRenames = {};
+    var plannedMoves = {};
+    for (var scan = 0; scan < actions.length; scan++) {
+        if (actions[scan].action === "rename") plannedRenames[String(actions[scan].layer_id)] = actions[scan].new_name;
+        if (actions[scan].action === "move") plannedMoves[String(actions[scan].layer_id)] = actions[scan];
+    }
     for (var i = 0; i < actions.length; i++) {
         var action = actions[i];
         if (action.action === "create_group") {
@@ -85,23 +93,52 @@ function validateActions(plan, index, mode) {
             if (action.parent_layer_id !== null && action.parent_layer_id !== undefined) {
                 validateVisibleGroup(index, action.parent_layer_id, i);
             }
-            refs[action.ref] = true;
+            var validationParent = resolveParentContainer(action, index, refs, app.activeDocument);
+            refs[action.ref] = { layer: validationParent ? findDirectGroup(validationParent, action.new_name, i) : null };
         } else if (action.action === "rename" || action.action === "move") {
             var entry = index.byId[String(action.layer_id)];
             if (!entry) throw new Error("Layer ID not found at action " + i + ".");
             if (!entry.visible) throw new Error("Hidden layer cannot be changed at action " + i + ".");
             if (action.action === "rename") {
                 validateAsciiName(action.new_name, i);
+                validateMechanicalPreconditions(entry, action, i, null, plannedRenames, plannedMoves, index, refs);
             } else {
                 var hasRef = !!action.parent_ref;
                 var hasId = action.parent_layer_id !== null && action.parent_layer_id !== undefined;
                 if (hasRef === hasId) throw new Error("Move needs exactly one parent at action " + i + ".");
                 if (hasRef && !refs[action.parent_ref]) throw new Error("Parent ref must be created earlier at action " + i + ".");
                 if (hasId) validateVisibleGroup(index, action.parent_layer_id, i);
+                var validationTarget = hasRef ? refs[action.parent_ref].layer : index.byId[String(action.parent_layer_id)].layer;
+                validateMechanicalPreconditions(entry, action, i, validationTarget, plannedRenames, plannedMoves, index, refs);
             }
         } else {
             throw new Error("Unknown action at index " + i + ".");
         }
+    }
+}
+
+function validateMechanicalPreconditions(entry, action, actionIndex, target, plannedRenames, plannedMoves, index, refs) {
+    var expectedKind = String(action.expected_layer_kind || "");
+    var actualKind = entry.layer.typename === "LayerSet" ? "group" : String(entry.layer.kind);
+    if (!expectedKind || actualKind !== expectedKind) {
+        throw new Error("Layer kind precondition failed at action " + actionIndex + ".");
+    }
+    var expectedName = String(action.expected_name || "");
+    var currentName = String(entry.layer.name || "");
+    var renameAlreadyApplied = action.action === "rename" && currentName === String(action.new_name || "");
+    var currentParent = layerParentKey(entry.layer);
+    var moveAlreadyApplied = action.action === "move" && target && currentParent === String(target.id);
+    var layerId = String(action.layer_id);
+    var renamedAsPartOfPlan = plannedRenames[layerId] && currentName === String(plannedRenames[layerId]);
+    if (!expectedName || (currentName !== expectedName && !renameAlreadyApplied && !renamedAsPartOfPlan)) {
+        throw new Error("Layer name precondition failed at action " + actionIndex + ".");
+    }
+    var companionMove = plannedMoves[layerId];
+    var companionTarget = companionMove ? resolveParentContainer(companionMove, index, refs, app.activeDocument) : null;
+    var movedAsPartOfPlan = companionTarget && companionTarget.id !== undefined && currentParent === String(companionTarget.id);
+    if (!action.expected_parent ||
+        (currentParent !== String(action.expected_parent) && !moveAlreadyApplied && !movedAsPartOfPlan)) {
+        throw new Error("Layer parent precondition failed at action " + actionIndex + ".");
     }
 }
 
@@ -120,27 +157,66 @@ function applyActions(actions, document, initialIndex, refs, result) {
     for (var i = 0; i < actions.length; i++) {
         var action = actions[i];
         if (action.action === "create_group") {
-            var group;
-            if (action.parent_ref) {
-                group = refs[action.parent_ref].layerSets.add();
-            } else if (action.parent_layer_id !== null && action.parent_layer_id !== undefined) {
-                group = initialIndex.byId[String(action.parent_layer_id)].layer.layerSets.add();
+            var parent = resolveParentContainer(action, initialIndex, refs, document);
+            var group = findDirectGroup(parent, action.new_name, i);
+            if (group) {
+                result.alreadyAppliedCount++;
             } else {
-                group = document.layerSets.add();
+                group = parent.layerSets.add();
+                group.name = action.new_name;
+                result.createdGroupCount++;
             }
-            group.name = action.new_name;
             refs[action.ref] = group;
-            result.createdGroupCount++;
         } else if (action.action === "rename") {
-            initialIndex.byId[String(action.layer_id)].layer.name = action.new_name;
-            result.renamedCount++;
+            var renameLayer = initialIndex.byId[String(action.layer_id)].layer;
+            if (String(renameLayer.name) === String(action.new_name)) {
+                result.alreadyAppliedCount++;
+            } else {
+                renameLayer.name = action.new_name;
+                result.renamedCount++;
+            }
         } else if (action.action === "move") {
             var target = action.parent_ref
                 ? refs[action.parent_ref]
                 : initialIndex.byId[String(action.parent_layer_id)].layer;
-            moveLayerInsideGroup(initialIndex.byId[String(action.layer_id)].layer, target, document);
-            result.movedCount++;
+            var movingLayer = initialIndex.byId[String(action.layer_id)].layer;
+            if (layerParentKey(movingLayer) === String(target.id)) {
+                result.alreadyAppliedCount++;
+            } else {
+                moveLayerInsideGroup(movingLayer, target, document);
+                result.movedCount++;
+            }
         }
+    }
+}
+
+function resolveParentContainer(action, index, refs, document) {
+    if (action.parent_ref) {
+        var ref = refs[action.parent_ref];
+        return ref && ref.layer ? ref.layer : ref;
+    }
+    if (action.parent_layer_id !== null && action.parent_layer_id !== undefined) {
+        return index.byId[String(action.parent_layer_id)].layer;
+    }
+    return document;
+}
+
+function findDirectGroup(container, name, actionIndex) {
+    if (!container || !container.layerSets) return null;
+    var match = null;
+    for (var i = 0; i < container.layerSets.length; i++) {
+        if (String(container.layerSets[i].name) !== String(name)) continue;
+        if (match) throw new Error("Multiple matching groups at action " + actionIndex + ".");
+        match = container.layerSets[i];
+    }
+    return match;
+}
+
+function layerParentKey(layer) {
+    try {
+        return layer.parent && layer.parent.typename === "LayerSet" ? String(layer.parent.id) : "ROOT";
+    } catch (error) {
+        return "ROOT";
     }
 }
 
@@ -161,19 +237,19 @@ function moveLayerInsideGroup(layer, target, document) {
 
 function buildLayerIndex(container) {
     var result = { byId: {}, ids: {}, count: 0 };
-    collectLayerIndex(container, true, result);
+    collectLayerIndex(container, true, result, null);
     return result;
 }
 
-function collectLayerIndex(container, parentVisible, result) {
+function collectLayerIndex(container, parentVisible, result, parentId) {
     for (var i = 0; i < container.layers.length; i++) {
         var layer = container.layers[i];
         var visible = parentVisible && layerVisible(layer);
         var id = String(layer.id);
-        result.byId[id] = { layer: layer, visible: visible };
+        result.byId[id] = { layer: layer, visible: visible, parentId: parentId };
         result.ids[id] = true;
         result.count++;
-        if (layer.typename === "LayerSet") collectLayerIndex(layer, visible, result);
+        if (layer.typename === "LayerSet") collectLayerIndex(layer, visible, result, layer.id);
     }
 }
 

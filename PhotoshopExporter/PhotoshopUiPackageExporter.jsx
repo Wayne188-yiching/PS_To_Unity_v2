@@ -58,6 +58,7 @@ var KNOWN_BRACKET_TAG_PATTERNS = [
             "詳細報告：\n" + result.reportFile.fsName;
         if (automated) {
             $.global.PS_TO_UNITY_V2_AUTOMATION_RESULT = {
+                runId: String(options.automationRunId || ""),
                 imageCount: result.imageCount,
                 textCount: result.textCount,
                 groupCount: result.groupCount,
@@ -68,7 +69,10 @@ var KNOWN_BRACKET_TAG_PATTERNS = [
         }
     } catch (e) {
         if (automated) {
-            $.global.PS_TO_UNITY_V2_AUTOMATION_RESULT = { error: e.message };
+            $.global.PS_TO_UNITY_V2_AUTOMATION_RESULT = {
+                runId: String(options.automationRunId || ""),
+                error: e.message
+            };
         } else {
             alert("UI Package 匯出失敗。\n\n錯誤：" + e.message);
         }

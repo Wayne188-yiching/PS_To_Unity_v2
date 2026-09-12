@@ -35,10 +35,15 @@ class PipelineRequest(BaseModel):
 
 class Issue(BaseModel):
     code: str
-    owner: Literal["PSD", "UNITY", "QA", "OUTSOURCE", "HUMAN"]
+    owner: Literal["PSD", "UNITY", "PIPELINE_VALIDATOR", "OUTSOURCE", "HUMAN"]
     severity: Literal["info", "warning", "error"]
     message: str
     node_path: str | None = None
+    phase: str | None = None
+    node: str | None = None
+    evidence: list[str] = Field(default_factory=list)
+    suggested_action: str | None = None
+    safe_to_auto_fix: bool = False
     retryable: bool = False
 
 
@@ -58,6 +63,9 @@ class PsdStructureAction(BaseModel):
     parent_layer_id: int | None = None
     new_name: str | None = None
     reason: str
+    expected_name: str | None = None
+    expected_parent: str | None = None
+    expected_layer_kind: str | None = None
 
 
 class PsdStructurePlan(BaseModel):
@@ -77,43 +85,8 @@ class PsdAgentDecision(AgentDecision):
 class PipelineDecision(BaseModel):
     status: Status
     summary: str
-    responsible_agent: Literal["PSD", "UNITY", "QA", "HUMAN", "NONE"]
+    responsible_agent: Literal["PSD", "UNITY", "PIPELINE_VALIDATOR", "HUMAN", "NONE"]
     retries_used: int = 0
     issues: list[Issue] = Field(default_factory=list)
     evidence: list[str] = Field(default_factory=list)
     next_action: str
-
-
-class OutsourcingRequest(BaseModel):
-    case_id: str
-    project_name: str = "DemoGame"
-    task_title: str
-    workflow: Literal["brief", "qc"] = "brief"
-    requirement_text: str = ""
-    spec_paths: list[Path] = Field(default_factory=list)
-    qc_evidence_paths: list[Path] = Field(default_factory=list)
-    user_context: list[str] = Field(default_factory=list)
-    confirmed_decisions: list[str] = Field(default_factory=list)
-    api_transmission_approved: bool = False
-    user_approved_output: bool = False
-    output_folder: Path
-
-
-class OutsourcingQcFinding(BaseModel):
-    category: Literal["must_fix", "recommended", "acceptable_difference", "discuss_with_user"]
-    area: Literal["requirements", "visual", "layout", "motion", "unity", "delivery"]
-    finding: str
-    evidence: str
-    requested_action: str
-
-
-class OutsourcingAgentDecision(AgentDecision):
-    workflow: Literal["brief", "qc"]
-    requirements_summary: list[str] = Field(default_factory=list)
-    assumptions: list[str] = Field(default_factory=list)
-    questions_for_user: list[str] = Field(default_factory=list)
-    package_document: str = ""
-    qc_findings: list[OutsourcingQcFinding] = Field(default_factory=list)
-    vendor_feedback_draft: str = ""
-    user_discussion_required: bool = True
-    ready_for_vendor: bool = False

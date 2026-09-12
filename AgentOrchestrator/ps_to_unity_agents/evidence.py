@@ -10,6 +10,7 @@ from typing import Any, Iterable
 
 from PIL import Image
 
+from .fingerprints import canonical_json_sha256, sha256_file
 from .models import PipelineRequest, Status
 
 
@@ -32,6 +33,107 @@ def _walk_nodes(nodes: Iterable[dict[str, Any]], parent: str = ""):
         path = f"{parent}/{name}" if parent else name
         yield node, path
         yield from _walk_nodes(node.get("children") or [], path)
+
+
+def _review_fingerprint(case_id: str, layout: dict[str, Any], entries: list[dict[str, Any]]) -> str:
+    return canonical_json_sha256({"caseId": case_id, "layout": layout, "entries": entries})
+
+
+def _load_matching_review_decisions(output_folder: Path, review_fingerprint: str) -> dict[str, Any]:
+    path = output_folder / "review_decisions.json"
+    if not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (json.JSONDecodeError, UnicodeError):
+        return {}
+    if not isinstance(payload, dict) or payload.get("reviewFingerprint") != review_fingerprint:
+        return {}
+    decisions = payload.get("decisions")
+    return decisions if isinstance(decisions, dict) else {}
+
+
+def validate_sprite_border(raw_border: Any, size: dict[str, Any]) -> dict[str, float]:
+    if not isinstance(raw_border, dict):
+        raise ValueError("Sprite borders must be an object.")
+    border = {}
+    for side in ("left", "top", "right", "bottom"):
+        try:
+            value = float(raw_border.get(side, 0))
+        except (TypeError, ValueError, OverflowError) as error:
+            raise ValueError("Sprite borders must be finite numbers.") from error
+        if not math.isfinite(value) or value < 0:
+            raise ValueError("Sprite borders must be finite and non-negative.")
+        border[side] = value
+    if border["left"] + border["right"] > size["width"]:
+        raise ValueError("Left and right borders exceed the asset width.")
+    if border["top"] + border["bottom"] > size["height"]:
+        raise ValueError("Top and bottom borders exceed the asset height.")
+    return border
+
+
+def _apply_review_decisions(
+    entries: list[dict[str, Any]],
+    nodes_by_path: dict[str, dict[str, Any]],
+    issues: list[dict[str, Any]],
+    decisions: dict[str, Any],
+) -> int:
+    applied = 0
+    resolved_paths: set[str] = set()
+    for entry in entries:
+        node_path = entry["nodePath"]
+        decision = decisions.get(node_path) or {}
+        if not isinstance(decision, dict) or decision.get("decision") != "approved":
+            continue
+        mode = decision.get("mode")
+        node = nodes_by_path[node_path]
+        if mode == "simple":
+            node["imageType"] = "simple"
+            for key in ("spriteBorderLeft", "spriteBorderTop", "spriteBorderRight", "spriteBorderBottom"):
+                node[key] = 0
+            entry["renderMode"] = "simple"
+            entry["spriteBorder"] = {"left": 0, "top": 0, "right": 0, "bottom": 0}
+        elif mode == "sliced":
+            try:
+                border = validate_sprite_border(decision.get("spriteBorder", {}), entry["assetPixelSize"])
+            except ValueError as error:
+                issues.append({
+                    "code": "INVALID_REVIEW_SPRITE_BORDER", "owner": "HUMAN",
+                    "severity": "error", "nodePath": node_path, "message": str(error),
+                })
+                continue
+            node["imageType"] = "sliced"
+            node["spriteBorderLeft"] = float(border.get("left") or 0)
+            node["spriteBorderTop"] = float(border.get("top") or 0)
+            node["spriteBorderRight"] = float(border.get("right") or 0)
+            node["spriteBorderBottom"] = float(border.get("bottom") or 0)
+            entry["renderMode"] = "sliced"
+            entry["spriteBorder"] = {
+                side: float(border.get(side) or 0) for side in ("left", "top", "right", "bottom")
+            }
+        else:
+            issues.append({
+                "code": "REVIEW_DECISION_REQUIRES_STRUCTURE_PLAN",
+                "owner": "PSD",
+                "severity": "warning",
+                "nodePath": node_path,
+                "message": f"Approved {mode} intent requires an explicit PSD structure plan.",
+            })
+            continue
+        entry["status"] = "PASS"
+        entry["confidence"] = "human_approved"
+        entry["reviewDecision"] = decision
+        resolved_paths.add(node_path)
+        applied += 1
+    if resolved_paths:
+        issues[:] = [
+            issue for issue in issues
+            if not (
+                issue.get("code") == "RENDER_INTENT_REVIEW_REQUIRED"
+                and issue.get("nodePath") in resolved_paths
+            )
+        ]
+    return applied
 
 
 def _size(path: Path) -> tuple[int, int]:
@@ -127,9 +229,11 @@ def prepare_case(request: PipelineRequest) -> dict[str, Any]:
 
     entries: list[dict[str, Any]] = []
     issues: list[dict[str, Any]] = []
+    nodes_by_path: dict[str, dict[str, Any]] = {}
     for node, node_path in _walk_nodes(prepared_layout.get("nodes") or []):
         if str(node.get("type", "")).casefold() != "image":
             continue
+        nodes_by_path[node_path] = node
         original_image_path = str(node.get("imagePath") or "")
         stem = Path(original_image_path).stem.casefold()
         node_stem = Path(str(node.get("name") or "")).stem.casefold()
@@ -196,6 +300,8 @@ def prepare_case(request: PipelineRequest) -> dict[str, Any]:
             "nodePath": node_path,
             "assetPath": destination_name,
             "assetSource": "artist" if artist_asset else "exporter_fallback",
+            "assetSha256": sha256_file(destination),
+            "referenceSha256": sha256_file(exporter_asset) if exporter_asset else None,
             "assetPixelSize": {"width": asset_width, "height": asset_height},
             "psLayoutTargetSize": {"width": target_width, "height": target_height},
             "expectedUnityRectSize": {"width": target_width, "height": target_height},
@@ -211,11 +317,17 @@ def prepare_case(request: PipelineRequest) -> dict[str, Any]:
             "proposal": proposal,
         })
 
+    review_fingerprint = _review_fingerprint(request.case_id, prepared_layout, entries)
+    review_decisions = _load_matching_review_decisions(request.output_folder, review_fingerprint)
+    applied_review_decisions = _apply_review_decisions(entries, nodes_by_path, issues, review_decisions)
+
     layout_output = package_folder / "layout.json"
     layout_output.write_text(json.dumps(prepared_layout, ensure_ascii=False, indent=2), encoding="utf-8")
     manifest = {
         "schemaVersion": "1.0",
         "caseId": request.case_id,
+        "reviewFingerprint": review_fingerprint,
+        "appliedReviewDecisionCount": applied_review_decisions,
         "privacy": "Images remain local; only structured evidence may be sent to the model.",
         "layoutPath": str(layout_output),
         "assetFolder": str(asset_folder),
@@ -258,7 +370,7 @@ def summarize_manifest(manifest: dict[str, Any], manifest_path: Path) -> dict[st
     }
 
 
-def qa_manifest(request: PipelineRequest) -> dict[str, Any]:
+def validate_psd_package_manifest(request: PipelineRequest) -> dict[str, Any]:
     manifest_path = request.output_folder / "semantic_manifest.json"
     if not manifest_path.is_file():
         return {"status": Status.BLOCKED.value, "issues": [{"code": "MANIFEST_MISSING", "owner": "PSD"}]}
@@ -269,15 +381,21 @@ def qa_manifest(request: PipelineRequest) -> dict[str, Any]:
             continue
         size = entry["assetPixelSize"]
         border = entry["spriteBorder"]
-        if border["left"] + border["right"] > size["width"] or border["top"] + border["bottom"] > size["height"]:
+        try:
+            validate_sprite_border(border, size)
+        except ValueError as error:
             issues.append({
-                "code": "SPRITE_BORDER_EXCEEDS_ASSET",
+                "code": "SPRITE_BORDER_EXCEEDS_ASSET" if "exceed" in str(error) else "INVALID_SPRITE_BORDER",
                 "owner": "PSD",
                 "severity": "error",
                 "nodePath": entry["nodePath"],
-                "message": "9-slice border exceeds the original asset pixels.",
+                "message": str(error),
             })
     blocked = any(issue.get("severity") == "error" for issue in issues)
     review = any(entry.get("status") == "NEEDS_REVIEW" for entry in manifest.get("entries") or [])
     status = Status.BLOCKED if blocked else Status.NEEDS_REVIEW if review else Status.PASS
     return {"status": status.value, "issues": issues, "manifestPath": str(manifest_path)}
+
+
+# Compatibility alias for older callers. New pipeline code uses the role-neutral name.
+qa_manifest = validate_psd_package_manifest

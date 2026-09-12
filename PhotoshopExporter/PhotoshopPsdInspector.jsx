@@ -16,6 +16,13 @@
             if (!inputFile.exists) {
                 throw new Error("PSD not found: " + inputFile.fsName);
             }
+            for (var openIndex = 0; openIndex < app.documents.length; openIndex++) {
+                var openPath = "";
+                try { openPath = app.documents[openIndex].fullName.fsName; } catch (unsavedDocument) {}
+                if (String(openPath).toLowerCase() === String(inputFile.fsName).toLowerCase()) {
+                    throw new Error("Close the target PSD before inspection so unsaved edits remain untouched.");
+                }
+            }
             document = app.open(inputFile);
             openedByInspector = true;
         } else if (app.documents.length > 0) {
@@ -25,6 +32,8 @@
         }
 
         var payload = inspectDocument(document);
+        payload.runId = String(options.runId || "");
+        payload.sourceFingerprint = String(options.sourceFingerprint || "");
         var outputFile = new File(options.outputFile);
         if (!outputFile.parent.exists && !outputFile.parent.create()) {
             throw new Error("Could not create output folder: " + outputFile.parent.fsName);
@@ -38,13 +47,17 @@
         outputFile.close();
 
         $.global.PS_TO_UNITY_V2_INSPECT_RESULT = {
+            runId: String(options.runId || ""),
             outputFile: outputFile.fsName,
             layerCount: payload.summary.layerCount,
             groupCount: payload.summary.groupCount,
             textCount: payload.summary.textCount
         };
     } catch (error) {
-        $.global.PS_TO_UNITY_V2_INSPECT_RESULT = { error: error.message };
+        $.global.PS_TO_UNITY_V2_INSPECT_RESULT = {
+            runId: String(options.runId || ""),
+            error: error.message
+        };
     } finally {
         if (openedByInspector && document) {
             try {

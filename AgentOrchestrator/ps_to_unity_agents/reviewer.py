@@ -10,6 +10,7 @@ from typing import Any
 from urllib.parse import parse_qs, quote, urlparse
 
 from .models import PipelineRequest
+from .evidence import validate_sprite_border
 
 
 DECISIONS_FILE = "review_decisions.json"
@@ -32,6 +33,10 @@ def load_decisions(output_folder: Path) -> dict[str, Any]:
 
 
 def save_decision(output_folder: Path, manifest: dict[str, Any], payload: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise ValueError("Decision payload must be an object.")
+    if "reviewFingerprint" in payload and payload["reviewFingerprint"] != manifest.get("reviewFingerprint"):
+        raise ValueError("Review evidence changed; reload the review page.")
     node_path = str(payload.get("nodePath") or "")
     entries = {entry["nodePath"]: entry for entry in manifest.get("entries") or []}
     if node_path not in entries:
@@ -46,28 +51,18 @@ def save_decision(output_folder: Path, manifest: dict[str, Any], payload: dict[s
     if decision == "approved" and not mode:
         raise ValueError("Approved items require a render mode.")
 
-    raw_border = payload.get("spriteBorder") or {}
-    border = {}
-    for side in ("left", "top", "right", "bottom"):
-        try:
-            value = float(raw_border.get(side) or 0)
-        except (TypeError, ValueError) as error:
-            raise ValueError("Sprite borders must be numbers.") from error
-        if value < 0:
-            raise ValueError("Sprite borders cannot be negative.")
-        border[side] = value
-
     entry = entries[node_path]
-    size = entry["assetPixelSize"]
-    if decision == "approved" and mode == "sliced":
-        if border["left"] + border["right"] > size["width"]:
-            raise ValueError("Left and right borders exceed the asset width.")
-        if border["top"] + border["bottom"] > size["height"]:
-            raise ValueError("Top and bottom borders exceed the asset height.")
+    border = validate_sprite_border(payload.get("spriteBorder", {}), entry["assetPixelSize"])
 
     result = load_decisions(output_folder)
+    review_fingerprint = str(manifest.get("reviewFingerprint") or "")
+    if not review_fingerprint:
+        raise ValueError("Manifest is missing reviewFingerprint; regenerate evidence before review.")
+    if result.get("reviewFingerprint") != review_fingerprint:
+        result = {"schemaVersion": "1.0", "decisions": {}}
     result["schemaVersion"] = "1.0"
     result["caseId"] = manifest.get("caseId")
+    result["reviewFingerprint"] = review_fingerprint
     result["updatedAt"] = datetime.now(timezone.utc).isoformat()
     result.setdefault("decisions", {})[node_path] = {
         "decision": decision,
@@ -90,7 +85,10 @@ def _proposal_mode(entry: dict[str, Any]) -> str:
 
 def render_page(manifest: dict[str, Any], decisions: dict[str, Any]) -> str:
     review_entries = [entry for entry in manifest.get("entries") or [] if entry.get("status") == "NEEDS_REVIEW"]
-    saved = decisions.get("decisions") or {}
+    saved = (decisions.get("decisions") or {}) if (
+        manifest.get("reviewFingerprint")
+        and decisions.get("reviewFingerprint") == manifest["reviewFingerprint"]
+    ) else {}
     cards = []
     for index, entry in enumerate(review_entries, 1):
         node_path = str(entry["nodePath"])
@@ -150,6 +148,7 @@ def render_page(manifest: dict[str, Any], decisions: dict[str, Any]) -> str:
         </article>""")
 
     safe_case_id = html.escape(str(manifest.get("caseId") or ""))
+    safe_fingerprint = json.dumps(manifest.get("reviewFingerprint")).replace("<", "\\u003c")
     return f"""<!doctype html>
 <html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PS → Unity 語意複查</title>
@@ -171,6 +170,7 @@ main{{max-width:1180px;margin:auto;padding:24px}}.card{{background:var(--panel);
 <main>{''.join(cards) if cards else '<p>目前沒有待複查項目。</p>'}</main>
 <script>
 const cards=[...document.querySelectorAll('.card')];
+const reviewFingerprint={safe_fingerprint};
 const labels={{approved:'已同意',rejected:'不同意',unsure:'不確定'}};
 function updateProgress(){{
   const saved=cards.filter(card=>card.dataset.saved).length;
@@ -192,7 +192,7 @@ async function save(card,decision){{
   if(decision==='approved'&&!mode){{message.textContent='請先選擇實作方式。';return}}
   const spriteBorder={{}}; card.querySelectorAll('.border').forEach(input=>spriteBorder[input.dataset.side]=Number(input.value)||0);
   message.textContent='儲存中…';
-  const response=await fetch('/api/decision',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{nodePath:card.dataset.node,decision,mode,spriteBorder,note:card.querySelector('.note').value}})}});
+  const response=await fetch('/api/decision',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{reviewFingerprint,nodePath:card.dataset.node,decision,mode,spriteBorder,note:card.querySelector('.note').value}})}});
   const result=await response.json();
   if(!response.ok){{message.textContent=result.error||'儲存失敗';return}}
   card.dataset.saved=decision; message.textContent='已儲存'; updateProgress();
@@ -232,6 +232,8 @@ def serve_review(request: PipelineRequest, port: int = 8765) -> None:
                 if length <= 0 or length > 64 * 1024:
                     raise ValueError("Invalid request size.")
                 payload = json.loads(self.rfile.read(length))
+                if load_manifest(request).get("reviewFingerprint") != manifest.get("reviewFingerprint"):
+                    raise ValueError("Review evidence changed; restart the review server.")
                 saved = save_decision(request.output_folder, manifest, payload)
                 self._json(HTTPStatus.OK, {"saved": saved})
             except (json.JSONDecodeError, ValueError) as error:

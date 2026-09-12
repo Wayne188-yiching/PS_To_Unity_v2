@@ -18,7 +18,6 @@ AgentOrchestrator/**/__pycache__/
 AgentOrchestrator/**/*.pyc
 AgentOrchestrator/config/outsourcing_knowledge.json
 AgentOrchestrator/config/outsourcing_projects.json
-AgentOrchestrator/cases/examples/psd/
 AgentOrchestrator/data/psd_case_learning/
 AgentOrchestrator/data/psd_structure_learning.json
 AgentOrchestrator/data/unity_layout_audit.json

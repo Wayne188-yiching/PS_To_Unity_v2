@@ -12,7 +12,8 @@ from xml.etree import ElementTree
 
 from agents import Agent, function_tool
 
-from ps_to_unity_agents.models import OutsourcingAgentDecision, OutsourcingRequest, Status
+from agent_roles.ui_outsourcing_models import OutsourcingAgentDecision, OutsourcingRequest
+from ps_to_unity_agents.models import Status
 
 
 MODEL = "gpt-5.6-terra"

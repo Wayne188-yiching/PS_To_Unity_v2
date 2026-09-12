@@ -8,8 +8,10 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from agent_roles.pipeline_agents import CaseTools
+from .fingerprints import inspection_fingerprint, plan_fingerprint, sha256_file
 from .models import PipelineRequest, PsdAgentDecision, PsdStructurePlan
-from .psd_structure_plan import validate_structure_plan
+from .psd_structure_plan import bind_structure_plan_preconditions, load_inspection, validate_structure_plan
+from .tool_failures import classify_tool_failure
 
 
 NON_ASCII = re.compile(r"[^\x00-\x7f]")
@@ -110,6 +112,35 @@ class PsdAgentController:
             return {"schemaVersion": "1.0", "caseId": self.request.case_id, "stage": "NEW"}
         return json.loads(self.state_path.read_text(encoding="utf-8-sig"))
 
+    def _current_fingerprints(self, plan: PsdStructurePlan | None = None) -> dict[str, str]:
+        fingerprints = {"psdFingerprint": sha256_file(self.request.psd_path)}
+        if self.inspection_path.is_file():
+            fingerprints["inspectionFingerprint"] = inspection_fingerprint(load_inspection(self.inspection_path))
+        if plan is not None:
+            fingerprints["planFingerprint"] = plan_fingerprint(plan)
+        return fingerprints
+
+    def _validate_approval_binding(self, state: dict[str, Any]) -> dict[str, Any] | None:
+        if not self.plan_path.is_file() or not self.inspection_path.is_file():
+            return self._result("BLOCKED", "APPROVAL_INVALIDATED", "Approved PSD evidence is missing.")
+        try:
+            plan = PsdStructurePlan.model_validate_json(self.plan_path.read_text(encoding="utf-8-sig"))
+            current = self._current_fingerprints(plan)
+        except (ValueError, OSError) as error:
+            return self._result("NEEDS_REVIEW", "APPROVAL_INVALIDATED", "Approved evidence is unreadable.", error=str(error))
+        mismatched = [key for key in ("planFingerprint", "inspectionFingerprint") if state.get(key) != current.get(key)]
+        if state.get("stage") == "PLAN_APPROVED" and state.get("approvedPsdFingerprint") != current["psdFingerprint"]:
+            mismatched.append("psdFingerprint")
+        if mismatched:
+            return self._result(
+                "NEEDS_REVIEW",
+                "APPROVAL_INVALIDATED",
+                "The approved plan or inspection evidence changed after review.",
+                changed=mismatched,
+                nextAction="Generate and approve a new plan from fresh PSD evidence.",
+            )
+        return None
+
     def _result(self, status: str, stage: str, summary: str, **extra: Any) -> dict[str, Any]:
         payload = {"status": status, "stage": stage, "summary": summary, **extra}
         self._write_json(self.result_path, payload)
@@ -133,16 +164,18 @@ class PsdAgentController:
                 nextAction=decision.next_action,
             )
 
-        plan = decision.structure_plan.model_copy(update={"approved": False})
+        inspection = load_inspection(self.inspection_path)
+        plan = bind_structure_plan_preconditions(decision.structure_plan, inspection)
         self._write_json(self.plan_path, plan.model_dump(mode="json"))
         validation = validate_structure_plan(self.plan_path, self.inspection_path)
         self._write_json(self.request.output_folder / "psd_structure_plan_validation.json", validation)
         stage = "PLAN_BLOCKED" if validation["status"] == "BLOCKED" else "AWAITING_PLAN_APPROVAL"
         state = {
-            "schemaVersion": "1.0",
+            "schemaVersion": "1.1",
             "caseId": self.request.case_id,
             "stage": stage,
             "planApproved": False,
+            **self._current_fingerprints(plan),
         }
         self._write_json(self.state_path, state)
         status = "BLOCKED" if stage == "PLAN_BLOCKED" else "NEEDS_REVIEW"
@@ -159,45 +192,77 @@ class PsdAgentController:
     def approve_existing_plan(self) -> dict[str, Any]:
         inspection = CaseTools(self.request).ensure_inspection()
         if inspection["status"] != "PASS":
-            return self._result("BLOCKED", "INSPECTION_BLOCKED", "Could not refresh PSD evidence before approval.", inspection=inspection)
-        validation = validate_structure_plan(self.plan_path, self.inspection_path)
-        if validation["status"] == "BLOCKED":
-            return self._result("BLOCKED", "PLAN_BLOCKED", "The plan no longer matches the PSD.", validation=validation)
+            status = inspection["status"] if inspection["status"] == "FAIL_RETRYABLE" else "BLOCKED"
+            return self._result(
+                status,
+                "INSPECTION_RETRYABLE" if status == "FAIL_RETRYABLE" else "INSPECTION_BLOCKED",
+                "Could not refresh PSD evidence before approval.",
+                inspection=inspection,
+            )
+        state = self._load_state()
         if not self.plan_path.is_file():
             return self._result("BLOCKED", "PLAN_MISSING", "No structure plan exists to approve.")
         plan = PsdStructurePlan.model_validate_json(self.plan_path.read_text(encoding="utf-8-sig"))
+        current = self._current_fingerprints(plan)
+        changed = [
+            key for key in ("psdFingerprint", "inspectionFingerprint", "planFingerprint")
+            if state.get(key) != current.get(key)
+        ]
+        if changed:
+            return self._result(
+                "NEEDS_REVIEW",
+                "APPROVAL_INVALIDATED",
+                "PSD, inspection evidence, or plan changed after planning.",
+                changed=changed,
+                nextAction="Generate a new plan from fresh PSD evidence.",
+            )
+        validation = validate_structure_plan(self.plan_path, self.inspection_path)
+        if validation["status"] == "BLOCKED":
+            return self._result("BLOCKED", "PLAN_BLOCKED", "The plan no longer matches the PSD.", validation=validation)
         approved = plan.model_copy(update={"approved": True})
         self._write_json(self.plan_path, approved.model_dump(mode="json"))
         validation = validate_structure_plan(self.plan_path, self.inspection_path)
         if not validation.get("readyToApply"):
             return self._result("BLOCKED", "PLAN_BLOCKED", "Approved plan failed the deterministic gate.", validation=validation)
-        state = self._load_state()
-        state.update({"stage": "PLAN_APPROVED", "planApproved": True})
+        state.update({
+            "stage": "PLAN_APPROVED",
+            "planApproved": True,
+            "planFingerprint": plan_fingerprint(approved),
+            "approvedPsdFingerprint": current["psdFingerprint"],
+        })
         self._write_json(self.state_path, state)
-        return {"status": "PASS", "stage": "PLAN_APPROVED", "validation": validation}
+        self._write_json(self.request.output_folder / "psd_structure_plan_validation.json", validation)
+        return self._result("PASS", "PLAN_APPROVED", "The reviewed plan is approved for application.", validation=validation)
 
     def _apply_structure(self) -> dict[str, Any]:
         report = self.request.output_folder / "photoshop_structure_report.json"
         script = Path(__file__).resolve().parents[2] / "Tools" / "Invoke-PhotoshopStructurePlan.ps1"
-        completed = self.command_runner(
-            [
-                "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script),
-                "-PsdPath", str(self.request.psd_path),
-                "-PlanFile", str(self.plan_path),
-                "-InspectionFile", str(self.inspection_path),
-                "-ReportFile", str(report),
-                "-Mode", "Apply",
-            ],
-            cwd=Path(__file__).resolve().parents[2],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=900,
-            check=False,
-        )
+        try:
+            completed = self.command_runner(
+                [
+                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script),
+                    "-PsdPath", str(self.request.psd_path),
+                    "-PlanFile", str(self.plan_path),
+                    "-InspectionFile", str(self.inspection_path),
+                    "-ReportFile", str(report),
+                    "-Mode", "Apply",
+                    "-PlanFingerprint", plan_fingerprint(
+                        PsdStructurePlan.model_validate_json(self.plan_path.read_text(encoding="utf-8-sig"))
+                    ),
+                ],
+                cwd=Path(__file__).resolve().parents[2],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=900,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            return {"status": "FAIL_RETRYABLE", "error": f"Photoshop structure apply timed out: {error}"}
         if completed.returncode != 0:
-            return {"status": "BLOCKED", "error": (completed.stderr or completed.stdout).strip()}
+            message = (completed.stderr or completed.stdout).strip()
+            return {"status": classify_tool_failure(message), "error": message}
         try:
             return json.loads(completed.stdout.strip().splitlines()[-1])
         except (json.JSONDecodeError, IndexError) as error:
@@ -212,8 +277,9 @@ class PsdAgentController:
         inspection = tools.ensure_inspection()
         export = tools.ensure_export()
         if inspection["status"] != "PASS" or export["status"] != "PASS":
+            tool_statuses = {inspection["status"], export["status"]}
             return {
-                "status": "BLOCKED",
+                "status": "FAIL_RETRYABLE" if "FAIL_RETRYABLE" in tool_statuses else "BLOCKED",
                 "inspection": inspection,
                 "export": export,
                 "issues": [{
@@ -239,42 +305,69 @@ class PsdAgentController:
     def approve_apply_and_export(self) -> dict[str, Any]:
         state = self._load_state()
         if state.get("stage") == "PACKAGE_READY" and self.result_path.is_file():
-            current_mtime = self.request.psd_path.stat().st_mtime_ns
-            if state.get("psdMtimeNs") == current_mtime:
-                return json.loads(self.result_path.read_text(encoding="utf-8-sig"))
+            # PSD bytes alone cannot prove exported layout/assets remain intact.
+            # Always revalidate the package; the approved structure stays applied.
             state["stage"] = "STRUCTURE_APPLIED"
             self._write_json(self.state_path, state)
 
         if state.get("stage") == "PLAN_NOT_REQUIRED":
             state.update({"stage": "STRUCTURE_APPLIED", "structureApplied": False})
             self._write_json(self.state_path, state)
-        elif state.get("stage") not in {"PLAN_APPROVED", "STRUCTURE_APPLIED"}:
+        elif state.get("stage") not in {"PLAN_APPROVED", "APPLYING", "STRUCTURE_APPLIED"}:
             approval = self.approve_existing_plan()
             if approval["status"] != "PASS":
                 return approval
             state = self._load_state()
 
-        if state.get("stage") != "STRUCTURE_APPLIED":
+        if state.get("stage") in {"PLAN_APPROVED", "APPLYING"}:
+            invalidated = self._validate_approval_binding(state)
+            if invalidated is not None:
+                return invalidated
+            state.update({"stage": "APPLYING", "applyAttempted": True})
+            self._write_json(self.state_path, state)
             applied = self._apply_structure()
             if applied.get("status") != "PASS":
-                return self._result("BLOCKED", "STRUCTURE_APPLY_BLOCKED", "Photoshop could not apply the approved plan.", apply=applied)
+                status = applied.get("status") if applied.get("status") == "FAIL_RETRYABLE" else "BLOCKED"
+                stage = "APPLYING" if status == "FAIL_RETRYABLE" else "STRUCTURE_APPLY_BLOCKED"
+                return self._result(
+                    status,
+                    stage,
+                    "Photoshop temporarily could not apply the approved plan; the APPLYING checkpoint is safe to retry."
+                    if status == "FAIL_RETRYABLE" else "Photoshop could not apply the approved plan.",
+                    apply=applied,
+                    nextAction="Retry the same approved request." if status == "FAIL_RETRYABLE" else "Review the Photoshop error.",
+                )
+            if applied.get("planFingerprint") != state.get("planFingerprint"):
+                return self._result(
+                    "BLOCKED",
+                    "STRUCTURE_APPLY_EVIDENCE_MISMATCH",
+                    "Photoshop apply report does not match the approved plan.",
+                    apply=applied,
+                )
             state.update({
                 "stage": "STRUCTURE_APPLIED",
                 "structureApplied": True,
                 "applyReport": applied,
-                "psdMtimeNs": self.request.psd_path.stat().st_mtime_ns,
+                "psdFingerprint": sha256_file(self.request.psd_path),
             })
             self._write_json(self.state_path, state)
 
         finalized = self._finalize_package()
-        if finalized["status"] == "BLOCKED":
+        if finalized["status"] in {"BLOCKED", "FAIL_RETRYABLE"}:
             details = {key: value for key, value in finalized.items() if key != "status"}
-            return self._result("BLOCKED", "PACKAGE_EXPORT_BLOCKED", "Structure was applied, but package export or validation failed.", **details)
+            retryable = finalized["status"] == "FAIL_RETRYABLE"
+            return self._result(
+                finalized["status"],
+                "PACKAGE_EXPORT_RETRYABLE" if retryable else "PACKAGE_EXPORT_BLOCKED",
+                "Structure was applied; Photoshop package export can be retried safely."
+                if retryable else "Structure was applied, but package export or validation failed.",
+                **details,
+            )
 
         state.update({
             "stage": "PACKAGE_READY",
             "packageStatus": finalized["status"],
-            "psdMtimeNs": self.request.psd_path.stat().st_mtime_ns,
+            "psdFingerprint": sha256_file(self.request.psd_path),
         })
         self._write_json(self.state_path, state)
         details = {key: value for key, value in finalized.items() if key != "status"}

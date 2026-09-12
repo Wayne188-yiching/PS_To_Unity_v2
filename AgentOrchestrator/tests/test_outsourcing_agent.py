@@ -10,12 +10,12 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
-from ps_to_unity_agents.models import (
+from agent_roles.ui_outsourcing_models import (
     OutsourcingAgentDecision,
     OutsourcingQcFinding,
     OutsourcingRequest,
-    Status,
 )
+from ps_to_unity_agents.models import Status
 from agent_roles.ui_outsourcing_producer import (
     AGENT_DISPLAY_NAME,
     OutsourcingCaseTools,
@@ -29,7 +29,7 @@ from agent_roles.ui_outsourcing_producer import (
     _read_source,
     render_qc_markdown,
 )
-from main import run_outsourcing_agent
+from outsource_main import run_outsourcing_agent
 
 
 TEST_TEMP_ROOT = Path(__file__).resolve().parents[1] / ".test_tmp"
@@ -277,9 +277,9 @@ class OutsourcingAgentTests(unittest.TestCase):
             )
             with (
                 patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False),
-                patch("main.load_local_key"),
-                patch("main.build_outsourcing_agent", return_value=object()),
-                patch("main.Runner.run", new=AsyncMock(return_value=SimpleNamespace(
+                patch("outsource_main.load_local_key"),
+                patch("outsource_main.build_outsourcing_agent", return_value=object()),
+                patch("outsource_main.Runner.run", new=AsyncMock(return_value=SimpleNamespace(
                     final_output=model_decision
                 ))),
             ):

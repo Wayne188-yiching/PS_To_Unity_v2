@@ -8,10 +8,12 @@ from pathlib import Path
 
 from agents import Agent, function_tool
 
-from ps_to_unity_agents.evidence import prepare_case, qa_manifest
-from ps_to_unity_agents.models import AgentDecision, PipelineDecision, PipelineRequest, PsdAgentDecision
+from ps_to_unity_agents.evidence import prepare_case, validate_psd_package_manifest
+from ps_to_unity_agents.fingerprints import sha256_file
+from ps_to_unity_agents.models import AgentDecision, Issue, PipelineDecision, PipelineRequest, PsdAgentDecision, Status
 from ps_to_unity_agents.psd_analysis import analyze_psd_hierarchy, analyze_psd_structure
 from ps_to_unity_agents.shared_assets import match_shared_assets
+from ps_to_unity_agents.tool_failures import classify_tool_failure
 
 
 MODEL = "gpt-5.6-terra"
@@ -57,51 +59,94 @@ class CaseTools:
     def inspection_path(self) -> Path:
         return self.request.psd_inspection_path or self.request.output_folder / "psd_inspection.json"
 
+    def _export_receipt_matches(self, receipt: dict, source_fingerprint: str) -> bool:
+        layout = self.request.layout_json_path
+        if not (receipt.get("runId") and receipt.get("status") == "PASS"
+                and receipt.get("psdSha256") == source_fingerprint and layout.is_file()):
+            return False
+        if receipt.get("layoutSha256") != sha256_file(layout):
+            return False
+        image_hashes = {path.name: sha256_file(path) for path in (layout.parent / "Images").glob("*.png")}
+        return receipt.get("imageSha256") == image_hashes
+
     def ensure_inspection(self) -> dict:
         output = self.inspection_path()
-        if output.is_file() and output.stat().st_mtime >= self.request.psd_path.stat().st_mtime:
-            return {"status": "PASS", "source": "cache"}
+        source_fingerprint = sha256_file(self.request.psd_path)
+        if output.is_file():
+            try:
+                cached = json.loads(output.read_text(encoding="utf-8-sig"))
+                if cached.get("runId") and cached.get("sourceFingerprint") == source_fingerprint:
+                    return {"status": "PASS", "source": "cache", "sourceFingerprint": source_fingerprint}
+            except (json.JSONDecodeError, UnicodeError):
+                pass
         script = WORKSPACE_ROOT / "Tools" / "Invoke-PhotoshopPsdInspect.ps1"
-        completed = subprocess.run(
-            [
-                "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script),
-                "-PsdPath", str(self.request.psd_path), "-OutputFile", str(output),
-            ],
-            cwd=WORKSPACE_ROOT,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=180,
-            check=False,
-        )
+        try:
+            completed = subprocess.run(
+                [
+                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script),
+                    "-PsdPath", str(self.request.psd_path), "-OutputFile", str(output),
+                ],
+                cwd=WORKSPACE_ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=180,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            return {"status": "FAIL_RETRYABLE", "source": "photoshop", "error": f"Inspector timed out: {error}"}
         if completed.returncode != 0:
-            return {"status": "BLOCKED", "source": "photoshop", "error": (completed.stderr or completed.stdout).strip()}
-        return {"status": "PASS", "source": "photoshop"}
+            message = (completed.stderr or completed.stdout).strip()
+            return {"status": classify_tool_failure(message), "source": "photoshop", "error": message}
+        try:
+            refreshed = json.loads(output.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError, UnicodeError) as error:
+            return {"status": "BLOCKED", "source": "photoshop", "error": f"Inspector output is invalid: {error}"}
+        if not refreshed.get("runId") or refreshed.get("sourceFingerprint") != source_fingerprint:
+            return {"status": "BLOCKED", "source": "photoshop", "error": "Inspector output does not match the source PSD fingerprint."}
+        return {"status": "PASS", "source": "photoshop", "sourceFingerprint": source_fingerprint}
 
     def ensure_export(self) -> dict:
         layout = self.request.layout_json_path
-        if layout.is_file() and layout.stat().st_mtime >= self.request.psd_path.stat().st_mtime:
-            return {"status": "PASS", "source": "cache"}
+        result_path = layout.parent / "photoshop_result.json"
+        source_fingerprint = sha256_file(self.request.psd_path)
+        if layout.is_file() and result_path.is_file():
+            try:
+                cached = json.loads(result_path.read_text(encoding="utf-8-sig"))
+                if self._export_receipt_matches(cached, source_fingerprint):
+                    return {"status": "PASS", "source": "cache", "sourceFingerprint": source_fingerprint}
+            except (json.JSONDecodeError, UnicodeError):
+                pass
         if self.request.execution_mode != "execute":
             return {"status": "BLOCKED", "source": "missing_or_stale", "error": "Photoshop export is missing or older than the PSD."}
         script = WORKSPACE_ROOT / "Tools" / "Invoke-PhotoshopUiExport.ps1"
-        completed = subprocess.run(
-            [
-                "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script),
-                "-PsdPath", str(self.request.psd_path), "-OutputFolder", str(layout.parent),
-            ],
-            cwd=WORKSPACE_ROOT,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=900,
-            check=False,
-        )
+        try:
+            completed = subprocess.run(
+                [
+                    "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script),
+                    "-PsdPath", str(self.request.psd_path), "-OutputFolder", str(layout.parent),
+                ],
+                cwd=WORKSPACE_ROOT,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=900,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            return {"status": "FAIL_RETRYABLE", "source": "photoshop", "error": f"Exporter timed out: {error}"}
         if completed.returncode != 0:
-            return {"status": "BLOCKED", "source": "photoshop", "error": (completed.stderr or completed.stdout).strip()}
-        return {"status": "PASS", "source": "photoshop"}
+            message = (completed.stderr or completed.stdout).strip()
+            return {"status": classify_tool_failure(message), "source": "photoshop", "error": message}
+        try:
+            exported = json.loads(result_path.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError, UnicodeError) as error:
+            return {"status": "BLOCKED", "source": "photoshop", "error": f"Exporter result is invalid: {error}"}
+        if not self._export_receipt_matches(exported, source_fingerprint):
+            return {"status": "BLOCKED", "source": "photoshop", "error": "Exporter result does not match the source PSD fingerprint."}
+        return {"status": "PASS", "source": "photoshop", "sourceFingerprint": source_fingerprint}
 
     def inspect_psd_for_planning(self) -> dict:
         if self.planning_evidence is not None:
@@ -109,7 +154,7 @@ class CaseTools:
         inspection = self.ensure_inspection()
         if inspection["status"] != "PASS":
             return {
-                "status": "BLOCKED",
+                "status": inspection["status"] if inspection["status"] == "FAIL_RETRYABLE" else "BLOCKED",
                 "summary": "PSD hierarchy evidence could not be refreshed.",
                 "inspection": inspection,
                 "issues": [{
@@ -151,8 +196,9 @@ class CaseTools:
         inspection = self.ensure_inspection()
         export = self.ensure_export()
         if inspection["status"] != "PASS" or export["status"] != "PASS":
+            tool_statuses = {inspection["status"], export["status"]}
             self.psd_evidence = {
-                "status": "BLOCKED",
+                "status": "FAIL_RETRYABLE" if "FAIL_RETRYABLE" in tool_statuses else "BLOCKED",
                 "summary": "PSD deterministic evidence could not be refreshed.",
                 "inspection": inspection,
                 "export": export,
@@ -272,10 +318,20 @@ def build_director(request: PipelineRequest) -> Agent:
         }, ensure_ascii=False)
 
     @function_tool
-    def run_current_qa() -> str:
-        """Run local semantic/structural QA. Size mismatches are evaluated by render semantics and never fail by themselves."""
+    def run_current_pipeline_validation() -> str:
+        """Run the PSD-package subset of validation; Unity-to-Prefab validation is not implemented yet."""
         tools.inspect()
-        return json.dumps(_model_safe_summary(qa_manifest(request)), ensure_ascii=False)
+        result = _model_safe_summary(validate_psd_package_manifest(request))
+        result["validationScope"] = "PSD_PACKAGE_ONLY"
+        if result.get("status") == "PASS":
+            result["status"] = "NEEDS_REVIEW"
+        result.setdefault("issues", []).append({
+            "code": "PIPELINE_VALIDATION_NOT_IMPLEMENTED",
+            "owner": "PIPELINE_VALIDATOR",
+            "severity": "warning",
+            "message": "Unity import and generated Prefab validation are not implemented yet.",
+        })
+        return json.dumps(result, ensure_ascii=False)
 
     @function_tool
     def inspect_project_layout_rules() -> str:
@@ -293,22 +349,24 @@ def build_director(request: PipelineRequest) -> Agent:
         tools=[validate_current_unity_gate, inspect_project_layout_rules],
         output_type=AgentDecision,
     )
-    qa_agent = Agent(
-        name="QA Agent",
+    pipeline_validator = Agent(
+        name="Pipeline Validator",
         model=MODEL,
         instructions=(
-            "Run local QA and compare PS design intent with Unity semantics. Simple, Sliced, Mask, Scroll, and LayoutGroup have "
+            "Validate only the PS_To_Unity pipeline. Do not perform outsourcing QC. Compare PS design intent with Unity semantics. "
+            "Simple, Sliced, Mask, Scroll, and LayoutGroup have "
             "different valid size relationships. Use the curated project layout rules, but never learn from holdouts. Never fail only because "
-            "dimensions differ. Unresolved visual intent must be NEEDS_REVIEW, not guessed."
+            "dimensions differ. The current deterministic tool covers PSD package validation only, so never claim full pipeline PASS. "
+            "Unresolved visual intent must be NEEDS_REVIEW, not guessed."
         ),
-        tools=[run_current_qa, inspect_project_layout_rules],
+        tools=[run_current_pipeline_validation, inspect_project_layout_rules],
         output_type=AgentDecision,
     )
     return Agent(
         name="Director Agent",
         model=MODEL,
         instructions=(
-            "You own the final workflow result. Call PSD Agent first, Unity Agent second, and QA Agent last. "
+            "You own the final workflow result. Call PSD Agent first, Unity Agent second, and Pipeline Validator last. "
             "This request is evidence-first: stop at NEEDS_REVIEW when semantic intent is not approved. "
             "Use at most one retry for a specialist and only for a retryable tool failure. Never turn a proposed border into an approved border. "
             "PASS is allowed only when every required stage passes. Return concise structured evidence and name the responsible role."
@@ -316,7 +374,40 @@ def build_director(request: PipelineRequest) -> Agent:
         tools=[
             psd_agent.as_tool(tool_name="inspect_psd_semantics", tool_description="Inspect PSD hierarchy and artist asset intent."),
             unity_agent.as_tool(tool_name="validate_unity_stage", tool_description="Validate Unity dependencies and execution gate."),
-            qa_agent.as_tool(tool_name="run_qa_stage", tool_description="Run semantic and structural QA."),
+            pipeline_validator.as_tool(
+                tool_name="run_pipeline_validation_stage",
+                tool_description="Validate available PSD package evidence and report that Unity-to-Prefab validation is not implemented yet.",
+            ),
         ],
         output_type=PipelineDecision,
     )
+
+
+def enforce_pipeline_gate(decision: PipelineDecision, request: PipelineRequest) -> PipelineDecision:
+    """A model cannot bypass execution, semantic approval, or unfinished validation gates."""
+    if decision.status != Status.PASS:
+        return decision
+    if request.execution_mode == "execute" and request.semantics_approved:
+        return decision.model_copy(update={
+            "status": Status.NEEDS_REVIEW,
+            "responsible_agent": "PIPELINE_VALIDATOR",
+            "summary": "Model PASS is unverified: full generated-Prefab validation is not implemented yet.",
+            "issues": [
+                *decision.issues,
+                Issue(
+                    code="PIPELINE_VALIDATION_NOT_IMPLEMENTED",
+                    owner="PIPELINE_VALIDATOR",
+                    severity="warning",
+                    phase="PIPELINE",
+                    message="Full PSD-to-Prefab validation must exist before the Director can return PASS.",
+                    suggested_action="Implement and run the Pipeline Validator after the Unity Agent stage.",
+                ),
+            ],
+            "next_action": "Complete Pipeline Validator implementation.",
+        })
+    return decision.model_copy(update={
+        "status": Status.NEEDS_REVIEW,
+        "responsible_agent": "HUMAN",
+        "summary": "Pipeline execution or semantic approval gate is incomplete.",
+        "next_action": "Approve semantic intent and use execute mode before generation.",
+    })

@@ -1,75 +1,72 @@
-# Agent 中心
+# PS_To_Unity_v2 Agent Orchestrator
 
-這裡集中管理 PS To Unity 的 AI 角色。Photoshop JSX 與 Unity C# 仍是實際執行工具；Agent 負責讀取證據、整理規格、提出判斷與守住人工核准流程。
+這裡只協調 PS_To_Unity pipeline。Photoshop JSX 與 Unity C# 是 deterministic Core；Agent 處理語意不確定性、規劃、工具選擇、診斷與人工核准。
 
-## 正式 Agent：UI 發包製作人
+## 目前實際完成度
 
-「UI 發包製作人」會直接讀取規格書，包括 Excel 後段工作表中的美術、會議決議與後製流程，再結合已登錄遊戲的 Unity 架構，自動完成：
+| 元件 | 狀態 | 說明 |
+|---|---|---|
+| PSDToUnity deterministic Core | 已存在 | 既有 exporter、Sprite、9-slice、TMP、ScrollRect、Mask、Atlas、Prefab 功能不由 Agent 重寫。 |
+| PSD Agent／Controller | 第一版完成，驗收強化中 | 具備 inspection、structure plan、人工核准、checkpoint、冪等套用、重新匯出及 package validation。 |
+| Evidence／Structure Plan | 已存在，持續驗證 | 已加入 PSD／inspection／plan 指紋與動作前置條件。 |
+| Pipeline Validator | 僅有 PSD package gate | 尚未比較 PSD semantic intent、IR、Unity import 與 generated Prefab；因此 Director 不得回傳全流程 PASS。 |
+| Unity Agent | 尚未開發 | 下一階段先抽出可程式呼叫的 Unity deterministic pipeline，再建立 Agent。 |
+| Director end-to-end | 僅有骨架 | 已能守住 terminal state，但閉環要等 Unity Agent 與 Pipeline Validator。 |
 
-1. 整理簡明的外包交接文件。
-2. 檢查分支、Unity 版本、專案／工項路徑、目標與共用 Prefab、共用圖片與字體。
-3. 整理 Unity 拼版、UI 對齊、頁面進場動態與交付要求。
-4. 在 QC 階段產生簡短、專業且需要先與使用者討論的回覆草稿。
+PSD Agent 的正式通過條件見 [docs/psd_agent_acceptance.md](docs/psd_agent_acceptance.md)。
 
-最簡單的使用方式是直接點兩下：
-
-`../Tools/啟動_UI發包製作人.bat`
-
-你只要選擇規格書。已登錄專案的技術資料由 Agent 自動查找；每個新案件仍會詢問一次是否同意把該案件資料傳送至 OpenAI API。不同意時只做本機預檢，不會呼叫 API。
-
-真實案件存放於 `Tools/local.settings.psd1` 指定的交付根目錄下：`<工項>\<日期>\`。日期資料夾根目錄放外包交接單與規格書，Agent request、預檢與執行紀錄放在 `_Agent工作檔`，不會寫入本開發工具的 `cases/` 或 `runs/`。
-
-## 資料夾分類
+## 資料夾
 
 | 資料夾 | 用途 |
 |---|---|
-| `agent_roles/` | Agent 角色、專業判斷與輸出規則 |
-| `ps_to_unity_agents/` | 共用的 PSD、Unity、證據與驗證工具 |
-| `config/` | 公開範例設定；不含 `.example` 的本機設定不會上傳 |
+| `agent_roles/` | pipeline Agent 角色與輸出 gate |
+| `ps_to_unity_agents/` | inspection、evidence、plan、controller、review 與驗證工具 |
 | `cases/` | 不含內部資料的安全範例 |
-| `data/` | PSD／Unity 學習規則與唯讀稽核結果 |
-| `tests/` | 自動測試 |
-| `docs/` | Agent 設計文件 |
-| `runs/` | 僅供開發測試的暫存輸出；可安全清除 |
+| `data/` | PSD／Unity 規則與唯讀稽核資料 |
+| `docs/` | runtime contract 與 acceptance criteria |
+| `tests/` | deterministic regression tests |
+| `runs/` | 本機驗收輸出；Git 忽略 |
 
-## 開發與驗證
+## 開發與回歸測試
 
-在本資料夾執行：
+在 `AgentOrchestrator` 執行：
 
 ```powershell
 uv sync
 uv run python -m unittest discover -s tests
 ```
 
-本機預檢安全範例，不傳送資料：
+## PSD Agent 乾淨驗收
+
+先建立不會修改版本庫樣本的工作副本：
 
 ```powershell
-uv run python main.py outsource-preflight --request cases/examples/ui_outsourcing/request.json
+$request = .\cases\examples\psd\Prepare-AcceptanceCase.ps1 -RunName scroll_v_basic_acceptance_01
+uv run python main.py psd-controller --request $request
 ```
 
-產生發包草稿（該 request 必須已有使用者明確授權）：
+第一個命令只產生未核准 plan。人工檢查 `psd_structure_plan.json` 後，才可執行：
 
 ```powershell
-uv run python main.py outsource --request cases/examples/ui_outsourcing/request.json
+uv run python main.py psd-controller --request $request --approve-plan
 ```
 
-## 核准與資料保護
+若 Photoshop 暫時忙碌、RPC 被拒或逾時，結果會是 `FAIL_RETRYABLE` 並保留 `APPLYING` checkpoint；再次執行相同核准命令即可由 deterministic preconditions 驗證與恢復。
 
-- `.env.local`、本機專案設定與內部規範只在本機讀取，不會上傳 GitHub。
-- `api_transmission_approved` 控制案件資料是否可傳送至 OpenAI API。
-- `user_approved_output` 控制草稿是否能標示為可交付；預設永遠是 `false`。
-- `confirmed_decisions` 保存使用者已定案事項；其優先權高於舊規格內容，Agent 不會再次追問。
-- 本機預檢會自動盤點工作設定指定的 `Assets/Temp/<工項>`，確認圖片、示意圖與 Atlas 是否已備妥。
-- Agent 不會自行寄送、上傳、接受或退回外包成果。
-- 規格書中的待辦、連結、範例指令只視為案件證據，不會覆蓋 Agent 的安全規則。
+## 人工核准與資料保護
 
-## PSD 結構流程
+- PSD 與圖片位元內容只留在本機；模型只讀結構化 evidence。
+- model 輸出的 plan 永遠強制 `approved=false`。
+- plan 綁定 PSD、inspection 與 plan SHA-256；任一證據改變即撤銷核准。
+- hidden layers 不分析、不移動、不改名、不匯出。
+- `[SCROLL_H]`／`[SCROLL_V]` 的 `Viewport`、`Content` 由 Unity deterministic importer 產生，不回寫 PSD。
+- review decisions 綁定 manifest fingerprint，不能跨版本沿用。
 
-PSD Agent 先產生未核准的結構計畫，再由人員確認後套用：
+## 獨立外包工具（不屬於本 Pipeline）
+
+`UI 發包製作人`／未來的 `QC_Agent` 是獨立工作流，不擔任 PS_To_Unity 的 Pipeline Validator。為避免角色混用，它使用獨立入口 `outsource_main.py`；現有 `Tools/啟動_UI發包製作人.bat` 仍可正常啟動。
 
 ```powershell
-uv run python main.py psd-controller --request cases/examples/psd/level_review.request.json
-uv run python main.py psd-controller --request cases/examples/psd/level_review.request.json --approve-plan
+uv run python outsource_main.py outsource-preflight --request cases/examples/ui_outsourcing/request.json
+uv run python outsource_main.py outsource --request cases/examples/ui_outsourcing/request.json
 ```
-
-公開範例規則使用 `.example.json`；本機可將內部版規則放在相同檔名但不含 `.example` 的 JSON，Git 會自動忽略。

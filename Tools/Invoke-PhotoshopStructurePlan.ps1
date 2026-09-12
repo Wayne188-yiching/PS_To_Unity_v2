@@ -6,10 +6,12 @@ param(
     [Parameter(Mandatory = $true)][string]$ReportFile,
     [ValidateSet('Validate', 'Apply')][string]$Mode = 'Validate',
     [string]$BackupPath,
+    [string]$PlanFingerprint,
     [string]$ApplierPath
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'PhotoshopAutomationCommon.ps1')
 $workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\')
 $psdFull = [IO.Path]::GetFullPath($PsdPath)
 $planFull = [IO.Path]::GetFullPath($PlanFile)
@@ -60,12 +62,16 @@ $source = $source -replace '^#target photoshop\s*', ''
 New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($reportFull)) -Force | Out-Null
 
 function Invoke-PlanInPhotoshop([string]$RunMode) {
-    $optionsJson = @{ mode = $RunMode.ToLowerInvariant(); outputFile = $reportFull } | ConvertTo-Json -Compress
+    $optionsJson = @{
+        mode = $RunMode.ToLowerInvariant()
+        outputFile = $reportFull
+        planFingerprint = $PlanFingerprint
+    } | ConvertTo-Json -Compress
     $javascript = "$.global.PS_TO_UNITY_V2_STRUCTURE_PLAN = $planJson;`n$.global.PS_TO_UNITY_V2_STRUCTURE_OPTIONS = $optionsJson;`n$source"
     if (Test-Path -LiteralPath $reportFull) {
         [IO.File]::Delete($reportFull)
     }
-    $photoshop = New-Object -ComObject Photoshop.Application
+    $photoshop = New-PhotoshopComApplication
     $opened = $false
     try {
         for ($index = 1; $index -le $photoshop.Documents.Count; $index++) {
@@ -105,7 +111,7 @@ if ($Mode -eq 'Apply') {
     if ([string]::IsNullOrWhiteSpace($BackupPath)) {
         $folder = [IO.Path]::GetDirectoryName($psdFull)
         $name = [IO.Path]::GetFileNameWithoutExtension($psdFull)
-        $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+        $stamp = (Get-Date -Format 'yyyyMMdd_HHmmss_fff') + '_' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
         $backupFull = Join-Path $folder "$name.pre_structure_$stamp.psd"
     } else {
         $backupFull = [IO.Path]::GetFullPath($BackupPath)
@@ -135,6 +141,8 @@ if ($Mode -eq 'Apply') {
     createdGroupCount = $result.createdGroupCount
     renamedCount = $result.renamedCount
     movedCount = $result.movedCount
+    alreadyAppliedCount = $result.alreadyAppliedCount
+    planFingerprint = $result.planFingerprint
     saved = $result.saved
     backupPath = $backupFull
     reportFile = $reportFull

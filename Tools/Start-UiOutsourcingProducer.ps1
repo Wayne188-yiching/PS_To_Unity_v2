@@ -149,10 +149,10 @@ $python = Join-Path $agentRoot ".venv\Scripts\python.exe"
 Push-Location $agentRoot
 try {
     if (Test-Path -LiteralPath $python) {
-        & $python "main.py" $runMode "--request" $requestPath
+        & $python "outsource_main.py" $runMode "--request" $requestPath
     }
     elseif (Get-Command uv -ErrorAction SilentlyContinue) {
-        & uv run python "main.py" $runMode "--request" $requestPath
+        & uv run python "outsource_main.py" $runMode "--request" $requestPath
     }
     else {
         throw "找不到 Agent 執行環境，請先在 AgentOrchestrator 執行 uv sync。"

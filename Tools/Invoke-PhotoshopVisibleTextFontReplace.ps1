@@ -6,6 +6,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'PhotoshopAutomationCommon.ps1')
 $workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..')).TrimEnd('\')
 $psdFull = [IO.Path]::GetFullPath($PsdPath)
 $reportFull = [IO.Path]::GetFullPath($ReportFile)
@@ -20,7 +21,7 @@ $folder = [IO.Path]::GetDirectoryName($psdFull)
 $name = [IO.Path]::GetFileNameWithoutExtension($psdFull)
 $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
 $backupFull = Join-Path $folder "$name.pre_font_$stamp.psd"
-$photoshop = New-Object -ComObject Photoshop.Application
+$photoshop = New-PhotoshopComApplication
 
 function Write-Report([hashtable]$Report) {
     [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($reportFull)) | Out-Null
