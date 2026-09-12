@@ -1,5 +1,7 @@
 # PSD Agent Acceptance Criteria
 
+目前執行證據見 [2026-09-12 驗收紀錄](psd_acceptance_20260912.md)。PSD Agent 仍在驗收中。
+
 PSD Agent 只負責處理不確定語意、提出結構計畫與選擇既有 Photoshop deterministic tools。它不重新實作匯出器，也不能在未核准時修改 PSD。
 
 ## 通過條件
