@@ -9,12 +9,16 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import main
-from agent_roles.pipeline_agents import CaseTools, enforce_pipeline_gate
+from agent_roles.pipeline_agents import CaseTools, _model_safe_summary, enforce_pipeline_gate
 from ps_to_unity_agents.fingerprints import sha256_file
 from ps_to_unity_agents.models import PipelineDecision, PipelineRequest, Status
 
 
 class PipelineEntryTests(unittest.IsolatedAsyncioTestCase):
+    def test_model_summary_removes_unity_run_folder(self):
+        safe = _model_safe_summary({"runFolder": "C:/private/run", "status": "PASS"})
+        self.assertEqual({"status": "PASS"}, safe)
+
     def make_request(self, root: Path, **updates) -> PipelineRequest:
         psd = root / "Screen.psd"
         psd.write_bytes(b"psd")

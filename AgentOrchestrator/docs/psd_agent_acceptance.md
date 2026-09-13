@@ -37,7 +37,7 @@ PSD Agent 只負責處理不確定語意、提出結構計畫與選擇既有 Pho
 | 語意判斷 | 規則與 plan validator 測試，不是模型推論證據 | 真實 Runner：明確 intent、模糊 intent、hidden、rename/hierarchy、MERGE／文字角色案例；模糊項不得猜測或自動套用 |
 | deterministic 匯出 | 六份 Phase4.5 真機 matrix、逐圖 receipt SHA 與 package 檢查通過 | 附掛 axis-mismatch／cache tag 往返仍未測；不要擴張為 Unity 驗收通過 |
 
-下一個最小交付是「一包由最終程式重新產生的 PSD Controller 核准／套用／重跑／匯出證據」，不先開發 Unity Agent，也不再任意擴大素材矩陣。接著才完成受控中斷與 Runner 語意案例，逐項關閉上述缺口。
+原排程先完成 Controller 證據包才開發 Unity Agent；2026-09-13 使用者改為「Agent 開發優先、完整驗收最後」。以上缺口保留為最終驗收清單，不再阻擋 Unity Agent／Pipeline Validator／Director 的開發，也不再任意擴大素材矩陣。此順序調整不代表 PSD Agent 已驗收通過，不放寬執行時的人工核准與安全門檻。
 
 API 的範圍：`main.py` 的新計畫分支呼叫 `Runner.run`，目前會要求 `OPENAI_API_KEY`；既有計畫的 `--approve-plan` 分支不需 Runner。Photoshop inspection/export、package validator 及既有回歸測試也不需 API Key。`agent_roles/pipeline_agents.py` 目前將模型寫死為 `gpt-5.6-terra`；此字串只是程式設定，不代表已驗證帳號可用性。實測前須確認模型／provider 設定與可用性，不能把缺 Key 說成整個 PSD 驗收無法進行。
 

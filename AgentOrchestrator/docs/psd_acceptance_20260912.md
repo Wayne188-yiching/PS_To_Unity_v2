@@ -4,7 +4,7 @@
 
 ## 結論
 
-PSD deterministic automation 與 Controller 復原流程已取得真機證據。PSD Agent 整體仍為 **驗收中**：尚未執行實際模型 `Runner` 的語意規劃驗收，不能進入 Unity Agent 開發。
+PSD deterministic automation 與 Controller 復原流程已取得真機證據。PSD Agent 整體仍為 **驗收中**：尚未執行實際模型 `Runner` 的語意規劃驗收。原先以此作為 Unity Agent 開發前置條件；2026-09-13 使用者已改為 Agent 開發優先、完整驗收最後，因此此未結案狀態不再阻擋開發，但 runtime 安全門檻不變。
 
 ## 自動驗證
 
@@ -79,10 +79,24 @@ PSD deterministic automation 與 Controller 復原流程已取得真機證據。
 8. approval validation/result 未同步持久化。
 9. 秒級 backup 名稱可能衝突，已加入毫秒與隨機識別碼。
 
+## 2026-09-13 Controller 全新證據包
+
+使用 `66215b1` 與乾淨 `controller_final_20260913` 副本執行人工 fixture。已保存 01_unapproved、02_approved、03_after_first、04_final_package 獨立快照；腳本完成並產生 `PSD_CONTROLLER_MANUAL_FIXTURE / PASS`，Controller 終態仍是 `PACKAGE_READY / NEEDS_REVIEW`。這是局部機械驗收結果，不是模型或 Unity 通過。
+
+首次新增 1 群組、改名 1 層、移動 2 層；重跑新增／改名／移動均為 0，alreadyAppliedCount=4。腳本核對 AcceptanceRoot 位於 ROOT、MainPage 在 BackgroundEmpty 上方、其他圖層名稱／parent／順序不變，以及重跑後完整 ID／名稱／parent／順序相等。重跑後呼叫正式 Controller API 刷新 package，不修改 checkpoint 偽裝成功。
+
+- 來源 PSD SHA 前後：`f0cdc33bbeeb63a10b6d5735df654048dcd74b186cfb4a9d486d7fddd42c1db1`。
+- 最終副本 SHA：`64df93141e397fe72701a7c15212593c4e1061359d19fed51d9b2ef144ba30ae`。
+- 最終 export run ID：`128ddf2c7bf54fb1bf5498aec67eb7cb`。
+- 最終 layout SHA：`9f573f6ace3bff2f16aad6269c3332406f6bfb81b0b6c20715b9a90de359c9d3`。
+- 原始素材未修改；模型語意與 Unity 均 NOT_RUN。
+
 ## 未完成項目
+
+歷史環境阻礙（已恢復）：2026-09-13 啟動前曾無 Photoshop process，正式 COM 入口在 sandbox 外回報 `80040154 / REGDB_E_CLASSNOTREG`，`.200` 的 LocalServer32 值為空。使用者回報恢復後，實測連上 Photoshop 27.6.0、OpenDocuments=0，才執行上述新證據包。未自行修改系統註冊設定；此阻礙與 API Key 無關。
 
 - 實際模型 Runner 的語意規劃、模糊 intent escalation、真實 PSD 多案例與文字／hidden／MERGE 語意驗收。本次環境與兩個 checkout 均未設定 OPENAI_API_KEY；不以工具層測試替代模型驗收。
 - 完整程序中斷 fault injection；六份 Photoshop fixture matrix 已完成，附掛的 axis-mismatch／cache 往返及模型語意案例尚未完成。
-- PSD 階段通過後才進行 Unity headless pipeline、Unity Agent、Pipeline Validator 與 Director end-to-end。
+- Unity headless pipeline、Unity Agent、Pipeline Validator 與 Director end-to-end：依最新排程先開發，完整驗收最後。
 
-本次不改動 Unity importer，不宣告 Multi-Agent end-to-end PASS，也不發布為正式完成版。
+本驗收紀錄不宣告 Multi-Agent end-to-end PASS，也不發布為正式完成版。後續 Unity importer orchestration 的開發狀態另見 README 與 OPTIMIZATION_PLAN。

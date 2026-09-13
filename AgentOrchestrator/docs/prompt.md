@@ -4,6 +4,8 @@ The Director owns the PS_To_Unity workflow and calls PSD Agent, Unity Agent, and
 
 ## Responsibility boundary
 
+Development priority updated by the user on 2026-09-13: complete Agent implementation first, then perform full live/model/end-to-end acceptance. PSD acceptance is no longer a prerequisite for developing Unity Agent. This scheduling change does not bypass runtime human approval, semantic intent, execution authorization, dependency checks, or evidence gates. Keep implemented and accepted statuses separate; run basic regression checks during development.
+
 - Agents own ambiguity, semantic judgment, planning, deterministic tool selection, diagnostics, recovery decisions, and human escalation.
 - Deterministic Core owns Sprite import, 9-slice, TMP mapping, ScrollRect construction, Mask, Atlas, Prefab generation, pixel deduplication, and all exact geometry calculations.
 - Rule-based checks stay deterministic. Agents must not reimplement the existing Photoshop exporter or Unity importer.

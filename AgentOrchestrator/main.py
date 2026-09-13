@@ -9,11 +9,12 @@ from pathlib import Path
 
 from agents import Runner
 
-from agent_roles.pipeline_agents import build_director, build_psd_agent, enforce_pipeline_gate
+from agent_roles.pipeline_agents import build_director, build_psd_agent, build_unity_agent, enforce_pipeline_gate
 from ps_to_unity_agents.evidence import prepare_case, validate_psd_package_manifest
 from ps_to_unity_agents.models import PipelineRequest
 from ps_to_unity_agents.psd_controller import PsdAgentController
 from ps_to_unity_agents.reviewer import serve_review
+from ps_to_unity_agents.unity_controller import UnityAgentController
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -113,6 +114,27 @@ async def run_psd_controller(request: PipelineRequest, approve_plan: bool) -> in
     return 0 if result["status"] in {"PASS", "NEEDS_REVIEW"} else 1
 
 
+async def run_unity_agent(request: PipelineRequest) -> int:
+    load_local_key()
+    if not os.environ.get("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY is not available.")
+    controller = UnityAgentController(request)
+    agent = build_unity_agent(request, controller)
+    run = await Runner.run(agent, json.dumps({"caseId": request.case_id,
+        "task": "Inspect dependencies and execute only if authorized; diagnose or escalate from deterministic evidence."}), max_turns=6)
+    decision = controller.enforce_decision(run.final_output)
+    request.output_folder.mkdir(parents=True, exist_ok=True)
+    (request.output_folder / "unity_agent_result.json").write_text(decision.model_dump_json(indent=2), encoding="utf-8")
+    print(decision.model_dump_json(indent=2))
+    return 0 if decision.status.value in {"PASS", "NEEDS_REVIEW"} else 1
+
+
+def run_unity_controller(request: PipelineRequest) -> int:
+    result = UnityAgentController(request).generate()
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0 if result["status"] in {"PASS", "NEEDS_REVIEW"} else 1
+
+
 def run_offline(request: PipelineRequest) -> int:
     prepared = prepare_case(request)
     validation = validate_psd_package_manifest(request)
@@ -129,7 +151,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="PS_To_Unity_v2 multi-agent MVP")
     parser.add_argument(
         "mode",
-        choices=("offline", "psd", "psd-controller", "run", "review"),
+        choices=("offline", "psd", "psd-controller", "unity", "unity-controller", "run", "review"),
     )
     parser.add_argument("--request", type=Path, required=True)
     parser.add_argument("--port", type=int, default=8765)
@@ -149,6 +171,10 @@ def main() -> int:
         return asyncio.run(run_psd_agent(request))
     if args.mode == "psd-controller":
         return asyncio.run(run_psd_controller(request, args.approve_plan))
+    if args.mode == "unity":
+        return asyncio.run(run_unity_agent(request))
+    if args.mode == "unity-controller":
+        return run_unity_controller(request)
     return asyncio.run(run_live(request))
 
 

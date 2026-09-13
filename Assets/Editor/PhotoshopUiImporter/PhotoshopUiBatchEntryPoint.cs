@@ -25,15 +25,25 @@ namespace PhotoshopToUnity.EditorImporter
             }
             catch (Exception exception)
             {
-                result.status = "BLOCKED";
-                result.errors.Add(exception.ToString());
+                result.AddError("BATCH_REQUEST_FAILED", exception.ToString());
             }
 
-            if (!string.IsNullOrWhiteSpace(resultPath))
+            try
             {
-                var parent = Path.GetDirectoryName(resultPath);
-                if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
-                File.WriteAllText(resultPath, JsonUtility.ToJson(result, true));
+                if (!string.IsNullOrWhiteSpace(resultPath))
+                {
+                    var parent = Path.GetDirectoryName(resultPath);
+                    if (!string.IsNullOrEmpty(parent)) Directory.CreateDirectory(parent);
+                    var temporary = resultPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+                    File.WriteAllText(temporary, JsonUtility.ToJson(result, true));
+                    if (File.Exists(resultPath)) File.Replace(temporary, resultPath, null);
+                    else File.Move(temporary, resultPath);
+                }
+            }
+            catch (Exception exception)
+            {
+                result.stage = "RECEIPT";
+                result.AddError("BATCH_RECEIPT_WRITE_FAILED", exception.ToString());
             }
 
             if (!result.IsSuccess)

@@ -30,6 +30,18 @@ class PipelineRequest(BaseModel):
     unity_import_folder: str = "Assets/Temp/AgentPeakPower/Atlas/SpriteAtlas/Base"
     unity_prefab_folder: str = "Assets/Temp/AgentPeakPower/Prefab"
     unity_default_tmp_font_asset: str | None = None
+    unity_default_tmp_material_preset: str | None = None
+    unity_tmp_font_map: str | None = None
+    unity_skin_map: str | None = None
+    unity_material_library_folder: str | None = None
+    unity_project_folder: str = "AgentPeakPower"
+    unity_prefab_name: str | None = None
+    unity_reference_resolution_x: float = Field(default=0, ge=0, allow_inf_nan=False)
+    unity_reference_resolution_y: float = Field(default=0, ge=0, allow_inf_nan=False)
+    unity_outline_thickness_multiplier: float = Field(default=1, gt=0, allow_inf_nan=False)
+    unity_use_responsive_anchor: bool = False
+    unity_create_sprite_atlases: bool = True
+    unity_timeout_seconds: int = Field(default=900, ge=1, le=7200)
     shared_asset_folders: list[Path] = Field(default_factory=list)
 
 

@@ -68,8 +68,8 @@ class OutsourcingAgentTests(unittest.TestCase):
         exporter = (workspace / "PhotoshopExporter" / "PhotoshopUiPackageExporter.jsx").read_text(
             encoding="utf-8-sig"
         )
-        importer_window = (
-            workspace / "Assets" / "Editor" / "PhotoshopUiImporter" / "PhotoshopUiImporterWindow.cs"
+        atlas_utility = (
+            workspace / "Assets" / "Editor" / "PhotoshopUiImporter" / "PhotoshopUiAssetUtility.cs"
         ).read_text(encoding="utf-8-sig")
         image_importer = (
             workspace / "Assets" / "Editor" / "PhotoshopUiImporter" / "ImageImportService.cs"
@@ -77,8 +77,8 @@ class OutsourcingAgentTests(unittest.TestCase):
 
         self.assertIn('"/Atlas/SpriteAtlas/" + language', exporter)
         self.assertIn('language === "Base" ? "" : "_" + language', exporter)
-        self.assertIn('{ "Base", "CHS", "CHT", "EN" }', importer_window)
-        self.assertIn('atlas.Add(new Object[] { folderObject })', importer_window)
+        self.assertIn('{ "Base", "CHS", "CHT", "EN" }', atlas_utility)
+        self.assertIn('atlas.Add(new Object[] { folderObject })', atlas_utility)
         self.assertIn('importer.spriteImportMode = SpriteImportMode.Single', image_importer)
 
     def test_registered_project_contains_store_work_profile(self):

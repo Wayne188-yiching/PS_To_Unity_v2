@@ -10,10 +10,12 @@
 | PSD Agent／Controller | 第一版完成，驗收強化中 | 具備 inspection、structure plan、人工核准、checkpoint、冪等套用、重新匯出及 package validation。 |
 | Evidence／Structure Plan | 已存在，持續驗證 | 已加入 PSD／inspection／plan 指紋與動作前置條件。 |
 | Pipeline Validator | 僅有 PSD package gate | 尚未比較 PSD semantic intent、IR、Unity import 與 generated Prefab；因此 Director 不得回傳全流程 PASS。 |
-| Unity Agent | 尚未開發 | 下一階段先抽出可程式呼叫的 Unity deterministic pipeline，再建立 Agent。 |
+| Unity Agent | 開發中，尚未完整驗收 | 已有 import service／batch 入口；正在統一 EditorWindow 生成流程，並接入 Agent／Controller。 |
 | Director end-to-end | 僅有骨架 | 已能守住 terminal state，但閉環要等 Unity Agent 與 Pipeline Validator。 |
 
 PSD Agent 的正式通過條件見 [docs/psd_agent_acceptance.md](docs/psd_agent_acceptance.md)。
+
+2026-09-13 使用者調整優先順序：先完成 Agent 架構與實作，完整真機／模型／端到端驗收最後進行。PSD 未結案不再阻擋 Unity Agent 開發；但人工核准、執行權限與輸出新鮮度等 runtime 安全門檻仍保留。開發中持續執行基本回歸測試，不能把「已實作」標成「已驗收」。
 
 ## 資料夾
 

@@ -234,7 +234,7 @@ class CaseTools:
 
 def _model_safe_summary(payload):
     """Recursively remove local paths before structured evidence reaches the model."""
-    hidden_keys = {"manifestPath", "layoutPath", "assetFolder", "inspectionPath"}
+    hidden_keys = {"manifestPath", "layoutPath", "assetFolder", "inspectionPath", "runFolder"}
     if isinstance(payload, dict):
         return {
             key: _model_safe_summary(value)
@@ -294,28 +294,35 @@ def build_psd_agent(request: PipelineRequest, tools: CaseTools | None = None, *,
     )
 
 
-def build_director(request: PipelineRequest) -> Agent:
-    tools = CaseTools(request)
+def build_unity_agent(request: PipelineRequest, controller=None) -> Agent:
+    from ps_to_unity_agents.unity_controller import UnityAgentController
+    controller = controller or UnityAgentController(request)
 
     @function_tool
-    def validate_current_unity_gate() -> str:
-        """Check whether Unity generation is allowed for this request. It does not launch Unity."""
-        evidence = tools.inspect()
-        allowed = (
-            request.execution_mode == "execute"
-            and request.semantics_approved
-            and evidence["status"] == "PASS"
-            and request.unity_executable is not None
-            and request.unity_project_path is not None
-        )
-        return json.dumps({
-            "status": "PASS" if allowed else "NEEDS_REVIEW",
-            "generationAllowed": allowed,
-            "executionMode": request.execution_mode,
-            "semanticsApproved": request.semantics_approved,
-            "semanticStatus": evidence["status"],
-            "reason": "Generation remains gated until semantic evidence is approved." if not allowed else "Unity generation gate passed.",
-        }, ensure_ascii=False)
+    def inspect_unity_prerequisites() -> str:
+        """Inspect approval, package and explicit project dependencies without launching Unity."""
+        return json.dumps(_model_safe_summary(controller.inspect()), ensure_ascii=False)
+
+    @function_tool
+    def generate_unity_prefab() -> str:
+        """Run the guarded existing Unity batch importer and verify current-run artifact evidence."""
+        return json.dumps(_model_safe_summary(controller.generate()), ensure_ascii=False)
+
+    return Agent(
+        name="Unity Agent", model=MODEL,
+        instructions=(
+            "Inspect prerequisites, then select generation only when generationAllowed is true. Use the existing deterministic "
+            "importer; never invent dependencies, font mappings, borders or geometry. Diagnose structured evidence and escalate "
+            "missing dependencies as BLOCKED and ambiguous intent as NEEDS_REVIEW. Only a FAIL_RETRYABLE result permits one retry; "
+            "never retry a live or locked project, never alter approval or delete locks. A prerequisite PASS is not generation PASS. "
+            "Claim generation PASS only from a fresh successful generate_unity_prefab result. This is UNITY_GENERATION_ONLY, "
+            "not full pipeline PASS or live acceptance. Preserve warnings and explain the next safe action."
+        ), tools=[inspect_unity_prerequisites, generate_unity_prefab], output_type=AgentDecision,
+    )
+
+
+def build_director(request: PipelineRequest) -> Agent:
+    tools = CaseTools(request)
 
     @function_tool
     def run_current_pipeline_validation() -> str:
@@ -339,16 +346,7 @@ def build_director(request: PipelineRequest) -> Agent:
         return json.dumps(load_unity_layout_knowledge(), ensure_ascii=False)
 
     psd_agent = build_psd_agent(request, tools)
-    unity_agent = Agent(
-        name="Unity Agent",
-        model=MODEL,
-        instructions=(
-            "Validate the Unity execution gate. Do not claim that a prefab was generated because this tool only checks the gate. "
-            "Font, TMP, Sprite, Atlas, and output dependencies must be explicit. If semantic evidence is not approved, return NEEDS_REVIEW."
-        ),
-        tools=[validate_current_unity_gate, inspect_project_layout_rules],
-        output_type=AgentDecision,
-    )
+    unity_agent = build_unity_agent(request)
     pipeline_validator = Agent(
         name="Pipeline Validator",
         model=MODEL,

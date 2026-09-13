@@ -4,7 +4,10 @@ ImageImportService.cs
 IUiPrefabBackend.cs
 LayoutReader.cs
 PathUtility.cs
+PhotoshopUiAssetUtility.cs
+PhotoshopUiBatchEntryPoint.cs
 PhotoshopUiImporterWindow.cs
+PhotoshopUiImportService.cs
 PhotoshopUiLayout.cs
 PsUiSkinApplier.cs
 PsUiSkinTheme.cs
