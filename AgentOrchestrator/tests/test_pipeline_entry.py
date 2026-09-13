@@ -48,6 +48,28 @@ class PipelineEntryTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(Status.NEEDS_REVIEW, gated.status)
             self.assertEqual("PIPELINE_VALIDATOR", gated.responsible_agent)
 
+    def test_current_deterministic_pipeline_pass_allows_director_pass(self):
+        with tempfile.TemporaryDirectory() as raw:
+            request = self.make_request(Path(raw), execution_mode="execute", semantics_approved=True)
+            gated = enforce_pipeline_gate(self.decision(), request, {"status": "PASS"})
+            self.assertEqual(Status.PASS, gated.status)
+
+    def test_deterministic_pipeline_block_cannot_be_softened(self):
+        with tempfile.TemporaryDirectory() as raw:
+            request = self.make_request(Path(raw), execution_mode="execute", semantics_approved=True)
+            evidence = {"status": "BLOCKED", "issues": [{"code": "PREFAB_NODE_MISSING"}]}
+            gated = enforce_pipeline_gate(self.decision(), request, evidence)
+            self.assertEqual(Status.BLOCKED, gated.status)
+            self.assertEqual("PREFAB_NODE_MISSING", gated.issues[-1].code)
+
+    def test_model_needs_review_cannot_soften_deterministic_block(self):
+        with tempfile.TemporaryDirectory() as raw:
+            request = self.make_request(Path(raw), execution_mode="execute", semantics_approved=True)
+            model = self.decision().model_copy(update={"status": Status.NEEDS_REVIEW})
+            evidence = {"status": "BLOCKED", "issues": [{"code": "PREFAB_NODE_MISSING"}]}
+            gated = enforce_pipeline_gate(model, request, evidence)
+            self.assertEqual(Status.BLOCKED, gated.status)
+
     async def test_run_live_writes_pipeline_decision_without_outsourcing_gate(self):
         with tempfile.TemporaryDirectory() as raw:
             request = self.make_request(Path(raw), execution_mode="execute", semantics_approved=True)

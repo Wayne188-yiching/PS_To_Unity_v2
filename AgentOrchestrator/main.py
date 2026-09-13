@@ -9,9 +9,16 @@ from pathlib import Path
 
 from agents import Runner
 
-from agent_roles.pipeline_agents import build_director, build_psd_agent, build_unity_agent, enforce_pipeline_gate
+from agent_roles.pipeline_agents import (
+    build_director,
+    build_pipeline_validator,
+    build_psd_agent,
+    build_unity_agent,
+    enforce_pipeline_gate,
+)
 from ps_to_unity_agents.evidence import prepare_case, validate_psd_package_manifest
 from ps_to_unity_agents.models import PipelineRequest
+from ps_to_unity_agents.pipeline_validator import PipelineValidatorController
 from ps_to_unity_agents.psd_controller import PsdAgentController
 from ps_to_unity_agents.reviewer import serve_review
 from ps_to_unity_agents.unity_controller import UnityAgentController
@@ -53,7 +60,9 @@ async def run_live(request: PipelineRequest) -> int:
     load_local_key()
     if not os.environ.get("OPENAI_API_KEY"):
         raise RuntimeError("OPENAI_API_KEY is not available.")
-    director = build_director(request)
+    unity_controller = UnityAgentController(request)
+    pipeline_controller = PipelineValidatorController(request, unity_controller)
+    director = build_director(request, unity_controller, pipeline_controller)
     input_text = json.dumps({
         "caseId": request.case_id,
         "executionMode": request.execution_mode,
@@ -61,7 +70,7 @@ async def run_live(request: PipelineRequest) -> int:
         "privacy": "Do not request or emit PSD/image bytes; use structured tool evidence only.",
     }, ensure_ascii=False)
     result = await Runner.run(director, input_text, max_turns=12)
-    decision = enforce_pipeline_gate(result.final_output, request)
+    decision = enforce_pipeline_gate(result.final_output, request, pipeline_controller.last_result)
     output_path = request.output_folder / "director_result.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(decision.model_dump_json(indent=2), encoding="utf-8")
@@ -135,6 +144,37 @@ def run_unity_controller(request: PipelineRequest) -> int:
     return 0 if result["status"] in {"PASS", "NEEDS_REVIEW"} else 1
 
 
+async def run_pipeline_validator_agent(request: PipelineRequest) -> int:
+    load_local_key()
+    if not os.environ.get("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY is not available.")
+    unity_controller = UnityAgentController(request)
+    unity_controller.generate()
+    controller = PipelineValidatorController(request, unity_controller)
+    agent = build_pipeline_validator(request, controller)
+    run = await Runner.run(agent, json.dumps({
+        "caseId": request.case_id,
+        "task": "Validate the current PSD/IR-to-Prefab evidence and escalate ambiguity without performing outsourcing QC.",
+    }), max_turns=4)
+    decision = controller.enforce_decision(run.final_output)
+    request.output_folder.mkdir(parents=True, exist_ok=True)
+    (request.output_folder / "pipeline_validator_result.json").write_text(
+        decision.model_dump_json(indent=2), encoding="utf-8")
+    print(decision.model_dump_json(indent=2))
+    return 0 if decision.status.value in {"PASS", "NEEDS_REVIEW"} else 1
+
+
+def run_pipeline_controller(request: PipelineRequest) -> int:
+    unity_controller = UnityAgentController(request)
+    unity_result = unity_controller.generate()
+    result = PipelineValidatorController(request, unity_controller).validate(unity_result)
+    request.output_folder.mkdir(parents=True, exist_ok=True)
+    (request.output_folder / "pipeline_controller_result.json").write_text(
+        json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    return 0 if result["status"] in {"PASS", "NEEDS_REVIEW"} else 1
+
+
 def run_offline(request: PipelineRequest) -> int:
     prepared = prepare_case(request)
     validation = validate_psd_package_manifest(request)
@@ -151,7 +191,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="PS_To_Unity_v2 multi-agent MVP")
     parser.add_argument(
         "mode",
-        choices=("offline", "psd", "psd-controller", "unity", "unity-controller", "run", "review"),
+        choices=(
+            "offline", "psd", "psd-controller", "unity", "unity-controller",
+            "pipeline", "pipeline-controller", "run", "review",
+        ),
     )
     parser.add_argument("--request", type=Path, required=True)
     parser.add_argument("--port", type=int, default=8765)
@@ -175,6 +218,10 @@ def main() -> int:
         return asyncio.run(run_unity_agent(request))
     if args.mode == "unity-controller":
         return run_unity_controller(request)
+    if args.mode == "pipeline":
+        return asyncio.run(run_pipeline_validator_agent(request))
+    if args.mode == "pipeline-controller":
+        return run_pipeline_controller(request)
     return asyncio.run(run_live(request))
 
 

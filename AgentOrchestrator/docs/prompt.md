@@ -1,6 +1,6 @@
 # Runtime contract
 
-The Director owns the PS_To_Unity workflow and calls PSD Agent, Unity Agent, and Pipeline Validator as bounded tools. At the current repository state, Unity Agent and the full Pipeline Validator are not implemented, so the Director must not report end-to-end `PASS`.
+The Director owns the PS_To_Unity workflow and calls PSD Agent, Unity Agent, and Pipeline Validator as bounded tools. The first implementation of all three roles is present, but full live/model/end-to-end acceptance is intentionally deferred until Agent implementation is complete. Never describe implementation or regression evidence as live acceptance.
 
 ## Responsibility boundary
 
@@ -37,7 +37,7 @@ Pipeline Validator is the internal consistency role formerly labelled QA. It onl
 
 It does not perform external vendor QC. Diagnostics should converge on `severity`, `code`, `phase`, `node`, `message`, `evidence`, `suggestedAction`, and `safeToAutoFix`.
 
-Until the full validator exists, a successful PSD package is handed to the next phase with `NEEDS_REVIEW / PIPELINE_VALIDATOR`, never end-to-end PASS.
+The deterministic validator requires a current Unity run receipt and Prefab structure snapshot. It checks current input freshness, authored node presence/hierarchy, hidden-node exclusion, non-layout geometry, TMP Font Asset/material/content/size, Sprite/9-slice/Button, Mask, ScrollRect, draggable Scrollbar wiring, and LayoutGroup components. Duplicate authored identity or other ambiguity remains NEEDS_REVIEW. Structural PASS is not final Photoshop/Unity visual acceptance.
 
 ## Independent outsourcing workflow
 

@@ -1047,11 +1047,12 @@ commit → push → 交由使用者/Codex 在 Unity 專案實機驗收。</pre>
     <table>
       <tr><th>項目</th><th>狀態</th></tr>
       <tr><td>PSD Agent／Controller／Evidence／Structure Plan</td><td>已實作，回歸與真機驗收中；尚未結案</td></tr>
-      <tr><td>Pipeline Validator</td><td>已有 PSD package 檢查；PSD → IR → Unity → Prefab 全面一致性驗證未完成</td></tr>
-      <tr><td>Unity Agent</td><td>開發中：統一可程式呼叫的 deterministic pipeline 並接入 Controller；尚未完整驗收</td></tr>
-      <tr><td>Director／Multi-Agent 閉環</td><td>骨架；全流程 PASS gate 維持關閉</td></tr>
+      <tr><td>Pipeline Validator</td><td>第一版已實作：比對 PSD package／IR 與同次 Unity 收據、Prefab Rect、TMP、Sprite、Mask、Scroll／Scrollbar、LayoutGroup；尚未實機驗收</td></tr>
+      <tr><td>Unity Agent</td><td>第一版已實作：EditorWindow／Batch／Agent 共用 deterministic service，Controller 驗證依賴、鎖、有限重試、輸入雜湊與回執；尚未實機驗收</td></tr>
+      <tr><td>Director／Multi-Agent 閉環</td><td>第一版已接通，共用 Unity／Validator 當次證據並限制模型 PASS；完整模型與端到端實機驗收留到最後</td></tr>
       <tr><td>獨立外包 QC</td><td>獨立入口，不擔任 PS_To_Unity Pipeline Validator</td></tr>
     </table>
+    <p>本輪 Agent 開發回歸共 118 項 Python 測試通過，Unity 2022.3 C# importer 亦完成離線編譯。Pipeline Validator 同步比對 TMP 內容、字級、字距、行距、對齊、顏色／漸層與 Font Asset／材質解析證據，並阻擋撤銷核准、Importer／輸入變更、隱藏節點輸出及滑軌錯誤接線所造成的過期或假通過。這是實作與基本回歸證據，不等於 Photoshop／Unity 最終實機驗收。</p>
   </div>
 
   <h2 id="howto">執行方式</h2>

@@ -75,6 +75,7 @@ foreach ($s in $config.surfaces) {
     $content = Read-Utf8Text $filePath
     $pattern = $s.pattern
     $replacement = $s.replacement.Replace('{version}', $version).Replace('{majorMinor}', $majorMinor)
+    $replacement = $replacement.Replace('{updated}', $config.updated).Replace('{updatedDots}', $config.updated.Replace('-', '.'))
 
     if ($content -notmatch $pattern) {
         if ($optional) {
@@ -91,7 +92,13 @@ foreach ($s in $config.surfaces) {
 
     if ($Check) {
         $sample = ([regex]$pattern).Matches($content)[0].Value
-        Write-Host "[chk ] $($s.file) — current: $sample ($matchCount match$(if($matchCount -gt 1){'es'}))"
+        $expectedContent = [regex]::Replace($content, $pattern, $replacement)
+        if ($expectedContent -ne $content) {
+            $problems += "Version surface out of sync: $($s.file) (current: $sample)"
+            Write-Host "[FAIL] $($s.file) — out of sync: $sample" -ForegroundColor Red
+        } else {
+            Write-Host "[chk ] $($s.file) — current: $sample ($matchCount match$(if($matchCount -gt 1){'es'}))"
+        }
         continue
     }
 

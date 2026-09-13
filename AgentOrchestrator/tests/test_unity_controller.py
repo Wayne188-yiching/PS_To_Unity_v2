@@ -110,6 +110,18 @@ class UnityControllerTests(unittest.TestCase):
         factory.assert_called_once()
         self.assertFalse((self.request.unity_project_path / ".ps_to_unity_agent.lock").exists())
 
+    def test_pending_completion_cannot_pass_after_approval_revocation(self):
+        factory = self.factory(timeout=True)
+        controller = UnityAgentController(self.request, process_factory=factory)
+        self.assertEqual("FAIL_RETRYABLE", controller.generate()["status"])
+        self.request.semantics_approved = False
+        self.process.poll.return_value = 0
+        result = controller.generate()
+        self.assertEqual("BLOCKED", result["status"])
+        self.assertEqual("UNITY_APPROVAL_REVOKED_DURING_RUN", result["issues"][0]["code"])
+        factory.assert_called_once()
+        self.assertFalse((self.request.unity_project_path / ".ps_to_unity_agent.lock").exists())
+
     def test_retry_at_most_once_after_exited_process(self):
         factory = self.factory(code=1, mutate=lambda r, p: r.clear())
         controller = UnityAgentController(self.request, process_factory=factory)
@@ -140,6 +152,36 @@ class UnityControllerTests(unittest.TestCase):
         result = UnityAgentController(request, process_factory=self.factory(mutate=mutate)).generate()
         self.assertEqual("BLOCKED", result["status"])
         self.assertEqual("UNITY_STALE_RESULT", result["issues"][0]["code"])
+
+    def test_current_input_snapshot_can_be_rechecked_by_validator(self):
+        controller = UnityAgentController(self.request, process_factory=self.factory())
+        self.assertEqual("PASS", controller.generate()["status"])
+        self.assertTrue(controller.current_inputs_match())
+        self.assertTrue(controller.current_evidence_matches())
+        Path(controller.last_payload["layoutJsonPath"]).write_text('{"changed":true}')
+        self.assertFalse(controller.current_inputs_match())
+        self.assertFalse(controller.current_evidence_matches())
+        self.assertEqual("BLOCKED", controller.generate()["status"])
+
+    def test_revoked_approval_invalidates_cached_pass(self):
+        factory = self.factory()
+        controller = UnityAgentController(self.request, process_factory=factory)
+        self.assertEqual("PASS", controller.generate()["status"])
+        self.request.semantics_approved = False
+        result = controller.generate()
+        self.assertEqual("BLOCKED", result["status"])
+        self.assertEqual("UNITY_CACHED_EVIDENCE_STALE", result["issues"][0]["code"])
+        factory.assert_called_once()
+
+    def test_importer_change_invalidates_cached_pass(self):
+        factory = self.factory()
+        controller = UnityAgentController(self.request, process_factory=factory)
+        self.assertEqual("PASS", controller.generate()["status"])
+        importer = self.request.unity_project_path / "Assets/Editor/PhotoshopUiImporter/PhotoshopUiBatchEntryPoint.cs"
+        importer.write_text("changed importer")
+        self.assertFalse(controller.current_evidence_matches())
+        self.assertEqual("BLOCKED", controller.generate()["status"])
+        factory.assert_called_once()
 
     def test_full_mapping(self):
         request = self.request.model_copy(update={"unity_prefab_name": "Screen", "unity_project_folder": "Screen",

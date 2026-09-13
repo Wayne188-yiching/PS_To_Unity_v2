@@ -1,7 +1,7 @@
 {
-  "version": "2.14.0",
-  "phase": "Multi-language sprite folders and per-language SpriteAtlas packing spec",
-  "updated": "2026-08-14",
+  "version": "2.15.0",
+  "phase": "Guarded Unity Agent, Pipeline Validator, and Director evidence loop",
+  "updated": "2026-09-13",
   "_notes": "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",
   "surfaces": [
     {
@@ -54,6 +54,16 @@
       "file": "PS_To_Unity_Presentation_zh.html",
       "pattern": "v\\d+\\.\\d+\\.\\d+(?=，\\d{4}-\\d{2}-\\d{2}）)",
       "replacement": "v{version}"
+    },
+    {
+      "file": "PS_To_Unity_Presentation_zh.html",
+      "pattern": "<span class=\"release-meta\" translate=\"no\">v\\d+\\.\\d+\\.\\d+&nbsp;·&nbsp;\\d{4}\\.\\d{2}\\.\\d{2}</span>",
+      "replacement": "<span class=\"release-meta\" translate=\"no\">v{version}&nbsp;·&nbsp;{updatedDots}</span>"
+    },
+    {
+      "file": "PS_To_Unity_Presentation_zh.html",
+      "pattern": "<code translate=\"no\">version\\.json</code>（v\\d+\\.\\d+\\.\\d+，\\d{4}-\\d{2}-\\d{2}）",
+      "replacement": "<code translate=\"no\">version.json</code>（v{version}，{updated}）"
     }
   ]
 }

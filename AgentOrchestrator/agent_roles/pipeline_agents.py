@@ -321,45 +321,46 @@ def build_unity_agent(request: PipelineRequest, controller=None) -> Agent:
     )
 
 
-def build_director(request: PipelineRequest) -> Agent:
-    tools = CaseTools(request)
+def build_pipeline_validator(request: PipelineRequest, controller=None) -> Agent:
+    from ps_to_unity_agents.pipeline_validator import PipelineValidatorController
+    controller = controller or PipelineValidatorController(request)
 
     @function_tool
-    def run_current_pipeline_validation() -> str:
-        """Run the PSD-package subset of validation; Unity-to-Prefab validation is not implemented yet."""
-        tools.inspect()
-        result = _model_safe_summary(validate_psd_package_manifest(request))
-        result["validationScope"] = "PSD_PACKAGE_ONLY"
-        if result.get("status") == "PASS":
-            result["status"] = "NEEDS_REVIEW"
-        result.setdefault("issues", []).append({
-            "code": "PIPELINE_VALIDATION_NOT_IMPLEMENTED",
-            "owner": "PIPELINE_VALIDATOR",
-            "severity": "warning",
-            "message": "Unity import and generated Prefab validation are not implemented yet.",
-        })
-        return json.dumps(result, ensure_ascii=False)
+    def validate_generated_prefab() -> str:
+        """Compare the current Unity receipt and Prefab snapshot against the current PSD package IR."""
+        return json.dumps(_model_safe_summary(controller.validate()), ensure_ascii=False)
 
     @function_tool
     def inspect_project_layout_rules() -> str:
-        """Return curated project UI layout rules. Holdouts must never be used as generation references."""
+        """Return curated project UI layout rules. Holdouts are never generation references."""
         return json.dumps(load_unity_layout_knowledge(), ensure_ascii=False)
 
-    psd_agent = build_psd_agent(request, tools)
-    unity_agent = build_unity_agent(request)
-    pipeline_validator = Agent(
+    return Agent(
         name="Pipeline Validator",
         model=MODEL,
         instructions=(
-            "Validate only the PS_To_Unity pipeline. Do not perform outsourcing QC. Compare PS design intent with Unity semantics. "
-            "Simple, Sliced, Mask, Scroll, and LayoutGroup have "
-            "different valid size relationships. Use the curated project layout rules, but never learn from holdouts. Never fail only because "
-            "dimensions differ. The current deterministic tool covers PSD package validation only, so never claim full pipeline PASS. "
-            "Unresolved visual intent must be NEEDS_REVIEW, not guessed."
+            "Validate only PSD semantic intent -> layout IR -> Unity import -> generated Prefab. Never perform external vendor QC. "
+            "Call validate_generated_prefab and use project rules only to interpret ambiguity; deterministic mismatches cannot be "
+            "softened. Simple, Sliced, Mask, Scroll, Scrollbar, TMP and LayoutGroup have different valid relationships. A structural "
+            "PASS is not final Photoshop/Unity visual acceptance: preserve validationScope and liveAcceptance. Unresolved intent or "
+            "duplicate identity is NEEDS_REVIEW; missing components, hidden exports, stale evidence or geometry drift is BLOCKED."
         ),
-        tools=[run_current_pipeline_validation, inspect_project_layout_rules],
+        tools=[validate_generated_prefab, inspect_project_layout_rules],
         output_type=AgentDecision,
     )
+
+
+def build_director(request: PipelineRequest, unity_controller=None, pipeline_controller=None) -> Agent:
+    tools = CaseTools(request)
+
+    from ps_to_unity_agents.pipeline_validator import PipelineValidatorController
+    from ps_to_unity_agents.unity_controller import UnityAgentController
+    unity_controller = unity_controller or UnityAgentController(request)
+    pipeline_controller = pipeline_controller or PipelineValidatorController(request, unity_controller)
+
+    psd_agent = build_psd_agent(request, tools)
+    unity_agent = build_unity_agent(request, unity_controller)
+    pipeline_validator = build_pipeline_validator(request, pipeline_controller)
     return Agent(
         name="Director Agent",
         model=MODEL,
@@ -374,38 +375,57 @@ def build_director(request: PipelineRequest) -> Agent:
             unity_agent.as_tool(tool_name="validate_unity_stage", tool_description="Validate Unity dependencies and execution gate."),
             pipeline_validator.as_tool(
                 tool_name="run_pipeline_validation_stage",
-                tool_description="Validate available PSD package evidence and report that Unity-to-Prefab validation is not implemented yet.",
+                tool_description="Compare current PSD/IR evidence with the current-run generated Prefab snapshot.",
             ),
         ],
         output_type=PipelineDecision,
     )
 
 
-def enforce_pipeline_gate(decision: PipelineDecision, request: PipelineRequest) -> PipelineDecision:
-    """A model cannot bypass execution, semantic approval, or unfinished validation gates."""
-    if decision.status != Status.PASS:
+def enforce_pipeline_gate(
+    decision: PipelineDecision,
+    request: PipelineRequest,
+    validation_result=None,
+) -> PipelineDecision:
+    """A model cannot bypass approval or deterministic pipeline validation evidence."""
+    if request.execution_mode != "execute" or not request.semantics_approved:
+        enforced_status = Status.NEEDS_REVIEW
+        owner = "HUMAN"
+        code = "PIPELINE_APPROVAL_REQUIRED"
+        message = "Pipeline execution or semantic approval gate is incomplete."
+        next_action = "Approve semantic intent and use execute mode before generation."
+    elif not validation_result:
+        enforced_status = Status.NEEDS_REVIEW
+        owner = "PIPELINE_VALIDATOR"
+        code = "PIPELINE_VALIDATION_REQUIRED"
+        message = "No current deterministic pipeline result backs the Director decision."
+        next_action = "Run Pipeline Validator on current-run Unity evidence."
+    else:
+        enforced_status = Status(validation_result.get("status", "BLOCKED"))
+        owner = "PIPELINE_VALIDATOR"
+        code = (validation_result.get("issues") or [{}])[0].get("code") or "PIPELINE_VALIDATION_REQUIRED"
+        message = "The Director decision is softer than the deterministic Pipeline Validator result."
+        next_action = "Resolve and rerun Pipeline Validator."
+
+    rank = {Status.PASS: 0, Status.NEEDS_REVIEW: 1, Status.FAIL_RETRYABLE: 2, Status.BLOCKED: 3}
+    if rank[decision.status] >= rank[enforced_status]:
         return decision
-    if request.execution_mode == "execute" and request.semantics_approved:
-        return decision.model_copy(update={
-            "status": Status.NEEDS_REVIEW,
-            "responsible_agent": "PIPELINE_VALIDATOR",
-            "summary": "Model PASS is unverified: full generated-Prefab validation is not implemented yet.",
-            "issues": [
-                *decision.issues,
-                Issue(
-                    code="PIPELINE_VALIDATION_NOT_IMPLEMENTED",
-                    owner="PIPELINE_VALIDATOR",
-                    severity="warning",
-                    phase="PIPELINE",
-                    message="Full PSD-to-Prefab validation must exist before the Director can return PASS.",
-                    suggested_action="Implement and run the Pipeline Validator after the Unity Agent stage.",
-                ),
-            ],
-            "next_action": "Complete Pipeline Validator implementation.",
-        })
+    issue_severity = "warning" if enforced_status == Status.NEEDS_REVIEW else "error"
     return decision.model_copy(update={
-        "status": Status.NEEDS_REVIEW,
-        "responsible_agent": "HUMAN",
-        "summary": "Pipeline execution or semantic approval gate is incomplete.",
-        "next_action": "Approve semantic intent and use execute mode before generation.",
+        "status": enforced_status,
+        "responsible_agent": owner,
+        "summary": message,
+        "issues": [
+            *decision.issues,
+            Issue(
+                code=code,
+                owner=owner if owner in {"HUMAN", "PIPELINE_VALIDATOR"} else "PIPELINE_VALIDATOR",
+                severity=issue_severity,
+                phase="PIPELINE",
+                message=message,
+                suggested_action=next_action,
+                retryable=enforced_status == Status.FAIL_RETRYABLE,
+            ),
+        ],
+        "next_action": next_action,
     })

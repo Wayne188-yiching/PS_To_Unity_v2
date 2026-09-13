@@ -19,5 +19,7 @@ namespace PhotoshopToUnity.EditorImporter
         public string prefabName;
         public Vector2 referenceResolution = new Vector2(1920f, 1080f);
         public bool useResponsiveAnchor;
+        public List<PhotoshopUiImageBinding> imageBindings = new List<PhotoshopUiImageBinding>();
+        public List<PhotoshopUiTextBinding> textBindings = new List<PhotoshopUiTextBinding>();
     }
 }

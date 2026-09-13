@@ -2,7 +2,7 @@
 
 將 Photoshop 排版好的遊戲 UI 轉成 Unity uGUI + TextMeshPro Prefab。文字圖層保留為可編輯的 TMP 節點，非文字圖層逐一輸出為 PNG Sprite。
 
-**目前版本：v2.14.0**
+**目前版本：v2.15.0**
 
 > PNG 像素去重會先依圖片尺寸篩選候選者，再只對 PNG 中會影響像素／色彩的區塊計算雜湊；Photoshop 每次可能不同的 iTXt/XMP 中繼資料不參與比對，因此完整 bytes 或檔案大小不同的相同圖片也會合併。這項處理不會改動 PNG 像素，layout 內的引用會自動重指到保留下來的單一檔案。
 

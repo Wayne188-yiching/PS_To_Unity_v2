@@ -41,4 +41,4 @@ uv run python main.py unity --request <request.json>
 
 語意不明或尚未核准維持 NEEDS_REVIEW；缺依賴／非法路徑／錯誤證據為 BLOCKED。只有已辨識的暫時失敗允許有限重試。逾時後仍活躍的程序必須追蹤同一次執行，不能以檔案鎖或等待逾時假設它已結束。
 
-本階段 basic artifact gate 不等於完整 Pipeline Validator。PSD intent、IR、Unity 元件／幾何／文字／圖像的完整對照與互動驗收尚需後續實作及最後驗證。
+Unity Agent 的 basic artifact gate 會把同次 Prefab 結構快照交給 Pipeline Validator。兩者即使都回傳結構性 PASS，仍不等於 Photoshop／Unity 畫面與互動的最終實機驗收；完整驗收依使用者排序留在所有 Agent 完成後。

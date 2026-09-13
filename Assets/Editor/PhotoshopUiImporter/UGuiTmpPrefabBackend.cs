@@ -267,7 +267,17 @@ namespace PhotoshopToUnity.EditorImporter
         {
             var image = gameObject.GetComponent<Image>();
             image.raycastTarget = false;
-            image.sprite = context.skinResolver?.Resolve(node);
+            string sourceKind = null;
+            image.sprite = context.skinResolver?.Resolve(node, out sourceKind);
+            context.imageBindings?.Add(new PhotoshopUiImageBinding
+            {
+                sourceName = node.name,
+                imagePath = node.imagePath,
+                skinKey = node.skinKey,
+                role = "image",
+                sourceKind = sourceKind,
+                spriteAssetPath = image.sprite == null ? null : AssetDatabase.GetAssetPath(image.sprite),
+            });
             var hasSpriteBorder = image.sprite != null && image.sprite.border.sqrMagnitude > 0f;
             image.type = node.RequestsSlicedImage || hasSpriteBorder
                 ? Image.Type.Sliced
@@ -463,11 +473,21 @@ namespace PhotoshopToUnity.EditorImporter
                 throw new InvalidOperationException(
                     $"群組 {node.name} 標示為形狀遮罩（maskMode=sprite），但找不到帶 [MASK] 的直接子層。");
 
-            var sprite = context.skinResolver?.Resolve(maskNode);
+            string sourceKind = null;
+            var sprite = context.skinResolver?.Resolve(maskNode, out sourceKind);
             if (sprite == null)
                 throw new InvalidOperationException(
                     $"群組 {node.name} 的遮罩圖 {maskNode.imagePath} 找不到對應 Sprite。" +
                     "Mask 的 sprite 為空會讓整組子物件被裁成全透明，因此中止生成。");
+            context.imageBindings?.Add(new PhotoshopUiImageBinding
+            {
+                sourceName = maskNode.name,
+                imagePath = maskNode.imagePath,
+                skinKey = maskNode.skinKey,
+                role = "mask",
+                sourceKind = sourceKind,
+                spriteAssetPath = AssetDatabase.GetAssetPath(sprite),
+            });
 
             var image = gameObject.AddComponent<Image>();
             image.sprite = sprite;
@@ -734,7 +754,12 @@ namespace PhotoshopToUnity.EditorImporter
         private static void ApplyText(GameObject gameObject, PhotoshopUiNode node, PrefabGenerationContext context)
         {
             var text = gameObject.GetComponent<TextMeshProUGUI>();
-            context.tmpMapper?.Apply(text, node);
+            var binding = context.tmpMapper?.Apply(text, node);
+            if (binding != null)
+            {
+                binding.role = "text";
+                context.textBindings?.Add(binding);
+            }
         }
 
         // 假厚度：在原 group GameObject 下疊兩層 TMP（shadow 在下、main 在上）
@@ -755,7 +780,12 @@ namespace PhotoshopToUnity.EditorImporter
             var mainRect = mainGo.GetComponent<RectTransform>();
             mainRect.SetParent(groupRect, false);
             ApplyChildTmpRect(mainRect, node.width, node.height, 0f, 0f);
-            context.tmpMapper?.Apply(mainGo.GetComponent<TextMeshProUGUI>(), node);
+            var mainBinding = context.tmpMapper?.Apply(mainGo.GetComponent<TextMeshProUGUI>(), node);
+            if (mainBinding != null)
+            {
+                mainBinding.role = "main";
+                context.textBindings?.Add(mainBinding);
+            }
 
             // 子節點掛在 group 上，座標空間與原 node 一致
             if (node.children == null) return;

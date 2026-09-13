@@ -41,11 +41,11 @@ namespace PhotoshopToUnity.EditorImporter
             this.fontMap = fontMap;
         }
 
-        public void Apply(TextMeshProUGUI target, PhotoshopUiNode node)
+        public PhotoshopUiTextBinding Apply(TextMeshProUGUI target, PhotoshopUiNode node)
         {
             if (target == null || node == null)
             {
-                return;
+                return null;
             }
 
             // Photoshop stores paragraph breaks as bare CR characters, while TMP
@@ -97,12 +97,16 @@ namespace PhotoshopToUnity.EditorImporter
             // v2.10：先查 fontMap（fontToken → Font Asset），沒指定 fontMap 或對不到才退回預設字型。
             var fontAsset = defaultFontAsset != null ? defaultFontAsset : TMP_Settings.defaultFontAsset;
             var baseMaterialPreset = defaultMaterialPreset;
+            var resolutionSource = string.IsNullOrWhiteSpace(node.fontToken) ? "default" : "defaultFallback";
+            string matchedFontKeyword = null;
             if (fontMap != null && !string.IsNullOrWhiteSpace(node.fontToken))
             {
                 if (fontMap.TryGetEntry(node.fontToken, out var entry))
                 {
                     fontAsset = entry.fontAsset;
                     baseMaterialPreset = entry.materialPreset != null ? entry.materialPreset : entry.fontAsset.material;
+                    resolutionSource = "fontMap";
+                    matchedFontKeyword = entry.fontKeyword;
                 }
                 else if (warnedFontTokens.Add(node.fontToken))
                 {
@@ -124,6 +128,16 @@ namespace PhotoshopToUnity.EditorImporter
             {
                 target.fontSharedMaterial = resolvedMaterial;
             }
+            return new PhotoshopUiTextBinding
+            {
+                sourceName = node.name,
+                fontToken = node.fontToken,
+                materialToken = node.materialToken,
+                resolutionSource = resolutionSource,
+                matchedFontKeyword = matchedFontKeyword,
+                fontAssetPath = target.font == null ? null : AssetDatabase.GetAssetPath(target.font),
+                materialAssetPath = target.fontSharedMaterial == null ? null : AssetDatabase.GetAssetPath(target.fontSharedMaterial),
+            };
         }
 
         // v2.10：fontAsset 由呼叫端傳入（fontMap 解析後的字型），SDF 換算與材質庫比對都以該字型為準。

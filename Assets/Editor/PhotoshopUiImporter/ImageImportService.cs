@@ -200,16 +200,20 @@ namespace PhotoshopToUnity.EditorImporter
 
         private static string ComputePixelHash(string assetPath)
         {
+            return ComputePixelHashFromFile(PathUtility.ToAbsolutePath(assetPath));
+        }
+
+        internal static string ComputePixelHashFromFile(string absolutePath)
+        {
             Texture2D tex = null;
             try
             {
-                var absPath = PathUtility.ToAbsolutePath(assetPath);
-                if (!File.Exists(absPath))
+                if (string.IsNullOrWhiteSpace(absolutePath) || !File.Exists(absolutePath))
                 {
                     return null;
                 }
 
-                var bytes = File.ReadAllBytes(absPath);
+                var bytes = File.ReadAllBytes(absolutePath);
                 tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
                 if (!tex.LoadImage(bytes, markNonReadable: false))
                 {

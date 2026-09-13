@@ -20,6 +20,9 @@ class UnityAgentController:
         self.last_result = None
         self.attempts = 0
         self.pending = None
+        self.last_payload = None
+        self.last_layout_hash = None
+        self.last_inputs = None
 
     def _result(self, status, code, message, **evidence):
         result = {
@@ -107,10 +110,20 @@ class UnityAgentController:
                 result = self._read_result(process.poll(), payload, layout_hash, inputs, run_folder)
             except (OSError, ValueError, TypeError) as error:
                 result = self._result("BLOCKED", "UNITY_EXECUTION_EVIDENCE_INVALID", str(error))
+            if self.request.execution_mode != "execute" or not self.request.semantics_approved:
+                result = self._result(
+                    "BLOCKED", "UNITY_APPROVAL_REVOKED_DURING_RUN",
+                    "Execution mode or human semantic approval was revoked while Unity was running; its completion cannot be accepted.",
+                )
             self.pending = None
             (self.request.unity_project_path / ".ps_to_unity_agent.lock").unlink(missing_ok=True)
             return self._save(result, payload["runId"], run_folder)
         if self.last_result and (self.last_result["status"] != "FAIL_RETRYABLE" or self.attempts >= 2):
+            if self.last_result["status"] in {"PASS", "NEEDS_REVIEW"} and not self.current_evidence_matches():
+                self.last_result = self._result(
+                    "BLOCKED", "UNITY_CACHED_EVIDENCE_STALE",
+                    "Approval, inputs, importer code, or generated Prefab changed after the cached Unity result; start a fresh guarded run.",
+                )
             return self.last_result
         gate = self.inspect()
         if not gate["generationAllowed"]:
@@ -131,6 +144,9 @@ class UnityAgentController:
             payload = self._payload(gate["package"], run_id)
             layout_hash = sha256_file(Path(payload["layoutJsonPath"]))
             inputs = self._input_hashes(payload)
+            self.last_payload = payload
+            self.last_layout_hash = layout_hash
+            self.last_inputs = inputs
             payload["requestFingerprint"] = canonical_json_sha256({"request": payload, "layoutSha256": layout_hash, "inputs": inputs})
             request_path, result_path = run_folder / "request.json", run_folder / "result.json"
             request_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -158,6 +174,12 @@ class UnityAgentController:
     def _input_hashes(self, payload):
         folder = Path(payload["sourceImageFolder"])
         inputs = {str(path.resolve()): sha256_file(path) for path in folder.rglob("*") if path.is_file()}
+        importer = self.request.unity_project_path / "Assets/Editor/PhotoshopUiImporter"
+        for candidate in importer.rglob("*"):
+            if candidate.is_file():
+                inputs[str(candidate.resolve())] = sha256_file(candidate)
+        project_version = self.request.unity_project_path / "ProjectSettings/ProjectVersion.txt"
+        inputs[str(project_version.resolve())] = sha256_file(project_version)
         for key in ("defaultTmpFontAssetPath", "defaultTmpMaterialPresetPath", "tmpFontMapPath", "skinMapPath",
                     "materialLibraryFolder"):
             if payload[key]:
@@ -171,6 +193,44 @@ class UnityAgentController:
                     if meta.is_file():
                         inputs[str(meta.resolve())] = sha256_file(meta)
         return inputs
+
+    def current_inputs_match(self):
+        if self.last_payload is None or self.last_layout_hash is None or self.last_inputs is None:
+            return False
+        try:
+            return (
+                sha256_file(Path(self.last_payload["layoutJsonPath"])) == self.last_layout_hash
+                and self._input_hashes(self.last_payload) == self.last_inputs
+            )
+        except (OSError, ValueError, TypeError, KeyError):
+            return False
+
+    def current_evidence_matches(self, result=None):
+        result = result or self.last_result
+        if (
+            self.request.execution_mode != "execute"
+            or not self.request.semantics_approved
+            or result is not self.last_result
+            or not self.current_inputs_match()
+        ):
+            return False
+        try:
+            receipt = result.get("importResult") or {}
+            if (
+                result.get("runId") != self.last_payload["runId"]
+                or receipt.get("runId") != self.last_payload["runId"]
+                or receipt.get("requestFingerprint") != self.last_payload["requestFingerprint"]
+                or receipt.get("layoutSha256") != self.last_layout_hash
+            ):
+                return False
+            prefab = self._asset_path(receipt.get("prefabAssetPath") or "")
+            return (
+                prefab.is_file()
+                and prefab.stat().st_size > 0
+                and receipt.get("prefabSha256") == sha256_file(prefab)
+            )
+        except (OSError, ValueError, TypeError, KeyError):
+            return False
 
     def _read_result(self, return_code, payload, layout_hash, inputs, run_folder):
         result_path = run_folder / "result.json"
@@ -201,7 +261,11 @@ class UnityAgentController:
             "TMP_FONT_TOKEN", "FONT_FALLBACK", "MISSING_FONT",
         )):
             return self._result("NEEDS_REVIEW", "UNITY_SEMANTIC_REVIEW", "Prefab exists, but unresolved semantic/font diagnostics need review.", importResult=receipt)
-        return self._result("PASS", "", "Unity generation passed basic artifact checks; full pipeline validation remains unimplemented.", importResult=receipt)
+        return self._result(
+            "PASS", "",
+            "Unity generation passed current-run artifact checks; Pipeline Validator must still compare the Prefab with the PSD/IR.",
+            importResult=receipt,
+        )
 
     def _save(self, result, run_id, run_folder):
         result.update(runId=run_id, runFolder=str(run_folder), attempts=self.attempts)

@@ -16,6 +16,12 @@ namespace PhotoshopToUnity.EditorImporter
 
         public Sprite Resolve(PhotoshopUiNode node)
         {
+            return Resolve(node, out _);
+        }
+
+        public Sprite Resolve(PhotoshopUiNode node, out string sourceKind)
+        {
+            sourceKind = null;
             if (node == null)
             {
                 return null;
@@ -23,12 +29,14 @@ namespace PhotoshopToUnity.EditorImporter
 
             if (skinMap != null && skinMap.TryGetSprite(node.skinKey, out var skinSprite))
             {
+                sourceKind = "skin";
                 return skinSprite;
             }
 
             var key = PathUtility.NormalizeAssetKey(node.imagePath);
             if (!string.IsNullOrEmpty(key) && importedSprites != null && importedSprites.TryGetValue(key, out var importedSprite))
             {
+                sourceKind = "imported";
                 return importedSprite;
             }
 
