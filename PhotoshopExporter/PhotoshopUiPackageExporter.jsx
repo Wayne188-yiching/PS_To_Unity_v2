@@ -1447,6 +1447,7 @@ function exportNodeImageFastDuplicate(layer, node, context, exportDoc, file) {
         app.activeDocument = exportDoc;
         exportDoc.activeLayer = duplicatedLayer;
         duplicatedLayer.visible = true;
+        unlockLayerForExport(duplicatedLayer);
         // OPTIMIZATION_PLAN_zh.html#phase4-5-q9：scroll 內容匯全圖——duplicate 會帶著遮色片（PS 實測），
         // 對複製體刪除 mask 後，align + trim 自然以完整像素回寫節點座標。
         if (node._noMaskExport) {
@@ -1483,6 +1484,22 @@ function exportNodeImageFastDuplicate(layer, node, context, exportDoc, file) {
     }
 
     return saved;
+}
+
+// duplicate() carries the source layer's lock flags into the temporary export
+// document, and translate() on a locked layer throws "user cancelled", which the
+// caller records as an empty layer and skips -- the artwork is then missing from
+// the package while layout.json still references its PNG. The duplicate is a
+// throwaway inside the temporary document, so clearing its locks cannot reach
+// the source PSD.
+function unlockLayerForExport(layer) {
+    if (!layer) {
+        return;
+    }
+    try { layer.allLocked = false; } catch (ignoredAll) {}
+    try { layer.positionLocked = false; } catch (ignoredPosition) {}
+    try { layer.pixelsLocked = false; } catch (ignoredPixels) {}
+    try { layer.transparentPixelsLocked = false; } catch (ignoredTransparent) {}
 }
 
 function alignActiveLayerToExportOrigin(doc) {

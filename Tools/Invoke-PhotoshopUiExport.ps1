@@ -103,8 +103,33 @@ $imageHashes = [ordered]@{}
 foreach ($imageFile in (Get-ChildItem -LiteralPath $imageFolder -File -Filter '*.png' | Sort-Object Name)) {
     $imageHashes[$imageFile.Name] = Get-PhotoshopFileSha256 $imageFile.FullName
 }
+# A skipped layer still keeps its imagePath in layout.json, so the package can
+# reference PNGs the exporter never wrote. Reporting PASS there hands the next
+# stage a package that fails its own validator, so compare the two sides here.
+$writtenImageNames = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+foreach ($writtenName in $imageHashes.Keys) {
+    [void]$writtenImageNames.Add([string]$writtenName)
+}
+$referencedImageNames = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+$pendingNodes = New-Object System.Collections.Stack
+foreach ($rootNode in @($layout.nodes)) {
+    if ($null -ne $rootNode) { [void]$pendingNodes.Push($rootNode) }
+}
+while ($pendingNodes.Count -gt 0) {
+    $node = $pendingNodes.Pop()
+    if ([string]$node.type -eq 'image' -and -not [string]::IsNullOrWhiteSpace([string]$node.imagePath)) {
+        [void]$referencedImageNames.Add([string]$node.imagePath)
+    }
+    foreach ($child in @($node.children)) {
+        if ($null -ne $child) { [void]$pendingNodes.Push($child) }
+    }
+}
+$missingImages = @($referencedImageNames | Where-Object { -not $writtenImageNames.Contains($_) } | Sort-Object)
+$exportStatus = 'PASS'
+if ($missingImages.Count -gt 0) { $exportStatus = 'BLOCKED' }
+
 $result = [ordered]@{
-    status = 'PASS'
+    status = $exportStatus
     runId = $runId
     psdSha256 = $sourceFingerprintAfter
     layoutSha256 = Get-PhotoshopFileSha256 $layoutPath
@@ -112,9 +137,14 @@ $result = [ordered]@{
     layoutJsonPath = $layoutPath
     imageFolder = $imageFolder
     imageCount = @(Get-ChildItem -LiteralPath $imageFolder -File -Filter '*.png').Count
+    referencedImageCount = $referencedImageNames.Count
+    missingImages = @($missingImages)
     schemaVersion = $layout.schemaVersion
     canvasWidth = $layout.canvas.width
     canvasHeight = $layout.canvas.height
 }
 $result | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $resultPath -Encoding utf8
+if ($missingImages.Count -gt 0) {
+    throw "Photoshop exporter wrote $($imageHashes.Count) PNG(s) but layout.json references $($referencedImageNames.Count). Missing: $($missingImages -join ', ')"
+}
 $result | ConvertTo-Json -Compress
