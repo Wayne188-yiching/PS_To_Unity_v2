@@ -45,3 +45,7 @@ ps_exporter_current.png
 # Impeccable review screenshots (regenerated per run; ~1.5 MB per pass).
 # design.json and surfaces/ are intentionally tracked -- only review/ is output.
 .impeccable/review/
+
+# Local-only acceptance inputs and pre-push backups (contain internal/network paths)
+AgentOrchestrator/cases/examples/psd/*.request.json
+AgentOrchestrator/**/*.local-before-github-*.json
