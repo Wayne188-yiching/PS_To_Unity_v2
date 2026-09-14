@@ -234,7 +234,7 @@
         <div class="scene real-case-scene">
           <div class="scene-heading scene-heading--wide">
             <p class="section-id">SECTION 05 · LIVE ACCEPTANCE · 2026-09-14</p>
-            <h2>正式專案的排行榜，<br>已經整條跑完並比對過。</h2>
+            <h2>正式專案的排行榜，<br>從設計稿一路做到 Unity 畫面。</h2>
             <p>用的是正式專案的 <code>Hall_Ranking.psd</code>，隔離副本與來源 SHA-256 相同。</p>
           </div>
 
@@ -273,7 +273,7 @@
                 <p class="depth-1"><i></i><span>TMP</span><code>40</code></p>
                 <p class="depth-1"><i></i><span>字型／描邊警告</span><code>0</code></p>
               </div>
-              <p class="case-disclaimer">Validator expected 129 = actual 129、0 blocking、0 review。拖曳與回彈仍未驗收，需要另一份含 <code>[SCROLL_*]</code> 的 PSD。</p>
+              <p class="case-disclaimer">129 個節點全數相符，代表 Unity 確實照著匯出的版面生成；但這不保證畫面和設計稿長得一樣。另外，清單能不能用手指拖動、放開會不會回彈，這份設計稿裡沒有可捲動的區塊，所以還沒辦法驗。</p>
             </section>
           </div>
         </div>
@@ -283,7 +283,7 @@
         <div class="scene progress-scene">
           <div class="scene-heading">
             <p class="section-id">SECTION 06 · EVIDENCE SNAPSHOT</p>
-            <h2>兩端都跑通了，<br>剩下拖曳與端到端還沒驗。</h2>
+            <h2>工具能整條跑完了，<br>但生成的畫面還沒對準設計稿。</h2>
           </div>
 
           <div class="roadmap" aria-label="Agent architecture development roadmap">
@@ -294,15 +294,15 @@
             <article class="roadmap-item roadmap-item--pass"><span>04</span><div><strong>PSD Controller / Evidence / Structure Plan</strong><p>綁定核准、記錄進度、重跑不會重複執行</p></div><em>COMPLETED</em></article>
             <article class="roadmap-item roadmap-item--pass"><span>05</span><div><strong>PSD Agent real-world validation</strong><p>正式專案 PSD 實跑：明確的照做、模糊的不猜、隱藏層零接觸</p></div><em>VALIDATED</em></article>
             <article class="roadmap-item roadmap-item--pass"><span>06</span><div><strong>Unity Agent</strong><p>EditorWindow／Batch／Agent 共用同一套 deterministic service；實機匯入 PASS</p></div><em>VALIDATED</em></article>
-            <article class="roadmap-item roadmap-item--pass"><span>07</span><div><strong>Pipeline Validator</strong><p>比對 PS 的意圖與 Unity 的 Prefab：節點、幾何、Sprite、TMP、字型解析</p></div><em>PASS 129 / 129</em></article>
+            <article class="roadmap-item roadmap-item--pass"><span>07</span><div><strong>Pipeline Validator</strong><p>比對設計稿的意圖與 Unity 產出的結構：節點、尺寸、圖片、文字、字型；不含畫面是否對齊</p></div><em>PASS 129 / 129</em></article>
             <article class="roadmap-item roadmap-item--current"><span>08</span><div><strong>Director orchestration</strong><p>決定誰先做、何時該停、何時退回人工；已接通，尚未整體跑過</p></div><em>CURRENT</em></article>
-            <article class="roadmap-item roadmap-item--planned"><span>09</span><div><strong>Multi-Agent end-to-end validation</strong><p>四個 Agent 串起來自動跑通；拖曳回彈需含 [SCROLL_*] 的 PSD</p></div><em>PLANNED</em></article>
+            <article class="roadmap-item roadmap-item--planned"><span>09</span><div><strong>Multi-Agent end-to-end validation</strong><p>四個 Agent 自己接力跑完一輪，中間不需要人介入</p></div><em>PLANNED</em></article>
           </div>
 
           <div class="verification-strip">
-            <span><b>131 / 131</b> Python regression tests</span>
-            <span><b>39 / 39</b> exported images validated</span>
-            <span><b>0</b> blocking mismatches in Prefab comparison</span>
+            <span><b>131 / 131</b> 自動回歸測試通過</span>
+            <span><b>39 / 39</b> 匯出圖片全數驗證</span>
+            <span><b>0</b> 結構比對不符（不含畫面對齊）</span>
           </div>
         </div>
       </section>
