@@ -54,4 +54,4 @@ AgentOrchestrator/**/*.local-before-github-*.json
 # local build that base64-inlines them stay out of git. dist/ itself is tracked:
 # it is built from the committed source, which has no image chapter.
 AgentProgressPresentation/app/src/assets/case-*.png
-AgentProgressPresentation/PS_To_Unity_Agent_Report_Offline_with_images.html
+AgentProgressPresentation/with-images/
