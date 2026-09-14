@@ -66,7 +66,7 @@ def _state_family_candidates(nodes: Iterable[dict[str, Any]], parent_path: str =
 
 
 def _visible_layer_index(nodes: Iterable[dict[str, Any]], parent_visible: bool = True, parent_path: str = "", parent_id: int | None = None):
-    for node in nodes or []:
+    for sibling_index, node in enumerate(nodes or []):
         name = str(node.get("name") or "")
         path = f"{parent_path}/{name}" if parent_path else name
         visible = parent_visible and bool(node.get("visible"))
@@ -74,6 +74,9 @@ def _visible_layer_index(nodes: Iterable[dict[str, Any]], parent_visible: bool =
             yield {
                 "id": node.get("id"),
                 "parentId": parent_id,
+                # Counts hidden siblings too, so it matches the stacking order the
+                # structure-plan validator enforces on sibling move actions.
+                "siblingIndex": sibling_index,
                 "path": path,
                 "name": name,
                 "nodeType": node.get("nodeType"),

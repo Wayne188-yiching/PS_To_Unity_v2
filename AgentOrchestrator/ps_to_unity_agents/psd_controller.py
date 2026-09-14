@@ -10,7 +10,12 @@ from typing import Any, Callable, Iterable
 from agent_roles.pipeline_agents import CaseTools
 from .fingerprints import inspection_fingerprint, plan_fingerprint, sha256_file
 from .models import PipelineRequest, PsdAgentDecision, PsdStructurePlan
-from .psd_structure_plan import bind_structure_plan_preconditions, load_inspection, validate_structure_plan
+from .psd_structure_plan import (
+    bind_structure_plan_preconditions,
+    load_inspection,
+    normalize_sibling_move_order,
+    validate_structure_plan,
+)
 from .tool_failures import classify_tool_failure
 
 
@@ -166,6 +171,7 @@ class PsdAgentController:
 
         inspection = load_inspection(self.inspection_path)
         plan = bind_structure_plan_preconditions(decision.structure_plan, inspection)
+        plan = normalize_sibling_move_order(plan, inspection)
         self._write_json(self.plan_path, plan.model_dump(mode="json"))
         validation = validate_structure_plan(self.plan_path, self.inspection_path)
         self._write_json(self.request.output_folder / "psd_structure_plan_validation.json", validation)

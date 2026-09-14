@@ -6,7 +6,11 @@ import unittest
 from pathlib import Path
 
 from ps_to_unity_agents.models import PsdStructurePlan
-from ps_to_unity_agents.psd_structure_plan import bind_structure_plan_preconditions, validate_structure_plan
+from ps_to_unity_agents.psd_structure_plan import (
+    bind_structure_plan_preconditions,
+    normalize_sibling_move_order,
+    validate_structure_plan,
+)
 
 
 TEST_TEMP_ROOT = Path(__file__).resolve().parents[1] / ".test_tmp"
@@ -224,6 +228,53 @@ class PsdStructurePlanTests(unittest.TestCase):
             self.assertTrue(any(issue["code"] == "STRUCTURE_PLAN_MOVE_ORDER" for issue in result["issues"]))
         finally:
             temporary.cleanup()
+
+    def test_normalizer_orders_sibling_moves_bottom_to_top(self):
+        inspection = self.base_inspection()
+        inspection["layers"] = [
+            {"id": 1, "name": "Top", "nodeType": "layer", "layerKind": "LayerKind.NORMAL", "visible": True, "children": []},
+            {"id": 2, "name": "Middle", "nodeType": "layer", "layerKind": "LayerKind.NORMAL", "visible": True, "children": []},
+            {"id": 3, "name": "Bottom", "nodeType": "layer", "layerKind": "LayerKind.NORMAL", "visible": True, "children": []},
+        ]
+        plan = self.base_plan()
+        plan["actions"] = [
+            {"action": "create_group", "ref": "target", "new_name": "Target", "reason": "Group"},
+            {"action": "move", "layer_id": 1, "parent_ref": "target", "reason": "Top first"},
+            {"action": "move", "layer_id": 3, "parent_ref": "target", "reason": "Bottom second"},
+            {"action": "move", "layer_id": 2, "parent_ref": "target", "reason": "Middle last"},
+        ]
+        normalized = normalize_sibling_move_order(PsdStructurePlan.model_validate(plan), inspection)
+        self.assertEqual(
+            [3, 2, 1],
+            [action.layer_id for action in normalized.actions if action.action == "move"],
+        )
+        self.assertEqual("create_group", normalized.actions[0].action)
+
+        temporary, plan_path, inspection_path = self.write_case(normalized.model_dump(mode="json"), inspection)
+        try:
+            result = validate_structure_plan(plan_path, inspection_path)
+            self.assertFalse(any(issue["code"] == "STRUCTURE_PLAN_MOVE_ORDER" for issue in result["issues"]))
+        finally:
+            temporary.cleanup()
+
+    def test_normalizer_keeps_moves_into_different_parents_apart(self):
+        inspection = self.base_inspection()
+        inspection["layers"] = [
+            {"id": 1, "name": "Top", "nodeType": "layer", "layerKind": "LayerKind.NORMAL", "visible": True, "children": []},
+            {"id": 2, "name": "Bottom", "nodeType": "layer", "layerKind": "LayerKind.NORMAL", "visible": True, "children": []},
+        ]
+        plan = self.base_plan()
+        plan["actions"] = [
+            {"action": "create_group", "ref": "first", "new_name": "First", "reason": "Group"},
+            {"action": "create_group", "ref": "second", "new_name": "Second", "reason": "Group"},
+            {"action": "move", "layer_id": 1, "parent_ref": "first", "reason": "Own bucket"},
+            {"action": "move", "layer_id": 2, "parent_ref": "second", "reason": "Own bucket"},
+        ]
+        normalized = normalize_sibling_move_order(PsdStructurePlan.model_validate(plan), inspection)
+        self.assertEqual(
+            [1, 2],
+            [action.layer_id for action in normalized.actions if action.action == "move"],
+        )
 
     def test_changed_name_breaks_bound_precondition(self):
         plan = self.base_plan()

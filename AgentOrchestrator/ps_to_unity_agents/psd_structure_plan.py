@@ -56,6 +56,46 @@ def bind_structure_plan_preconditions(
     return plan.model_copy(update={"actions": actions, "approved": False})
 
 
+def normalize_sibling_move_order(
+    plan: PsdStructurePlan,
+    inspection: dict[str, Any],
+) -> PsdStructurePlan:
+    """Order sibling move actions bottom-to-top without changing which layers move.
+
+    Choosing the layers and their target parent is a semantic decision. The order
+    sibling moves must be applied in is mechanical and fully derivable from the
+    current stacking order, so settle it here instead of relying on the model to
+    emit it correctly. Only the positions of moves that already share a source and
+    target parent change; validate_structure_plan still checks the result.
+    """
+    layers = {
+        int(node["id"]): (parent_id, sibling_index)
+        for node, _, parent_id, sibling_index in _walk(inspection.get("layers") or [])
+        if node.get("id") is not None
+    }
+    actions = list(plan.actions)
+    buckets: dict[tuple[str, str], list[int]] = {}
+    for index, action in enumerate(actions):
+        if action.action != "move" or action.layer_id not in layers:
+            continue
+        parent_id, _ = layers[action.layer_id]
+        target_key = f"REF:{action.parent_ref}" if action.parent_ref else _parent_key(action.parent_layer_id)
+        buckets.setdefault((_parent_key(parent_id), target_key), []).append(index)
+
+    reordered = False
+    for slots in buckets.values():
+        if len(slots) < 2:
+            continue
+        bottom_first = sorted(slots, key=lambda slot: layers[actions[slot].layer_id][1], reverse=True)
+        if bottom_first == slots:
+            continue
+        for slot, action in zip(slots, [actions[slot] for slot in bottom_first]):
+            actions[slot] = action
+        reordered = True
+
+    return plan.model_copy(update={"actions": actions}) if reordered else plan
+
+
 def load_inspection(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
