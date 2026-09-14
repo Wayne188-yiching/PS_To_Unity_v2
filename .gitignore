@@ -50,7 +50,8 @@ ps_exporter_current.png
 AgentOrchestrator/cases/examples/psd/*.request.json
 AgentOrchestrator/**/*.local-before-github-*.json
 
-# Presentation build output and its comparison images embed production game
-# artwork, so they stay local. Rebuild with: cd AgentProgressPresentation && npm run build
-AgentProgressPresentation/dist/
+# The Section 06 comparison images are production game artwork, so they and the
+# local build that base64-inlines them stay out of git. dist/ itself is tracked:
+# it is built from the committed source, which has no image chapter.
 AgentProgressPresentation/app/src/assets/case-*.png
+AgentProgressPresentation/PS_To_Unity_Agent_Report_Offline_with_images.html
