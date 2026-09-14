@@ -11,13 +11,17 @@ const executablePath = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.e
 // Home/End scroll smoothly, so the distance grows with every chapter added. Wait
 // for the scroll position to settle instead of guessing a fixed delay.
 const settleScroll = async (page) => {
-  await page.evaluate(() => { window.__verifyLastY = null; });
+  // Give the smooth scroll a moment to start, then require several identical
+  // samples: a single repeat also matches the easing plateau and the instant
+  // before the scroll begins, which would report the wrong chapter.
+  await page.waitForTimeout(350);
+  await page.evaluate(() => { window.__verifyLastY = null; window.__verifyStable = 0; });
   await page.waitForFunction(() => {
     const y = Math.round(window.scrollY);
-    const settled = window.__verifyLastY === y;
+    window.__verifyStable = window.__verifyLastY === y ? window.__verifyStable + 1 : 0;
     window.__verifyLastY = y;
-    return settled;
-  }, null, { polling: 200, timeout: 15000 });
+    return window.__verifyStable >= 3;
+  }, null, { polling: 150, timeout: 15000 });
 };
 
 const mimeTypes = {
