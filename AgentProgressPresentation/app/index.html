@@ -44,7 +44,7 @@
         </button>
       </div>
       <div class="chapter-readout" aria-live="polite">
-        <span id="currentIndex">01</span><span class="readout-divider">/</span><span>07</span>
+        <span id="currentIndex">01</span><span class="readout-divider">/</span><span>09</span>
         <strong id="currentLabel">PREVIOUS STATE</strong>
       </div>
     </header>
@@ -54,10 +54,12 @@
       <a href="#previous" aria-label="第一章 Previous State"><span>01</span><i></i></a>
       <a href="#limitation" aria-label="第二章 Limitation"><span>02</span><i></i></a>
       <a href="#agent-layer" aria-label="第三章 Agent Layer"><span>03</span><i></i></a>
-      <a href="#psd-agent" aria-label="第四章 Current PSD Agent"><span>04</span><i></i></a>
-      <a href="#real-case" aria-label="第五章 Real Case"><span>05</span><i></i></a>
-      <a href="#progress" aria-label="第六章 Current Progress"><span>06</span><i></i></a>
-      <a href="#direction" aria-label="第七章 Multi-Agent Direction"><span>07</span><i></i></a>
+      <a href="#agent-roles" aria-label="第四章 Agent Roles"><span>04</span><i></i></a>
+      <a href="#psd-agent" aria-label="第五章 Current PSD Agent"><span>05</span><i></i></a>
+      <a href="#real-case" aria-label="第六章 Real Case"><span>06</span><i></i></a>
+      <a href="#progress" aria-label="第七章 Current Progress"><span>07</span><i></i></a>
+      <a href="#direction" aria-label="第八章 Multi-Agent Direction"><span>08</span><i></i></a>
+      <a href="#workflow" aria-label="第九章 Future Workflow"><span>09</span><i></i></a>
     </nav>
 
     <main id="main">
@@ -167,11 +169,42 @@
         </div>
       </section>
 
-      <section class="chapter chapter--psd-agent" id="psd-agent" data-index="04" data-label="CURRENT PSD AGENT">
+      <section class="chapter chapter--agent-roles" id="agent-roles" data-index="04" data-label="AGENT ROLES">
+        <div class="scene roles-scene">
+          <div class="scene-heading scene-heading--wide">
+            <p class="section-id">SECTION 04 · AGENT ROLES</p>
+            <h2>四個 Agent，<br>各自負責一段判斷。</h2>
+            <p>它們都不直接改檔案。真正動手的還是原本那套工具，Agent 只負責判斷跟把關。</p>
+          </div>
+
+          <div class="roles-grid">
+            <article>
+              <header><span class="role-no">01</span><strong>PSD Agent</strong><small>看懂設計稿</small></header>
+              <p>讀圖層結構，判斷哪個群組在 Unity 該變成什麼。看不出來的不猜，標記起來讓人決定。它只提計畫，不動檔案。</p>
+            </article>
+            <article>
+              <header><span class="role-no">02</span><strong>Unity Agent</strong><small>把計畫變成畫面</small></header>
+              <p>先確認素材、字型、專案設定都到位，再叫既有的匯入工具產生 Prefab。缺東西就停下來說缺什麼，不會硬跑。</p>
+            </article>
+            <article>
+              <header><span class="role-no">03</span><strong>Pipeline Validator</strong><small>檢查有沒有做對</small></header>
+              <p>拿設計稿的意圖跟 Unity 的產出逐項對照：節點有沒有少、位置尺寸對不對、圖片有沒有綁上、文字有沒有用對字型。對不上就擋下來。</p>
+            </article>
+            <article>
+              <header><span class="role-no">04</span><strong>Director</strong><small>決定順序與何時停</small></header>
+              <p>決定誰先做、誰接手、哪一步要退回人工。任何一關沒過，它不讓流程繼續往下走。</p>
+            </article>
+          </div>
+
+          <p class="roles-note">前三個都已經用正式專案的檔案實跑過；Director 已經接通，但還沒讓它自己整體跑完一輪。</p>
+        </div>
+      </section>
+
+      <section class="chapter chapter--psd-agent" id="psd-agent" data-index="05" data-label="CURRENT PSD AGENT">
         <div class="scene psd-agent-scene">
           <div class="psd-agent-header">
             <div>
-              <p class="section-id">SECTION 04 · CURRENT</p>
+              <p class="section-id">SECTION 05 · CURRENT</p>
               <h2>PSD Agent v1：<br>把 PS 的分組，整理成 Unity 的結構。</h2>
             </div>
             <div class="evidence-summary">
@@ -226,10 +259,10 @@
         </div>
       </section>
 
-      <section class="chapter chapter--real-case" id="real-case" data-index="05" data-label="REAL CASE">
+      <section class="chapter chapter--real-case" id="real-case" data-index="06" data-label="REAL CASE">
         <div class="scene real-case-scene">
           <div class="scene-heading scene-heading--wide">
-            <p class="section-id">SECTION 05 · LIVE ACCEPTANCE · 2026-09-14</p>
+            <p class="section-id">SECTION 06 · LIVE ACCEPTANCE · 2026-09-14</p>
             <h2>正式專案的排行榜，<br>從設計稿一路做到 Unity 畫面。</h2>
             <p>用的是正式專案的 <code>Hall_Ranking.psd</code>，隔離副本與來源 SHA-256 相同。</p>
           </div>
@@ -275,10 +308,10 @@
         </div>
       </section>
 
-      <section class="chapter chapter--progress" id="progress" data-index="06" data-label="CURRENT PROGRESS">
+      <section class="chapter chapter--progress" id="progress" data-index="07" data-label="CURRENT PROGRESS">
         <div class="scene progress-scene">
           <div class="scene-heading">
-            <p class="section-id">SECTION 06 · EVIDENCE SNAPSHOT</p>
+            <p class="section-id">SECTION 07 · EVIDENCE SNAPSHOT</p>
             <h2>工具能整條跑完了，<br>但畫面還沒對準設計稿。</h2>
           </div>
 
@@ -303,10 +336,10 @@
         </div>
       </section>
 
-      <section class="chapter chapter--direction" id="direction" data-index="07" data-label="MULTI-AGENT DIRECTION">
+      <section class="chapter chapter--direction" id="direction" data-index="08" data-label="MULTI-AGENT DIRECTION">
         <div class="scene direction-scene">
           <div class="scene-heading scene-heading--center">
-            <p class="section-id">SECTION 07 · DIRECTION</p>
+            <p class="section-id">SECTION 08 · DIRECTION</p>
             <h2>四個角色都到位了，<br>剩下讓它們自己跑完一輪。</h2>
           </div>
 
@@ -335,6 +368,41 @@
           <p class="future-note"><span>FUTURE WORK</span> Production Automation 和 Outsource QC 是另外兩套系統，跟這條線分開走。</p>
         </div>
       </section>
+      <section class="chapter chapter--workflow" id="workflow" data-index="09" data-label="FUTURE WORKFLOW">
+        <div class="scene workflow-scene">
+          <div class="scene-heading scene-heading--wide">
+            <p class="section-id">SECTION 09 · FUTURE WORKFLOW</p>
+            <h2>做起來之後，<br>工作流會變成這樣。</h2>
+            <p>差別不是「人不用做了」，而是人做的位置從整段，變成兩個決定點。</p>
+          </div>
+
+          <div class="workflow-compare">
+            <section class="workflow-column">
+              <header><span class="status status--review">現在</span><strong>整段都要人做</strong></header>
+              <ol>
+                <li>設定美術交出設計稿</li>
+                <li>後製美術在 Unity 裡一個一個重排版面</li>
+                <li>自己判斷哪個要做成九宮格、哪個要能捲動</li>
+                <li>手動改圖層名、切圖、拉元件</li>
+                <li>做完自己檢查有沒有漏</li>
+              </ol>
+            </section>
+            <section class="workflow-column workflow-column--next">
+              <header><span class="status status--pass">以後</span><strong>人只做兩個決定</strong></header>
+              <ol>
+                <li>設定美術交出設計稿</li>
+                <li class="is-human">Agent 讀完提出結構計畫，<b>人看一眼、按核准</b></li>
+                <li>工具自動切圖、產生 Prefab</li>
+                <li>Validator 自動比對，有問題直接擋下並指出哪裡不對</li>
+                <li class="is-human"><b>人只在最後做 QC</b></li>
+              </ol>
+            </section>
+          </div>
+
+          <p class="workflow-note">目前到哪：第 2 到第 4 步已經跑得起來，第 4 步的畫面對齊還在修。第 2 步的人工核准不會取消——那是刻意留下的安全線。</p>
+        </div>
+      </section>
+
     </main>
 
     <footer class="keyboard-help" aria-label="操作說明">

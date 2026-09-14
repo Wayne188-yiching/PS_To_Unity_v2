@@ -8,6 +8,18 @@ const root = normalize(join(import.meta.dirname, "..", "dist"));
 const sourceEntry = normalize(join(import.meta.dirname, "..", "index.html"));
 const reviewDir = normalize(join(import.meta.dirname, "..", ".impeccable", "review"));
 const executablePath = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
+// Home/End scroll smoothly, so the distance grows with every chapter added. Wait
+// for the scroll position to settle instead of guessing a fixed delay.
+const settleScroll = async (page) => {
+  await page.evaluate(() => { window.__verifyLastY = null; });
+  await page.waitForFunction(() => {
+    const y = Math.round(window.scrollY);
+    const settled = window.__verifyLastY === y;
+    window.__verifyLastY = y;
+    return settled;
+  }, null, { polling: 200, timeout: 15000 });
+};
+
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
@@ -121,7 +133,7 @@ async function inspectViewport(name, width, height) {
   await page.screenshot({ path: join(reviewDir, `${name}-progress.png`) });
 
   await page.keyboard.press("End");
-  await page.waitForTimeout(450);
+  await settleScroll(page);
   const endState = await page.evaluate(() => ({
     scrollY: window.scrollY,
     maxScroll: document.documentElement.scrollHeight - window.innerHeight,
@@ -131,7 +143,7 @@ async function inspectViewport(name, width, height) {
   await page.screenshot({ path: join(reviewDir, `${name}-direction.png`) });
 
   await page.keyboard.press("Home");
-  await page.waitForTimeout(450);
+  await settleScroll(page);
   await page.keyboard.press("ArrowDown");
   await page.waitForTimeout(350);
   const keyboard = await page.evaluate(() => ({ scrollY: window.scrollY }));
@@ -199,7 +211,7 @@ const failed = report.errors.length > 0
   || report.viewports.some((entry) => entry.initial.scrollWidth > entry.initial.width || entry.psdAgent.overflow || entry.endState.overflow)
   || report.viewports.some((entry) => entry.resizeState.overflow || Math.abs(entry.resizeState.pinnedTop) > 2)
   || report.viewports.some((entry) => entry.progressState.overflow || entry.progressState.overlapCount > 0)
-  || report.viewports.some((entry) => entry.endState.chapter !== "07" || entry.keyboard.scrollY <= 0)
+  || report.viewports.some((entry) => entry.endState.chapter !== "09" || entry.keyboard.scrollY <= 0)
   || report.reducedMotion?.visibleEvidencePanels !== 10
   || report.reducedMotion?.overflow
   || !report.fileOffline?.url.endsWith("PS_To_Unity_Agent_Report_Offline.html")

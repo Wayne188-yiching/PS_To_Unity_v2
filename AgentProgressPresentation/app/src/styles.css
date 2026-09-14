@@ -1579,3 +1579,114 @@ h2 {
   .motion-toggle span { display: none; }
   .reduced-motion .evidence-panels { grid-template-columns: 1fr; }
 }
+
+/* ---- Section 04 · agent roles ------------------------------------------ */
+
+.roles-scene .scene-heading h2 { font-size: var(--type-compact); }
+
+.roles-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(12px, 1.2vw, 22px);
+  margin-top: clamp(20px, 2.2vw, 36px);
+}
+
+.roles-grid article {
+  min-width: 0;
+  padding: clamp(14px, 1.3vw, 22px);
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+}
+
+.roles-grid header {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: clamp(8px, 0.8vw, 14px);
+}
+
+.roles-grid .role-no {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: var(--pass);
+}
+
+.roles-grid header strong { font-size: clamp(1.02rem, 1.05vw, 1.3rem); color: var(--ink); }
+.roles-grid header small { width: 100%; font-size: clamp(0.8rem, 0.82vw, 0.96rem); color: var(--current); }
+
+.roles-grid p {
+  margin: 0;
+  font-size: clamp(0.84rem, 0.86vw, 1rem);
+  line-height: 1.65;
+  color: var(--muted);
+}
+
+.roles-note {
+  margin-top: clamp(16px, 1.6vw, 26px);
+  font-size: clamp(0.84rem, 0.86vw, 1rem);
+  color: var(--quiet);
+}
+
+/* ---- Section 09 · future workflow -------------------------------------- */
+
+.workflow-scene .scene-heading h2 { font-size: var(--type-compact); }
+
+.workflow-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(16px, 1.8vw, 32px);
+  margin-top: clamp(20px, 2.2vw, 36px);
+}
+
+.workflow-column {
+  min-width: 0;
+  padding: clamp(16px, 1.5vw, 26px);
+  border: 1px solid var(--line-strong);
+  background: var(--panel);
+}
+
+.workflow-column--next { background: var(--surface-soft); }
+
+.workflow-column header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: clamp(10px, 1vw, 18px);
+}
+
+.workflow-column header strong { font-size: clamp(1rem, 1.05vw, 1.3rem); color: var(--ink); }
+
+.workflow-column ol {
+  margin: 0;
+  padding-left: 1.4em;
+  display: grid;
+  gap: clamp(6px, 0.7vw, 12px);
+}
+
+.workflow-column li {
+  font-size: clamp(0.86rem, 0.88vw, 1.03rem);
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.workflow-column li.is-human { color: var(--ink); }
+.workflow-column li.is-human b { color: var(--pass); }
+
+.workflow-note {
+  margin-top: clamp(16px, 1.6vw, 26px);
+  margin-bottom: clamp(40px, 4vw, 68px);
+  max-width: 128ch;
+  font-size: clamp(0.84rem, 0.86vw, 1rem);
+  line-height: 1.6;
+  color: var(--quiet);
+}
+
+@media (max-width: 1100px) {
+  .roles-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .roles-grid, .workflow-compare { grid-template-columns: minmax(0, 1fr); }
+}
