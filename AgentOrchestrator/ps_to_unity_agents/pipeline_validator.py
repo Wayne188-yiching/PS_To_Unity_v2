@@ -380,7 +380,19 @@ class PipelineValidatorController:
                 self.request.unity_use_responsive_anchor and node.get("width") and node.get("height"),
             ))
         )
-        if has_own_rect and not item["layoutAncestor"]:
+        # A wired Scrollbar handle is intentionally reparented below the generated
+        # SlidingArea. Unity then owns its anchors, size, and position so it can move
+        # with Scrollbar.value. Keep strict geometry checks for the track and for an
+        # unlinked image merely labelled as a handle.
+        is_runtime_scrollbar_handle = (
+            str(node.get("scrollbarRole") or "").lower() == "handle"
+            and any(
+                candidate.get("scrollbarHandlePath") == snapshot.get("path")
+                for candidate in all_snapshots
+                if "Scrollbar" in set(candidate.get("components") or [])
+            )
+        )
+        if has_own_rect and not item["layoutAncestor"] and not is_runtime_scrollbar_handle:
             canvas = layout.get("canvas") or {}
             reference_x = self.request.unity_reference_resolution_x or float(canvas.get("width") or 1920)
             reference_y = self.request.unity_reference_resolution_y or float(canvas.get("height") or 1080)

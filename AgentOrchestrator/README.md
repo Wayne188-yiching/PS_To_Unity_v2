@@ -9,11 +9,13 @@
 | PSDToUnity deterministic Core | 已存在 | 既有 exporter、Sprite、9-slice、TMP、ScrollRect、Mask、Atlas、Prefab 功能不由 Agent 重寫。 |
 | PSD Agent／Controller | 第一版完成，驗收強化中 | 具備 inspection、structure plan、人工核准、checkpoint、冪等套用、重新匯出及 package validation。 |
 | Evidence／Structure Plan | 已存在，持續驗證 | 已加入 PSD／inspection／plan 指紋與動作前置條件。 |
-| Pipeline Validator | 第一版已實作，尚未實機驗收 | 比對目前 PSD package／IR 與同次 Unity 生成收據、Prefab 結構、Rect、TMP、Sprite、Mask、Scroll／Scrollbar、LayoutGroup 證據。 |
-| Unity Agent | 第一版已實作，尚未實機驗收 | EditorWindow／Batch／Agent 共用 import service；Controller 管理核准、依賴、鎖、有限重試、雜湊與回執。 |
+| Pipeline Validator | 第一版已實作，排行榜結構閉環實機 PASS | 比對目前 PSD package／IR 與同次 Unity 生成收據、Prefab 結構、Rect、TMP、Sprite、Mask、Scroll／Scrollbar、LayoutGroup 證據；最終視覺／操作驗收仍進行中。 |
+| Unity Agent | 第一版已實作，deterministic import 實機 PASS | EditorWindow／Batch／Agent 共用 import service；Controller 管理核准、依賴、鎖、有限重試、雜湊與回執；模型 Runner 驗收尚未結案。 |
 | Director end-to-end | 第一版閉環已接通，尚未實機驗收 | PSD、Unity、Pipeline Validator 共用目前執行證據；模型不得越過 deterministic gate 宣告 PASS。 |
 
 PSD Agent 的正式通過條件見 [docs/psd_agent_acceptance.md](docs/psd_agent_acceptance.md)；Unity Agent 與 Pipeline Validator 契約分別見 [docs/unity_agent.md](docs/unity_agent.md)及 [docs/pipeline_validator.md](docs/pipeline_validator.md)。
+
+2026-09-14 的排行榜 PSD→Unity MCP→Prefab 階段性實機證據見 [docs/agent_pipeline_acceptance_20260914.md](docs/agent_pipeline_acceptance_20260914.md)。
 
 2026-09-13 使用者調整優先順序：先完成 Agent 架構與實作，完整真機／模型／端到端驗收最後進行。PSD 未結案不再阻擋 Unity Agent 開發；但人工核准、執行權限與輸出新鮮度等 runtime 安全門檻仍保留。開發中持續執行基本回歸測試，不能把「已實作」標成「已驗收」。
 

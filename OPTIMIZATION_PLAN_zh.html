@@ -1047,12 +1047,13 @@ commit → push → 交由使用者/Codex 在 Unity 專案實機驗收。</pre>
     <table>
       <tr><th>項目</th><th>狀態</th></tr>
       <tr><td>PSD Agent／Controller／Evidence／Structure Plan</td><td>已實作，回歸與真機驗收中；尚未結案</td></tr>
-      <tr><td>Pipeline Validator</td><td>第一版已實作：比對 PSD package／IR 與同次 Unity 收據、Prefab Rect、TMP、Sprite、Mask、Scroll／Scrollbar、LayoutGroup；尚未實機驗收</td></tr>
-      <tr><td>Unity Agent</td><td>第一版已實作：EditorWindow／Batch／Agent 共用 deterministic service，Controller 驗證依賴、鎖、有限重試、輸入雜湊與回執；尚未實機驗收</td></tr>
+      <tr><td>Pipeline Validator</td><td>第一版已實作；2026-09-14 排行榜結構閉環實機 PASS：111 個預期節點、114 個含 deterministic helpers 的實際節點，0 blocking／0 review；最終視覺與操作驗收仍進行中</td></tr>
+      <tr><td>Unity Agent</td><td>第一版已實作：EditorWindow／Batch／Agent 共用 deterministic service，Controller 驗證依賴、鎖、有限重試、輸入雜湊與回執；排行榜 deterministic import 已由 Unity MCP 實機 PASS，模型 Runner 驗收尚未結案</td></tr>
       <tr><td>Director／Multi-Agent 閉環</td><td>第一版已接通，共用 Unity／Validator 當次證據並限制模型 PASS；完整模型與端到端實機驗收留到最後</td></tr>
       <tr><td>獨立外包 QC</td><td>獨立入口，不擔任 PS_To_Unity Pipeline Validator</td></tr>
     </table>
-    <p>本輪 Agent 開發回歸共 118 項 Python 測試通過，Unity 2022.3 C# importer 亦完成離線編譯。Pipeline Validator 同步比對 TMP 內容、字級、字距、行距、對齊、顏色／漸層與 Font Asset／材質解析證據，並阻擋撤銷核准、Importer／輸入變更、隱藏節點輸出及滑軌錯誤接線所造成的過期或假通過。這是實作與基本回歸證據，不等於 Photoshop／Unity 最終實機驗收。</p>
+    <p>本輪 Agent 開發回歸共 119 項 Python 測試通過，Unity 2022.3 C# importer 亦完成離線編譯。Pipeline Validator 同步比對 TMP 內容、字級、字距、行距、對齊、顏色／漸層與 Font Asset／材質解析證據，並阻擋撤銷核准、Importer／輸入變更、隱藏節點輸出及滑軌錯誤接線所造成的過期或假通過。</p>
+    <p><strong>2026-09-14 階段性實機驗收：</strong>以乾淨的廳館排行榜 PSD 副本完成 Photoshop inspection／export、Unity MCP deterministic import 與 Pipeline Validator。Unity 生成 43 個 Image、40 個 TMP，字體 token 警告為 0；外置垂直 Scrollbar 已接線，MCP 實例測試 value 0→1 可驅動 ScrollRect 並使 Handle 移動 84.58548px。Validator 修正「已接線 Handle runtime geometry 被誤判為靜態跑版」後為 PASS。外部 reskin 素材仍有 10 個尺寸／render intent 人工決策，不自動核准；視覺逐像素、實際 Pointer drag 與模型 Runner 尚未結案。完整紀錄見 <a href="AgentOrchestrator/docs/agent_pipeline_acceptance_20260914.md">2026-09-14 Agent Pipeline 驗收進度</a>。</p>
   </div>
 
   <h2 id="howto">執行方式</h2>

@@ -74,6 +74,50 @@ class PipelineValidatorTests(unittest.TestCase):
         self.assertIn("PREFAB_GEOMETRY_MISMATCH", codes)
         self.assertIn("TMP_ASSET_NOT_BOUND", codes)
 
+    def test_wired_scrollbar_handle_uses_runtime_geometry(self):
+        node = {
+            "name": "Handle", "type": "image", "visible": True,
+            "x": 10, "y": 20, "width": 30, "height": 100,
+            "imagePath": "handle.png", "scrollbarRole": "handle",
+        }
+        snapshot = {
+            "path": "Prefab/0:Bar/1:SlidingArea/0:Handle", "name": "Handle",
+            "x": 0, "y": 0, "width": 0, "height": 0,
+            "components": ["RectTransform", "Image"],
+            "spriteAssetPath": "Assets/Sprites/handle.png", "imageType": "Simple",
+        }
+        scrollbar = {
+            "path": "Prefab/0:Bar", "name": "Bar",
+            "components": ["RectTransform", "Scrollbar"],
+            "scrollbarHandlePath": snapshot["path"],
+        }
+        binding = [{
+            "sourceName": "Handle", "imagePath": "handle.png", "role": "image",
+            "sourceKind": "imported", "spriteAssetPath": "Assets/Sprites/handle.png",
+        }]
+        imported = {"handle.png": {
+            "imagePath": "handle.png", "spriteAssetPath": "Assets/Sprites/handle.png",
+            "sourcePixelHash": "pixels", "spritePixelHash": "pixels",
+        }}
+        issues = []
+        PipelineValidatorController(self.request)._validate_node(
+            {"node": node, "sourcePath": "0:Bar/0:Handle", "parentSourcePath": "",
+             "parentName": None, "layoutAncestor": False},
+            snapshot, [self.snapshots[0], scrollbar, snapshot],
+            {"canvas": {"width": 400, "height": 300}}, issues, binding, imported, [],
+        )
+        self.assertNotIn("PREFAB_GEOMETRY_MISMATCH", {issue["code"] for issue in issues})
+
+        scrollbar["scrollbarHandlePath"] = ""
+        issues = []
+        PipelineValidatorController(self.request)._validate_node(
+            {"node": node, "sourcePath": "0:Bar/0:Handle", "parentSourcePath": "",
+             "parentName": None, "layoutAncestor": False},
+            snapshot, [self.snapshots[0], scrollbar, snapshot],
+            {"canvas": {"width": 400, "height": 300}}, issues, binding, imported, [],
+        )
+        self.assertIn("PREFAB_GEOMETRY_MISMATCH", {issue["code"] for issue in issues})
+
     def test_hidden_node_must_not_be_exported(self):
         self.layout["nodes"].append({"name": "HiddenGuide", "type": "image", "visible": False})
         self.snapshots.append({"path": "Prefab/2:HiddenGuide", "name": "HiddenGuide", "components": ["RectTransform", "Image"]})
