@@ -49,3 +49,8 @@ ps_exporter_current.png
 # Local-only acceptance inputs and pre-push backups (contain internal/network paths)
 AgentOrchestrator/cases/examples/psd/*.request.json
 AgentOrchestrator/**/*.local-before-github-*.json
+
+# Presentation build output and its comparison images embed production game
+# artwork, so they stay local. Rebuild with: cd AgentProgressPresentation && npm run build
+AgentProgressPresentation/dist/
+AgentProgressPresentation/app/src/assets/case-*.png

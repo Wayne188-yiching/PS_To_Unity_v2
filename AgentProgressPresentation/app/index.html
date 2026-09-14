@@ -44,7 +44,7 @@
         </button>
       </div>
       <div class="chapter-readout" aria-live="polite">
-        <span id="currentIndex">01</span><span class="readout-divider">/</span><span>07</span>
+        <span id="currentIndex">01</span><span class="readout-divider">/</span><span>08</span>
         <strong id="currentLabel">PREVIOUS STATE</strong>
       </div>
     </header>
@@ -56,8 +56,9 @@
       <a href="#agent-layer" aria-label="第三章 Agent Layer"><span>03</span><i></i></a>
       <a href="#psd-agent" aria-label="第四章 Current PSD Agent"><span>04</span><i></i></a>
       <a href="#real-case" aria-label="第五章 Real Case"><span>05</span><i></i></a>
-      <a href="#progress" aria-label="第六章 Current Progress"><span>06</span><i></i></a>
-      <a href="#direction" aria-label="第七章 Multi-Agent Direction"><span>07</span><i></i></a>
+      <a href="#render" aria-label="第六章 Render Comparison"><span>06</span><i></i></a>
+      <a href="#progress" aria-label="第七章 Current Progress"><span>07</span><i></i></a>
+      <a href="#direction" aria-label="第八章 Multi-Agent Direction"><span>08</span><i></i></a>
     </nav>
 
     <main id="main">
@@ -66,7 +67,7 @@
           <div class="opening-copy">
             <h1>Photoshop 排好的 UI，<br>直接變成 Unity 畫面</h1>
             <p class="lead">以前後製美術要照著設定美術的示意圖，在 Unity 裡一個一個重排。現在這段由工具產生。目標是整條流程自動跑，人只在最後做 QC。</p>
-            <div class="evidence-line"><span class="status status--pass">COMPLETED</span><span>PSDtoUnity deterministic Core</span><code>v2.14.0 branch snapshot</code></div>
+            <div class="evidence-line"><span class="status status--pass">COMPLETED</span><span>PSDtoUnity deterministic Core</span><code>v2.15.0 branch snapshot</code></div>
           </div>
 
           <div class="core-trace" aria-label="上一階段 Photoshop 到 Unity deterministic pipeline">
@@ -175,7 +176,7 @@
               <h2>PSD Agent v1：<br>把 PS 的分組，整理成 Unity 的結構。</h2>
             </div>
             <div class="evidence-summary">
-              <span class="status status--pass">56 / 56 TESTS PASS</span>
+              <span class="status status--pass">131 / 131 TESTS PASS</span>
               <span class="status status--current">REAL-WORLD ACCEPTANCE CURRENT</span>
             </div>
           </div>
@@ -229,85 +230,112 @@
       <section class="chapter chapter--real-case" id="real-case" data-index="05" data-label="REAL CASE">
         <div class="scene real-case-scene">
           <div class="scene-heading scene-heading--wide">
-            <p class="section-id">SECTION 05 · REPO-TRACKED DEMO</p>
-            <h2>測試檔案準備好了，<br>但還沒真的跑過一輪。</h2>
-            <p>用的是 repo 裡公開的 <code>scroll_v_basic.psd</code>，不是正式專案的檔案。</p>
+            <p class="section-id">SECTION 05 · LIVE ACCEPTANCE · 2026-09-14</p>
+            <h2>正式專案的排行榜，<br>已經整條跑完並比對過。</h2>
+            <p>用的是正式專案的 <code>Hall_Ranking.psd</code>，隔離副本與來源 SHA-256 相同。</p>
           </div>
 
           <div class="case-trace">
             <section class="case-column case-column--source">
-              <header><span class="status status--pass">REPOSITORY</span><strong>Original PSD Structure</strong></header>
+              <header><span class="status status--pass">PRODUCTION PSD</span><strong>Hall_Ranking.psd</strong></header>
               <div class="tree">
-                <p><i></i><strong>MainPage</strong><code>GROUP</code></p>
-                <p class="depth-1"><i></i><strong>List[SCROLL_V]</strong><code>GROUP</code></p>
-                <p class="depth-2"><i></i><span>Row_01</span><code>400×100</code></p>
-                <p class="depth-2"><i></i><span>Row_02</span><code>400×100</code></p>
-                <p class="depth-2"><i></i><span>Row_03</span><code>400×100</code></p>
-                <p class="depth-2"><i></i><span>Row_04</span><code>400×100</code></p>
+                <p><i></i><strong>Canvas</strong><code>2340×1080</code></p>
+                <p class="depth-1"><i></i><span>圖層</span><code>180</code></p>
+                <p class="depth-1"><i></i><span>群組</span><code>42</code></p>
+                <p class="depth-1"><i></i><span>文字層</span><code>43</code></p>
+                <p class="depth-1"><i></i><span>匯出圖片</span><code>39</code></p>
               </div>
             </section>
 
-            <div class="case-link" aria-hidden="true"><span></span><b>prepared</b></div>
+            <div class="case-link" aria-hidden="true"><span></span><b>exported</b></div>
 
             <section class="case-column case-column--evidence">
-              <header><span class="status status--current">CURRENT</span><strong>Acceptance Evidence</strong></header>
+              <header><span class="status status--pass">PASS</span><strong>Acceptance Evidence</strong></header>
               <dl>
-                <div><dt>sample copy</dt><dd>HASH MATCH</dd></div>
-                <div><dt>request</dt><dd>PREPARED</dd></div>
-                <div><dt>inspection</dt><dd class="not-run">NOT RUN</dd></div>
-                <div><dt>approved plan</dt><dd class="not-run">NOT RUN</dd></div>
-                <div><dt>re-export</dt><dd class="not-run">NOT RUN</dd></div>
+                <div><dt>隔離副本</dt><dd>HASH MATCH</dd></div>
+                <div><dt>inspection</dt><dd>PASS</dd></div>
+                <div><dt>export</dt><dd>PASS 39 / 39</dd></div>
+                <div><dt>Unity import</dt><dd>PASS</dd></div>
+                <div><dt>Pipeline Validator</dt><dd>PASS</dd></div>
               </dl>
             </section>
 
-            <div class="case-link case-link--blocked" aria-hidden="true"><span></span><b>human gate</b></div>
+            <div class="case-link" aria-hidden="true"><span></span><b>validated</b></div>
 
             <section class="case-column case-column--result">
-              <header><span class="status status--planned">EXPECTED CORE OUTPUT</span><strong>Deterministic Target</strong></header>
-              <div class="tree tree--dimmed">
-                <p><i></i><strong>List</strong><code>ScrollRect</code></p>
-                <p class="depth-1"><i></i><span>Viewport</span><code>RectMask2D</code></p>
-                <p class="depth-2"><i></i><span>Content</span><code>4 rows</code></p>
+              <header><span class="status status--pass">GENERATED PREFAB</span><strong>Hall_Ranking.prefab</strong></header>
+              <div class="tree">
+                <p><i></i><strong>節點</strong><code>130</code></p>
+                <p class="depth-1"><i></i><span>Image</span><code>55</code></p>
+                <p class="depth-1"><i></i><span>TMP</span><code>40</code></p>
+                <p class="depth-1"><i></i><span>字型／描邊警告</span><code>0</code></p>
               </div>
-              <p class="case-disclaimer">這是既有 Phase 4.5 deterministic acceptance 的預期結構，不是本次 Agent run 的完成證據。</p>
+              <p class="case-disclaimer">Validator expected 129 = actual 129、0 blocking、0 review。拖曳與回彈仍未驗收，需要另一份含 <code>[SCROLL_*]</code> 的 PSD。</p>
             </section>
           </div>
         </div>
       </section>
 
-      <section class="chapter chapter--progress" id="progress" data-index="06" data-label="CURRENT PROGRESS">
+      <section class="chapter chapter--render" id="render" data-index="06" data-label="RENDER COMPARISON">
+        <div class="scene render-scene">
+          <div class="scene-heading scene-heading--wide">
+            <p class="section-id">SECTION 06 · PIXEL COMPARISON</p>
+            <h2>設計稿與生成畫面，<br>逐像素並排比對。</h2>
+            <p>左邊是設計稿合成，中間是工具生成的 Unity 畫面，右邊是兩者的逐像素差異。</p>
+          </div>
+
+          <div class="render-grid">
+            <figure>
+              <img src="./src/assets/case-ps.png" alt="Photoshop 合成的排行榜畫面" loading="lazy" decoding="async">
+              <figcaption><span class="status status--pass">SOURCE</span><strong>Photoshop 合成</strong><small>設計稿基準 2340×1080</small></figcaption>
+            </figure>
+            <figure>
+              <img src="./src/assets/case-unity.png" alt="Unity 生成的 Prefab 渲染畫面" loading="lazy" decoding="async">
+              <figcaption><span class="status status--pass">GENERATED</span><strong>Unity 生成</strong><small>130 節點 · 55 Image · 40 TMP</small></figcaption>
+            </figure>
+            <figure>
+              <img src="./src/assets/case-diff.png" alt="兩張畫面的逐像素差異圖，亮處代表差異" loading="lazy" decoding="async">
+              <figcaption><span class="status status--review">DIFF</span><strong>逐像素差異</strong><small>亮處為差異，黑色代表一致</small></figcaption>
+            </figure>
+          </div>
+
+          <p class="render-note">位移、翻轉與 gamma 轉換都無法降低差異，<strong>排版與素材正確</strong>；殘差集中在字重與邊緣抗鋸齒。</p>
+        </div>
+      </section>
+
+      <section class="chapter chapter--progress" id="progress" data-index="07" data-label="CURRENT PROGRESS">
         <div class="scene progress-scene">
           <div class="scene-heading">
-            <p class="section-id">SECTION 06 · EVIDENCE SNAPSHOT</p>
-            <h2>防呆的部分做完了，<br>還沒拿真檔案驗證過。</h2>
+            <p class="section-id">SECTION 07 · EVIDENCE SNAPSHOT</p>
+            <h2>兩端都跑通了，<br>剩下拖曳與端到端還沒驗。</h2>
           </div>
 
           <div class="roadmap" aria-label="Agent architecture development roadmap">
             <div class="roadmap-spine" aria-hidden="true"><span id="roadmapProgress"></span></div>
             <article class="roadmap-item roadmap-item--pass"><span>01</span><div><strong>PSDtoUnity deterministic Core</strong><p>Exporter + layout.json + Unity Importer + editable Prefab</p></div><em>COMPLETED</em></article>
             <article class="roadmap-item roadmap-item--pass"><span>02</span><div><strong>Agent Orchestrator</strong><p>限定每個 Agent 能做什麼，並規定何時算結束</p></div><em>COMPLETED</em></article>
-            <article class="roadmap-item roadmap-item--pass"><span>03</span><div><strong>PSD Agent v1</strong><p>先讀出證據，再規劃結構</p></div><em>CODE READY</em></article>
-            <article class="roadmap-item roadmap-item--pass"><span>04</span><div><strong>PSD Controller / Evidence / Structure Plan</strong><p>綁定核准、記錄進度、重跑不會重複執行</p></div><em>CODE READY</em></article>
-            <article class="roadmap-item roadmap-item--current"><span>05</span><div><strong>PSD Agent real-world validation</strong><p>測試檔案已備妥；Photoshop 端還沒跑完一輪</p></div><em>CURRENT</em></article>
-            <article class="roadmap-item roadmap-item--planned"><span>06</span><div><strong>Unity Agent</strong><p>判斷 Unity 生成的元件對不對；目前只有可呼叫的入口，Agent 還沒做</p></div><em>PLANNED</em></article>
-            <article class="roadmap-item roadmap-item--partial"><span>07</span><div><strong>Pipeline Validator</strong><p>比對 PS 的意圖與 Unity 的結果；目前只驗 PSD 封包，還不比對 Prefab</p></div><em>PARTIAL</em></article>
-            <article class="roadmap-item roadmap-item--partial"><span>08</span><div><strong>Director orchestration</strong><p>決定誰先做、何時該停、何時退回人工；目前只有骨架</p></div><em>SKELETON</em></article>
-            <article class="roadmap-item roadmap-item--planned"><span>09</span><div><strong>Multi-Agent end-to-end validation</strong><p>整條流程自動跑通；等 Unity Agent 與完整 Validator</p></div><em>PLANNED</em></article>
+            <article class="roadmap-item roadmap-item--pass"><span>03</span><div><strong>PSD Agent v1</strong><p>先讀出證據，再規劃結構；已實跑，模型產出的計畫通過驗證</p></div><em>VALIDATED</em></article>
+            <article class="roadmap-item roadmap-item--pass"><span>04</span><div><strong>PSD Controller / Evidence / Structure Plan</strong><p>綁定核准、記錄進度、重跑不會重複執行</p></div><em>COMPLETED</em></article>
+            <article class="roadmap-item roadmap-item--pass"><span>05</span><div><strong>PSD Agent real-world validation</strong><p>正式專案 PSD 實跑：明確的照做、模糊的不猜、隱藏層零接觸</p></div><em>VALIDATED</em></article>
+            <article class="roadmap-item roadmap-item--pass"><span>06</span><div><strong>Unity Agent</strong><p>EditorWindow／Batch／Agent 共用同一套 deterministic service；實機匯入 PASS</p></div><em>VALIDATED</em></article>
+            <article class="roadmap-item roadmap-item--pass"><span>07</span><div><strong>Pipeline Validator</strong><p>比對 PS 的意圖與 Unity 的 Prefab：節點、幾何、Sprite、TMP、字型解析</p></div><em>PASS 129 / 129</em></article>
+            <article class="roadmap-item roadmap-item--current"><span>08</span><div><strong>Director orchestration</strong><p>決定誰先做、何時該停、何時退回人工；已接通，尚未整體跑過</p></div><em>CURRENT</em></article>
+            <article class="roadmap-item roadmap-item--planned"><span>09</span><div><strong>Multi-Agent end-to-end validation</strong><p>四個 Agent 串起來自動跑通；拖曳回彈需含 [SCROLL_*] 的 PSD</p></div><em>PLANNED</em></article>
           </div>
 
           <div class="verification-strip">
-            <span><b>56 / 56</b> Python regression tests</span>
-            <span><b>26 / 26</b> Photoshop naming checks</span>
-            <span><b>0</b> fresh Photoshop Agent acceptance results</span>
+            <span><b>131 / 131</b> Python regression tests</span>
+            <span><b>39 / 39</b> exported images validated</span>
+            <span><b>0</b> blocking mismatches in Prefab comparison</span>
           </div>
         </div>
       </section>
 
-      <section class="chapter chapter--direction" id="direction" data-index="07" data-label="MULTI-AGENT DIRECTION">
+      <section class="chapter chapter--direction" id="direction" data-index="08" data-label="MULTI-AGENT DIRECTION">
         <div class="scene direction-scene">
           <div class="scene-heading scene-heading--center">
-            <p class="section-id">SECTION 07 · DIRECTION</p>
-            <h2>下一步做 Unity Agent，<br>再逐步組成 Multi-Agent。</h2>
+            <p class="section-id">SECTION 08 · DIRECTION</p>
+            <h2>四個角色都到位了，<br>剩下讓它們自己跑完一輪。</h2>
           </div>
 
           <div class="multi-agent-graph" aria-label="Future PS_To_Unity multi-agent architecture">
@@ -316,10 +344,10 @@
               <path class="multi-line multi-line--base" d="M235 362 V474 M600 362 V474 M965 362 V474"/>
               <path class="multi-line multi-line--active" id="multiAgentPath" d="M600 96 V176 M600 176 H235 V268 M600 176 V268 M600 176 H965 V268 M235 362 V474 M600 362 V474 M965 362 V474"/>
             </svg>
-            <article class="graph-node graph-node--director"><span class="status status--current">SKELETON</span><strong>Director</strong><small>route · gate · terminal state</small></article>
+            <article class="graph-node graph-node--director"><span class="status status--current">CONNECTED</span><strong>Director</strong><small>route · gate · terminal state</small></article>
             <article class="graph-node graph-node--psd"><span class="status status--pass">V1</span><strong>PSD Agent</strong><small>ambiguity · plan · approval</small></article>
-            <article class="graph-node graph-node--unity"><span class="status status--planned">PLANNED</span><strong>Unity Agent</strong><small>deterministic pipeline selection</small></article>
-            <article class="graph-node graph-node--validator"><span class="status status--review">PARTIAL</span><strong>Pipeline Validator</strong><small>intent → IR → Prefab</small></article>
+            <article class="graph-node graph-node--unity"><span class="status status--pass">V1</span><strong>Unity Agent</strong><small>deterministic pipeline selection</small></article>
+            <article class="graph-node graph-node--validator"><span class="status status--pass">V1</span><strong>Pipeline Validator</strong><small>intent → IR → Prefab</small></article>
             <article class="graph-node graph-node--ps-core"><span class="status status--pass">CORE</span><strong>Photoshop Tools</strong><small>inspect · apply · export</small></article>
             <article class="graph-node graph-node--unity-core"><span class="status status--pass">CORE</span><strong>Unity Importer</strong><small>sprite · TMP · layout · prefab</small></article>
             <article class="graph-node graph-node--evidence"><span class="status status--pass">CORE</span><strong>Deterministic Validators</strong><small>preconditions · package · geometry</small></article>

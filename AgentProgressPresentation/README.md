@@ -21,6 +21,8 @@ npm run preview
 
 正式輸出位於 `dist/`。`vite.config.js` 使用相對 base，所有必要的 JavaScript、CSS、GSAP 與 Report CJK 字型都會輸出到本地。
 
+`dist/` 不納入版本控制：Section 06 的對照圖是正式專案的遊戲畫面，離線單檔會把它們 base64 內嵌，因此 build 產物與 `app/src/assets/case-*.png` 都留在本機。clone 之後請自行放入對照圖並執行 `npm run build`；缺圖時其餘章節仍可正常建置與展示。
+
 若要直接雙擊、不啟動本機伺服器，請開啟：
 
 ```text
@@ -35,7 +37,7 @@ dist/PS_To_Unity_Agent_Report_Offline.html
 AgentProgressPresentation/
   index.html   轉址頁：GitHub Pages 的資料夾入口，只含 inline script
   app/         Vite root：簡報原始碼（index.html 與 src/）
-  dist/        build 產物，實際對外發布的版本
+  dist/        build 產物，不納入版本控制（見上方說明）
   scripts/     離線打包與驗收腳本
 ```
 

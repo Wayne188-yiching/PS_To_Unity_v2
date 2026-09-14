@@ -199,7 +199,7 @@ const failed = report.errors.length > 0
   || report.viewports.some((entry) => entry.initial.scrollWidth > entry.initial.width || entry.psdAgent.overflow || entry.endState.overflow)
   || report.viewports.some((entry) => entry.resizeState.overflow || Math.abs(entry.resizeState.pinnedTop) > 2)
   || report.viewports.some((entry) => entry.progressState.overflow || entry.progressState.overlapCount > 0)
-  || report.viewports.some((entry) => entry.endState.chapter !== "07" || entry.keyboard.scrollY <= 0)
+  || report.viewports.some((entry) => entry.endState.chapter !== "08" || entry.keyboard.scrollY <= 0)
   || report.reducedMotion?.visibleEvidencePanels !== 10
   || report.reducedMotion?.overflow
   || !report.fileOffline?.url.endsWith("PS_To_Unity_Agent_Report_Offline.html")
