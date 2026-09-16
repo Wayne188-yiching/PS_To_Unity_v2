@@ -4,6 +4,13 @@
 
 **目前版本：v2.15.0**
 
+## 從這裡開始
+
+- **[完整使用說明（docs/GUIDE_zh.html）](docs/GUIDE_zh.html)** — 安裝、第一次上手、圖層命名規則、常見問題。看第 1～3 章就能從零跑出第一個 Prefab。
+- [這個工具在做什麼（docs/PS_To_Unity_Presentation_zh.html）](docs/PS_To_Unity_Presentation_zh.html) — 發表報告，給想先了解用途、還不需要動手的人。
+
+本頁以下是給已經熟悉 PS／Unity 的人看的速查摘要。
+
 > PNG 像素去重會先依圖片尺寸篩選候選者，再只對 PNG 中會影響像素／色彩的區塊計算雜湊；Photoshop 每次可能不同的 iTXt/XMP 中繼資料不參與比對，因此完整 bytes 或檔案大小不同的相同圖片也會合併。這項處理不會改動 PNG 像素，layout 內的引用會自動重指到保留下來的單一檔案。
 
 > 可見滑軌自動化：滑軌群組使用 `[SCROLLBAR_V]` / `[SCROLLBAR_H]`，其直接圖片子圖層以英文命名並分別加上 `[TRACK]`、`[HANDLE]`。放在對應 `[SCROLL_*]` 群組內仍是最明確的結構；v2.13.4 起，若滑軌因 PS 排版需要放在外部，只要整個 Prefab 內剛好只有一個方向相容、尚未接線的 ScrollRect，也會安全自動配對。多組可能配對時不猜測，會輸出 `SCROLLBAR_ORPHAN_UNRESOLVED`。接線會保留 PS 匯出的 Content 初始位置，再讓 Handle 可拖動。
@@ -85,10 +92,6 @@ Mac：    /Applications/Adobe Photoshop [版本]/Presets/Scripts/
 - **Unity 端**：Importer_v2 視窗標題點 **從 GitHub 更新工具**，自動下載並觸發重新編譯。
 
 ---
-
-## 文件
-
-→ [完整使用說明（docs/GUIDE_zh.html）](docs/GUIDE_zh.html)（圖層命名規則、文字材質球、常見問題等）
 
 ## UI 發包製作人
 

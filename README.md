@@ -4,6 +4,12 @@ Photoshop To Unity V2 is a production-oriented Photoshop-to-Unity UI workflow to
 
 It exports a Photoshop UI as a UI Package, then rebuilds the layout in Unity as a uGUI + TextMeshPro Prefab. Text layers remain editable TMP objects, while non-text layers are exported as PNG sprites.
 
+## Start here
+
+- **[Full user guide — docs/GUIDE_zh.html](docs/GUIDE_zh.html)** — install, a first run to follow along with, the layer-naming rules and the FAQ. Read sections 1 to 3 to go from nothing to a generated Prefab. Traditional Chinese.
+- [What the tool does — docs/PS_To_Unity_Presentation_zh.html](docs/PS_To_Unity_Presentation_zh.html) — the release report, for readers who want the idea rather than the steps.
+- [中文 README](README_zh.md) — the same summary as this page, in Traditional Chinese.
+
 ## Version
 
 v2.15.0
@@ -79,11 +85,6 @@ Batch font replacement (`Tools > Photoshop UI Importer > Font Replacer`):
 - `PhotoshopExporter/PhotoshopToolboxHub.jsx`
 - Optional: `PhotoshopExporter/PhotoshopToSpine.jsx`
 - `Assets/Editor/PhotoshopUiImporter/`
-
-## Documentation
-
-- [中文 README](README_zh.md)
-- [完整使用說明 docs/GUIDE_zh.html](docs/GUIDE_zh.html)
 
 ## UI outsourcing agent
 
