@@ -1,4 +1,4 @@
-# bump-version.ps1
+﻿# bump-version.ps1
 # 從 version.json 同步版本號到所有需要顯示版本的檔案。
 #
 # 用法：
