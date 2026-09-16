@@ -42,7 +42,7 @@ web
 
 ## Evidence on Hand
 
-- `README_zh.md` 與 `GUIDE_zh.html`：目前流程與功能說明。
+- `README_zh.md` 與 `docs/GUIDE_zh.html`：目前流程與功能說明。
 - `version.json`：目前版本 v2.13.3，更新日期 2026-08-17。
 - `Samples/Phase4_5/`：ScrollRect 驗收 PSD 與說明。
 - 已記錄的實例：43 張 PNG 經像素去重後收斂為 26 種不同像素，避免 258 KB 重複內容進入圖集。

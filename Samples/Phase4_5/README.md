@@ -2,7 +2,7 @@
 
 > **狀態**：6 個 PSD 樣本已於 2026-07-15 建立並完成 Photoshop 2026 + Unity 2022.3.62f1 實機驗收。
 > v2.11.0 首輪發現 2 個阻斷缺陷；v2.11.1 修復後以同批樣本複驗，結論為 **通過**。
-> 決議依據 [`OPTIMIZATION_PLAN_zh.html#phase4-5`](../../OPTIMIZATION_PLAN_zh.html#phase4-5)（Q1–Q11）。
+> 決議依據 [`OPTIMIZATION_PLAN_zh.html#phase4-5`](../../docs/OPTIMIZATION_PLAN_zh.html#phase4-5)（Q1–Q11）。
 > 另以真實 PSD（轉蛋王列表）做內部驗收，公司資產不進 repo。
 
 ---

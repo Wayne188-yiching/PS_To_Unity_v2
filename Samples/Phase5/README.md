@@ -2,7 +2,7 @@
 
 > **狀態**：待驗收。本階段輸入是 **Unity Prefab**（依賴 GUID/meta，本倉庫非 Unity 專案）
 > 且字型檔有授權限制 → **Prefab 與字型檔不進 repo**，驗收在使用者的 Unity 專案內執行。
-> 決議依據 [`OPTIMIZATION_PLAN_zh.html#phase5`](../../OPTIMIZATION_PLAN_zh.html#phase5)（Q1–Q7）。
+> 決議依據 [`OPTIMIZATION_PLAN_zh.html#phase5`](../../docs/OPTIMIZATION_PLAN_zh.html#phase5)（Q1–Q7）。
 
 ## 前置
 

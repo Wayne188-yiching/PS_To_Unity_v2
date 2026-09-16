@@ -1,13 +1,13 @@
 ---
 version: 1
 slug: "ps-to-unity-presentation-zh-html"
-primary_target: "PS_To_Unity_Presentation_zh.html"
+primary_target: "docs/PS_To_Unity_Presentation_zh.html"
 related_targets: []
 ---
 
 ## Scope and mode
 
-`PS_To_Unity_Presentation_zh.html` is a Persuade-mode release report for live presentation and later self-guided reading.
+`docs/PS_To_Unity_Presentation_zh.html` is a Persuade-mode release report for live presentation and later self-guided reading.
 
 ## Audience and job
 

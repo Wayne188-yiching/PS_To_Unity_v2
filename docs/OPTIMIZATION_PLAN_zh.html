@@ -690,7 +690,7 @@ SettingPage_layout Missing Prefab 與本工具無關，不要在未確認需求�
 
     <h4>2026-07-15 Photoshop + Unity MCP 實機驗收</h4>
     <div class="panel">
-      <p><strong>結論：v2.11.1 修復複驗通過，可進入下一階段。</strong>完整逐項證據與可重跑 PSD 已寫入 <a href="Samples/Phase4_5/README.md">Samples/Phase4_5/README.md</a>。首輪先建立 MiSans、HarmonyOS Sans、NotoSansCJK 共 6 組 TMP Font Asset／SDF 材質與 8 筆 TmpFontMap，再執行 Photoshop 真實匯出與 Unity full import；修復後以同批 6 PSD + Unity MCP 10.0.0 重跑阻斷項與回歸。</p>
+      <p><strong>結論：v2.11.1 修復複驗通過，可進入下一階段。</strong>完整逐項證據與可重跑 PSD 已寫入 <a href="../Samples/Phase4_5/README.md">Samples/Phase4_5/README.md</a>。首輪先建立 MiSans、HarmonyOS Sans、NotoSansCJK 共 6 組 TMP Font Asset／SDF 材質與 8 筆 TmpFontMap，再執行 Photoshop 真實匯出與 Unity full import；修復後以同批 6 PSD + Unity MCP 10.0.0 重跑阻斷項與回歸。</p>
       <table>
         <tr><th>分類</th><th>結果</th><th>證據摘要</th></tr>
         <tr><td>通過</td><td>ScrollRect 基本三層、row mask、V/H Grid、警告、cache、Play mode 拖曳</td><td>row mask 第 5 張由裁切 50 高正確重匯成完整 100 高；Unity vertical/horizontal、Elastic、sens=50、RectMask2D、CSF constraint 均符合 Q1–Q9。</td></tr>
@@ -1041,7 +1041,7 @@ commit → push → 交由使用者/Codex 在 Unity 專案實機驗收。</pre>
   <div class="panel">
     <p><strong>目前：PSD Agent 安全性與復原流程驗收中。</strong>已補強人工核准指紋、動作前置條件、計畫重複套用、過期證據、人工 render 決策與重試終態。開發使用 GPT-6 Astra／中等推理，獨立程式驗收使用 GPT-5.6 Sol／中等推理。</p>
     <p>乾淨 Photoshop 副本已完成首次套用：8 → 9 層，新增 1 群組、改名 1 層、移動 2 層；同計畫第二次套用：9 → 9 層，新增／改名／移動均為 0，4 個動作全部辨識為已完成。原始受控 PSD SHA-256 保持不變。</p>
-    <p>76 項自動測試通過；Controller 已由模擬中斷的 checkpoint 恢復至 PACKAGE_READY，package 驗證通過（7 nodes／4 PNG）。樣本空滑動群組保留 SCROLL_EMPTY，終態為 NEEDS_REVIEW。模型 Runner 語意驗收尚缺本機 API 設定，尚未宣告 PSD Agent 全面通過。詳見 <a href="AgentOrchestrator/docs/psd_acceptance_20260912.md">2026-09-12 驗收紀錄</a>及 <a href="AgentOrchestrator/docs/psd_agent_acceptance.md">驗收條件</a>。</p>
+    <p>76 項自動測試通過；Controller 已由模擬中斷的 checkpoint 恢復至 PACKAGE_READY，package 驗證通過（7 nodes／4 PNG）。樣本空滑動群組保留 SCROLL_EMPTY，終態為 NEEDS_REVIEW。模型 Runner 語意驗收尚缺本機 API 設定，尚未宣告 PSD Agent 全面通過。詳見 <a href="../AgentOrchestrator/docs/psd_acceptance_20260912.md">2026-09-12 驗收紀錄</a>及 <a href="../AgentOrchestrator/docs/psd_agent_acceptance.md">驗收條件</a>。</p>
     <p>2026-09-13 收尾：六份 Phase4.5 Photoshop 輸出樣本已由 Sol 獨立複核通過；文字樣本的 15 個文字圖層保留為 text 節點，8 種字體的內容與 token 比對差異為 0，來源與輸出雜湊相符。這些是 PS／IR 證據，不代表 Unity TMP、排版或拖曳驗收通過。</p>
     <p><strong>2026-09-13 最新優先順序：</strong>依使用者要求先完成 Agent 開發，完整真機／模型／端到端驗收最後進行。先統一既有 Unity import service 與 EditorWindow 生成流程，再接 Unity Agent／Controller、Pipeline Validator 與 Director；基本回歸測試隨開發執行。PSD 尚未結案不再阻擋開發，但所有 runtime 人工核准與安全門檻維持不變。</p>
     <table>
@@ -1053,7 +1053,7 @@ commit → push → 交由使用者/Codex 在 Unity 專案實機驗收。</pre>
       <tr><td>獨立外包 QC</td><td>獨立入口，不擔任 PS_To_Unity Pipeline Validator</td></tr>
     </table>
     <p>本輪 Agent 開發回歸共 119 項 Python 測試通過，Unity 2022.3 C# importer 亦完成離線編譯。Pipeline Validator 同步比對 TMP 內容、字級、字距、行距、對齊、顏色／漸層與 Font Asset／材質解析證據，並阻擋撤銷核准、Importer／輸入變更、隱藏節點輸出及滑軌錯誤接線所造成的過期或假通過。</p>
-    <p><strong>2026-09-14 階段性實機驗收：</strong>以乾淨的廳館排行榜 PSD 副本完成 Photoshop inspection／export、Unity MCP deterministic import 與 Pipeline Validator。Unity 生成 43 個 Image、40 個 TMP，字體 token 警告為 0；外置垂直 Scrollbar 已接線，MCP 實例測試 value 0→1 可驅動 ScrollRect 並使 Handle 移動 84.58548px。Validator 修正「已接線 Handle runtime geometry 被誤判為靜態跑版」後為 PASS。外部 reskin 素材仍有 10 個尺寸／render intent 人工決策，不自動核准；視覺逐像素、實際 Pointer drag 與模型 Runner 尚未結案。完整紀錄見 <a href="AgentOrchestrator/docs/agent_pipeline_acceptance_20260914.md">2026-09-14 Agent Pipeline 驗收進度</a>。</p>
+    <p><strong>2026-09-14 階段性實機驗收：</strong>以乾淨的廳館排行榜 PSD 副本完成 Photoshop inspection／export、Unity MCP deterministic import 與 Pipeline Validator。Unity 生成 43 個 Image、40 個 TMP，字體 token 警告為 0；外置垂直 Scrollbar 已接線，MCP 實例測試 value 0→1 可驅動 ScrollRect 並使 Handle 移動 84.58548px。Validator 修正「已接線 Handle runtime geometry 被誤判為靜態跑版」後為 PASS。外部 reskin 素材仍有 10 個尺寸／render intent 人工決策，不自動核准；視覺逐像素、實際 Pointer drag 與模型 Runner 尚未結案。完整紀錄見 <a href="../AgentOrchestrator/docs/agent_pipeline_acceptance_20260914.md">2026-09-14 Agent Pipeline 驗收進度</a>。</p>
   </div>
 
   <h2 id="howto">執行方式</h2>

@@ -88,7 +88,7 @@ Mac：    /Applications/Adobe Photoshop [版本]/Presets/Scripts/
 
 ## 文件
 
-→ [完整使用說明（GUIDE_zh.html）](GUIDE_zh.html)（圖層命名規則、文字材質球、常見問題等）
+→ [完整使用說明（docs/GUIDE_zh.html）](docs/GUIDE_zh.html)（圖層命名規則、文字材質球、常見問題等）
 
 ## UI 發包製作人
 

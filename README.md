@@ -83,7 +83,7 @@ Batch font replacement (`Tools > Photoshop UI Importer > Font Replacer`):
 ## Documentation
 
 - [中文 README](README_zh.md)
-- [完整使用說明 GUIDE_zh.html](GUIDE_zh.html)
+- [完整使用說明 docs/GUIDE_zh.html](docs/GUIDE_zh.html)
 
 ## UI outsourcing agent
 
