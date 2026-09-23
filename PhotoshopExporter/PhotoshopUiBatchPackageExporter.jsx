@@ -209,7 +209,11 @@ function relativePsdPath(file, root) {
 }
 
 function safePathSegment(value) {
-    var cleaned = String(value).replace(/[\\/:*?\"<>|]/g, "_").replace(/^\.+$/, "package");
+    // The segment comes from a path already split on "/", so slash characters
+    // cannot reach here.  Keep this ES3 regex deliberately simple: Photoshop's
+    // legacy ExtendScript parser rejects the escaped slash/backslash character
+    // class used by modern JavaScript engines.
+    var cleaned = String(value).replace(/[:*?"<>|]/g, "_").replace(/^\.+$/, "package");
     return cleaned || "package";
 }
 
