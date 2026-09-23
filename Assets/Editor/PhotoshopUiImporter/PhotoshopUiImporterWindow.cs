@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Text;
 using TMPro;
 using UnityEditor;
@@ -34,6 +35,8 @@ namespace PhotoshopToUnity.EditorImporter
         private bool autoReferenceResolution = true;
         private Vector2 referenceResolution = new Vector2(1920f, 1080f);
         private bool useResponsiveAnchor;
+        // v2.16：量測式無損九宮格；只作用在這次新建立（或先前由工具切過）的 Sprite。
+        private bool autoNineSlice = true;
         private Vector2 scrollPosition;
         private string statusMessage;
         private MessageType statusType = MessageType.Info;
@@ -50,14 +53,14 @@ namespace PhotoshopToUnity.EditorImporter
             "PhotoshopUiImporter.OutlineThicknessMultiplier";
         private string reskinArtSourceFolder = string.Empty;
         private string reskinTargetFolder = string.Empty;
-        private System.Collections.Generic.List<string> reskinMissingFiles;
-        private Vector2 reskinMissingScrollPos;
-        private System.Collections.Generic.List<string> reskinPendingOverwrites;
-        private Vector2 reskinOverwriteScrollPos;
-        private string reskinScannedSourceFolder;
-        private string reskinScannedTargetFolder;
+        private string reskinUsageScopeFolder = "Assets";
+        private PsUiSkinApplier.Report reskinPlan;
+        private string reskinPlanInputs;
+        private Vector2 reskinPlanScrollPos;
         private PsUiSkinTheme activeSkinTheme;
-        private const string ToolVersion = "2.15.0";
+        private string reskinAutoMatchSummary;
+        private const string ToolVersion = "2.16.0";
+        internal static string ReportToolVersion => ToolVersion;
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
         [MenuItem("Tools/Photoshop UI Importer/Importer_v2")]
@@ -264,6 +267,10 @@ namespace PhotoshopToUnity.EditorImporter
             useResponsiveAnchor = EditorGUILayout.ToggleLeft(
                 "啟用響應式 anchor（實驗性：套用 PS anchor 與 group 實際尺寸）",
                 useResponsiveAnchor);
+            autoNineSlice = EditorGUILayout.ToggleLeft(
+                new GUIContent("自動九宮格（量測中段均勻的框／底條，縮成小圖 + Sliced，誤差 ≤ 2/255）",
+                    "只切新匯入的圖；既有且非本工具切過的 Sprite 只列提案不改，避免其他 Prefab 以 Simple 引用時變形。"),
+                autoNineSlice);
         }
 
         private void DrawTypographySection()
@@ -499,6 +506,8 @@ namespace PhotoshopToUnity.EditorImporter
             // U7：換皮工具屬獨立、低頻、具破壞性的功能，預設摺疊收進主流程之後。
             // Foldout 必須包在 VerticalScope 內，否則 Unity 6 IMGUI 會丟出
             // kDontSaveInEditor / kAllowDontSaveObjectsToPersistent 的 assertion。
+            // v2.16：資料夾覆蓋與 SkinTheme 兩個入口保留（輸入不同：一個只要兩個資料夾，一個要對照表），
+            // 但共用 PsUiSkinApplier 同一套 預覽 → 確認執行 → 自動備份 / 還原 引擎，不再各寫一套覆蓋邏輯。
             EditorGUILayout.Space(8);
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
             {
@@ -511,69 +520,25 @@ namespace PhotoshopToUnity.EditorImporter
                     return;
                 }
 
-                EditorGUILayout.LabelField("換皮工具（美術圖覆蓋）", EditorStyles.boldLabel);
+                EditorGUILayout.HelpBox(
+                    "兩個入口共用同一套換皮引擎：先「預覽」（dry-run，不改任何檔案）→ 看清單 →「確認執行」。\n" +
+                    "執行前自動備份，取消、例外或機械檢查失敗會自動還原。每次預覽 / 執行都會寫出報告：\n" +
+                    PsUiSkinApplier.ReportRelativePath,
+                    MessageType.None);
+
+                EditorGUILayout.LabelField("A. 資料夾同名覆蓋（美術圖與 Unity 圖同檔名）", EditorStyles.boldLabel);
                 DrawFolderPathField("美術來源資料夾", ref reskinArtSourceFolder, false);
                 DrawFolderPathField("Unity 目標資料夾", ref reskinTargetFolder, true);
-
-                // 路徑變更後舊掃描結果失效，必須重新掃描才能覆蓋
-                if (reskinPendingOverwrites != null &&
-                    (reskinScannedSourceFolder != reskinArtSourceFolder ||
-                     reskinScannedTargetFolder != reskinTargetFolder))
+                DrawFolderPathField("Prefab 使用範圍", ref reskinUsageScopeFolder, true);
+                if (GUILayout.Button("預覽資料夾覆蓋（不會修改檔案）", GUILayout.Height(30)))
                 {
-                    reskinPendingOverwrites = null;
-                    reskinMissingFiles = null;
+                    reskinPlan = PsUiSkinApplier.PlanFolder(reskinArtSourceFolder, reskinTargetFolder, reskinUsageScopeFolder);
+                    reskinPlanInputs = ReskinInputs(PsUiSkinApplier.FlowFolder);
+                    ReportReskinPlanStatus();
                 }
 
-                if (GUILayout.Button("掃描換皮（預覽，不會修改檔案）", GUILayout.Height(34)))
-                {
-                    ScanReskin();
-                }
-
-                if (reskinPendingOverwrites != null)
-                {
-                    EditorGUILayout.Space(4);
-                    var missingCount = reskinMissingFiles != null ? reskinMissingFiles.Count : 0;
-                    EditorGUILayout.LabelField(
-                        $"掃描結果：將覆蓋 {reskinPendingOverwrites.Count} 張 / 缺少 {missingCount} 張",
-                        EditorStyles.boldLabel);
-
-                    if (reskinPendingOverwrites.Count > 0)
-                    {
-                        reskinOverwriteScrollPos = EditorGUILayout.BeginScrollView(reskinOverwriteScrollPos, GUILayout.MaxHeight(120));
-                        foreach (var name in reskinPendingOverwrites)
-                        {
-                            EditorGUILayout.LabelField(name, EditorStyles.miniLabel);
-                        }
-                        EditorGUILayout.EndScrollView();
-
-                        if (GUILayout.Button($"確認覆蓋 {reskinPendingOverwrites.Count} 張 PNG", GUILayout.Height(34)))
-                        {
-                            ApplyReskinOverwrites();
-                        }
-                    }
-                    else
-                    {
-                        EditorGUILayout.HelpBox("美術來源資料夾內沒有與目標同名的 PNG，無可覆蓋項目。", MessageType.Info);
-                    }
-                }
-
-                if (reskinMissingFiles != null && reskinMissingFiles.Count > 0)
-                {
-                    EditorGUILayout.Space(4);
-                    EditorGUILayout.LabelField($"新美術待辦清單（{reskinMissingFiles.Count} 筆，請交給美術人員）", EditorStyles.boldLabel);
-                    reskinMissingScrollPos = EditorGUILayout.BeginScrollView(reskinMissingScrollPos, GUILayout.MaxHeight(120));
-                    foreach (var name in reskinMissingFiles)
-                    {
-                        EditorGUILayout.LabelField(name, EditorStyles.miniLabel);
-                    }
-                    EditorGUILayout.EndScrollView();
-                }
-            }
-
-            EditorGUILayout.Space(4);
-            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox))
-            {
-                EditorGUILayout.LabelField("SkinTheme 批次換皮", EditorStyles.boldLabel);
+                EditorGUILayout.Space(6);
+                EditorGUILayout.LabelField("B. SkinTheme 對照表（舊 Sprite → 新 Sprite，支援改名與參照替換）", EditorStyles.boldLabel);
                 activeSkinTheme = (PsUiSkinTheme)EditorGUILayout.ObjectField(
                     "Skin Theme", activeSkinTheme, typeof(PsUiSkinTheme), false);
 
@@ -584,16 +549,137 @@ namespace PhotoshopToUnity.EditorImporter
                         : "（未設定）";
                     EditorGUILayout.LabelField($"目標資料夾：{folder}", EditorStyles.miniLabel);
 
+                    EditorGUI.BeginChangeCheck();
+                    var referenceFolder = EditorGUILayout.ObjectField("對照 Prefab 資料夾（已換新圖）",
+                        activeSkinTheme.referencePrefabFolderAsset, typeof(DefaultAsset), false);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(activeSkinTheme, "設定對照 Prefab 資料夾");
+                        activeSkinTheme.referencePrefabFolderAsset = referenceFolder;
+                        EditorUtility.SetDirty(activeSkinTheme);
+                        reskinAutoMatchSummary = null;
+                    }
+
                     DrawFolderPathField("新美術來源資料夾", ref activeSkinTheme.sourceArtFolder, false);
                     if (GUI.changed) EditorUtility.SetDirty(activeSkinTheme);
 
                     if (GUILayout.Button("掃描 Prefab，自動填入舊 Sprite", GUILayout.Height(28)))
                         ScanSkinTheme();
 
-                    if (GUILayout.Button("套用換皮到所有 Prefab", GUILayout.Height(34)))
-                        ExecuteSkinTheme();
+                    if (GUILayout.Button("依對應 Prefab＋節點路徑填入新 Sprite", GUILayout.Height(28)))
+                        AutoMatchSkinTheme();
+                    if (!string.IsNullOrEmpty(reskinAutoMatchSummary))
+                        EditorGUILayout.HelpBox(reskinAutoMatchSummary, MessageType.Info);
+
+                    if (GUILayout.Button("預覽 SkinTheme 換皮（不會修改檔案）", GUILayout.Height(30)))
+                    {
+                        reskinPlan = PsUiSkinApplier.PlanTheme(activeSkinTheme);
+                        reskinPlanInputs = ReskinInputs(PsUiSkinApplier.FlowSkinTheme);
+                        ReportReskinPlanStatus();
+                    }
+                }
+
+                // 輸入變更後舊預覽失效；SkinTheme 內容的變更由 Execute 重新規劃比對時攔下。
+                if (reskinPlan != null && reskinPlanInputs != ReskinInputs(reskinPlan.flow))
+                {
+                    reskinPlan = null;
+                }
+
+                DrawReskinPlan();
+
+                if (PsUiSkinApplier.HasRollback &&
+                    GUILayout.Button("還原上次換皮（從備份還原圖檔與 Prefab）", GUILayout.Height(26)))
+                {
+                    RollbackReskin();
                 }
             }
+        }
+
+        private string ReskinInputs(string flow)
+        {
+            if (flow == PsUiSkinApplier.FlowFolder)
+                return $"{flow}|{reskinArtSourceFolder}|{reskinTargetFolder}|{reskinUsageScopeFolder}";
+            if (activeSkinTheme == null)
+                return flow;
+            var folder = activeSkinTheme.targetPrefabFolderAsset != null
+                ? AssetDatabase.GetAssetPath(activeSkinTheme.targetPrefabFolderAsset)
+                : string.Empty;
+            return $"{flow}|{activeSkinTheme.GetInstanceID()}|{folder}|{activeSkinTheme.sourceArtFolder}";
+        }
+
+        private void DrawReskinPlan()
+        {
+            if (reskinPlan == null)
+            {
+                return;
+            }
+
+            var plan = reskinPlan;
+            var s = plan.summary;
+            EditorGUILayout.Space(6);
+            EditorGUILayout.LabelField(
+                $"預覽結果（{(plan.flow == PsUiSkinApplier.FlowSkinTheme ? "SkinTheme" : "資料夾覆蓋")}）", EditorStyles.boldLabel);
+            foreach (var error in plan.errors)
+            {
+                EditorGUILayout.HelpBox(error, MessageType.Warning);
+            }
+            EditorGUILayout.LabelField(
+                $"將覆蓋圖檔 {s.filesOverwritten}｜將替換參照 {s.spritesReplaced}（{s.prefabsChanged} 個 Prefab）｜" +
+                $"缺圖 {s.missing}｜擋下 {s.blocked}｜略過 {s.skipped}",
+                EditorStyles.miniBoldLabel);
+
+            reskinPlanScrollPos = EditorGUILayout.BeginScrollView(reskinPlanScrollPos, GUILayout.MaxHeight(240));
+            DrawReskinItems(plan, "將執行", PsUiSkinApplier.StatusOk);
+            DrawReskinItems(plan, "缺圖（請交給美術）", PsUiSkinApplier.StatusMissing);
+            DrawReskinItems(plan, "擋下（處理後重新預覽）", PsUiSkinApplier.StatusBlocked);
+            DrawReskinItems(plan, "略過", PsUiSkinApplier.StatusSkipped);
+            EditorGUILayout.EndScrollView();
+
+            using (new EditorGUILayout.HorizontalScope())
+            {
+                var executable = System.Linq.Enumerable.Count(plan.Executable);
+                using (new EditorGUI.DisabledScope(!plan.planComplete || executable == 0))
+                {
+                    if (GUILayout.Button($"確認執行 {executable} 項（先備份）", GUILayout.Height(32)))
+                    {
+                        ExecuteReskinPlan();
+                    }
+                }
+                if (GUILayout.Button("開啟報告", GUILayout.Width(90), GUILayout.Height(32)))
+                {
+                    EditorUtility.RevealInFinder(PsUiSkinApplier.ReportPath);
+                }
+            }
+        }
+
+        private static void DrawReskinItems(PsUiSkinApplier.Report plan, string title, string status)
+        {
+            var items = plan.items.FindAll(i => i.status == status);
+            if (items.Count == 0)
+            {
+                return;
+            }
+
+            EditorGUILayout.LabelField($"{title}（{items.Count}）", EditorStyles.miniBoldLabel);
+            foreach (var item in items)
+            {
+                var name = string.IsNullOrEmpty(item.oldSprite) ? "（未指定）" : Path.GetFileName(item.oldSprite);
+                EditorGUILayout.LabelField($"• {name}　{item.reason}", EditorStyles.wordWrappedMiniLabel);
+                foreach (var warning in item.warnings)
+                {
+                    EditorGUILayout.LabelField("　　注意：" + warning, EditorStyles.wordWrappedMiniLabel);
+                }
+            }
+        }
+
+        private void ReportReskinPlanStatus()
+        {
+            var s = reskinPlan.summary;
+            SetStatus(
+                reskinPlan.planComplete
+                    ? $"預覽完成，尚未修改任何檔案：將覆蓋 {s.filesOverwritten}、替換 {s.spritesReplaced} 處參照；缺圖 {s.missing}、擋下 {s.blocked}、略過 {s.skipped}。"
+                    : "預覽未完成：" + string.Join("；", reskinPlan.errors),
+                reskinPlan.planComplete && s.missing + s.blocked == 0 ? MessageType.Info : MessageType.Warning);
         }
 
         private void ScanSkinTheme()
@@ -606,170 +692,77 @@ namespace PhotoshopToUnity.EditorImporter
                 return;
             }
 
-            var added = PsUiSkinApplier.ScanAndFillOldSprites(activeSkinTheme);
+            var added = PsUiSkinApplier.ScanAndFillOldSprites(activeSkinTheme, out var notes);
+            foreach (var note in notes)
+                Debug.LogWarning($"[SkinTheme] {note}");
             SetStatus(
-                added > 0
-                    ? $"掃描完成，找到 {added} 個 Sprite。請在 SkinTheme Inspector 為每筆填入對應的新 Sprite。"
-                    : "掃描完成，沒有新增項目（所有 Sprite 已在清單中）。",
+                (added > 0
+                    ? $"掃描完成，找到 {added} 個 Sprite（可 Undo）。請在 SkinTheme Inspector 為每筆填入對應的新 Sprite。"
+                    : "掃描完成，沒有新增項目（所有 Sprite 已在清單中）。") +
+                (notes.Count > 0 ? $" 另有 {notes.Count} 則提醒見 Console。" : string.Empty),
                 added > 0 ? MessageType.Info : MessageType.Warning);
         }
 
-        private void ExecuteSkinTheme()
+        private void AutoMatchSkinTheme()
         {
-            if (activeSkinTheme == null) return;
+            var result = PsUiSkinApplier.AutoFillFromPrefabPairs(activeSkinTheme);
+            reskinPlan = null;
+            reskinAutoMatchSummary =
+                $"配對 Prefab {result.pairedPrefabs} 組；填入新 Sprite {result.filled} 筆；" +
+                $"待人工處理 {result.remaining} 筆（歧義 {result.ambiguous}、對照 Prefab 未換圖 {result.unchanged}）。" +
+                $" 缺少對照 Prefab {result.missingPrefabs}、節點 {result.missingNodes}、新圖 {result.missingSprites}。";
+            foreach (var note in result.notes.Take(30))
+                Debug.LogWarning($"[SkinTheme 自動配對] {note}");
+            SetStatus(reskinAutoMatchSummary + (result.notes.Count > 0 ? " 詳情見 Console。" : ""),
+                result.filled > 0 ? MessageType.Info : MessageType.Warning);
+        }
 
-            var folder = activeSkinTheme.targetPrefabFolderAsset != null
-                ? AssetDatabase.GetAssetPath(activeSkinTheme.targetPrefabFolderAsset)
-                : "（未設定）";
-
+        private void ExecuteReskinPlan()
+        {
+            var s = reskinPlan.summary;
             if (!EditorUtility.DisplayDialog(
-                "套用換皮",
-                $"目標資料夾：{folder}\n\n" +
-                "• 同名項目（New Sprite 為空或同名）→ 從美術來源資料夾覆蓋 PNG 檔案\n" +
-                "• 不同名項目（New Sprite 不同）→ 替換 Prefab 裡的 Sprite 參照\n\n" +
-                "此操作直接修改檔案，確定繼續嗎？",
-                "確定套用",
+                "確認換皮",
+                $"將覆蓋 {s.filesOverwritten} 個圖檔、替換 {s.spritesReplaced} 處 Sprite 參照（{s.prefabsChanged} 個 Prefab）。\n\n" +
+                "執行前會先備份；取消、例外或機械檢查失敗會自動還原，之後也可按「還原上次換皮」。\n" +
+                $"缺圖 {s.missing}、擋下 {s.blocked} 項不會執行。",
+                "確定執行",
                 "取消"))
                 return;
 
-            var r = PsUiSkinApplier.Apply(activeSkinTheme);
+            var r = PsUiSkinApplier.Execute(reskinPlan);
+            reskinPlan = null;
 
-            if (!string.IsNullOrEmpty(r.errorMessage))
+            foreach (var item in r.items)
             {
-                SetStatus(r.errorMessage, MessageType.Error);
-                return;
+                if (item.status == PsUiSkinApplier.StatusMissing || item.status == PsUiSkinApplier.StatusBlocked)
+                    Debug.LogWarning($"[Reskin] {item.status} {item.oldSprite}：{item.reason}");
             }
 
-            var parts = new System.Collections.Generic.List<string>();
-            if (r.filesOverwritten > 0)
-                parts.Add($"覆蓋 {r.filesOverwritten} 個 PNG");
-            if (r.prefabsChanged > 0)
-                parts.Add($"{r.prefabsChanged} 個 Prefab 替換 {r.spritesReplaced} 個 Sprite 參照");
-            if (r.missingFiles != null && r.missingFiles.Count > 0)
-                parts.Add($"找不到 {r.missingFiles.Count} 個（見 Console）");
-
-            var msg = parts.Count > 0
-                ? "換皮完成：" + string.Join("，", parts) + "。"
-                : "換皮完成，沒有任何變更。";
-
-            if (r.missingFiles != null)
-                foreach (var f in r.missingFiles)
-                    Debug.LogWarning($"[SkinTheme] 找不到：{f}");
-
-            SetStatus(msg, r.filesOverwritten + r.prefabsChanged > 0 ? MessageType.Info : MessageType.Warning);
-        }
-
-        private void ScanReskin()
-        {
-            reskinPendingOverwrites = null;
-            reskinMissingFiles = null;
-
-            if (string.IsNullOrWhiteSpace(reskinArtSourceFolder) || !Directory.Exists(reskinArtSourceFolder))
+            var done = r.summary;
+            if (r.execution != null && r.execution.completed)
             {
-                SetStatus("請先選擇有效的美術來源資料夾。", MessageType.Warning);
-                return;
-            }
-
-            if (!PathUtility.IsAssetPath(reskinTargetFolder))
-            {
-                SetStatus("Unity 目標資料夾必須位於專案 Assets 之下。", MessageType.Error);
-                return;
-            }
-
-            var targetAbsPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", reskinTargetFolder));
-            if (!Directory.Exists(targetAbsPath))
-            {
-                SetStatus("Unity 目標資料夾不存在，請確認路徑。", MessageType.Error);
-                return;
-            }
-
-            var targetFiles = Directory.GetFiles(targetAbsPath, "*.png", SearchOption.TopDirectoryOnly);
-            if (targetFiles.Length == 0)
-            {
-                SetStatus("Unity 目標資料夾內找不到 PNG 圖片。", MessageType.Warning);
-                return;
-            }
-
-            var pendingOverwrites = new System.Collections.Generic.List<string>();
-            var missingFiles = new System.Collections.Generic.List<string>();
-            foreach (var targetFile in targetFiles)
-            {
-                var fileName = Path.GetFileName(targetFile);
-                if (File.Exists(Path.Combine(reskinArtSourceFolder, fileName)))
-                {
-                    pendingOverwrites.Add(fileName);
-                }
-                else
-                {
-                    missingFiles.Add(fileName);
-                }
-            }
-
-            reskinPendingOverwrites = pendingOverwrites;
-            reskinMissingFiles = missingFiles;
-            reskinScannedSourceFolder = reskinArtSourceFolder;
-            reskinScannedTargetFolder = reskinTargetFolder;
-
-            SetStatus(
-                pendingOverwrites.Count > 0
-                    ? $"掃描完成：將覆蓋 {pendingOverwrites.Count} 張 / 缺少 {missingFiles.Count} 張。尚未修改任何檔案，請確認清單後按「確認覆蓋」。"
-                    : $"掃描完成：沒有同名 PNG 可覆蓋，缺少 {missingFiles.Count} 張。尚未修改任何檔案。",
-                pendingOverwrites.Count > 0 ? MessageType.Info : MessageType.Warning);
-        }
-
-        private void ApplyReskinOverwrites()
-        {
-            if (reskinPendingOverwrites == null || reskinPendingOverwrites.Count == 0)
-            {
-                return;
-            }
-
-            if (!EditorUtility.DisplayDialog(
-                "確認換皮覆蓋",
-                $"即將以「{reskinScannedSourceFolder}」的同名 PNG\n" +
-                $"覆蓋「{reskinScannedTargetFolder}」內共 {reskinPendingOverwrites.Count} 張圖片。\n\n" +
-                "此操作會直接覆蓋檔案且無法復原，確定繼續嗎？",
-                "確定覆蓋",
-                "取消"))
-            {
-                return;
-            }
-
-            var targetAbsPath = Path.GetFullPath(Path.Combine(Application.dataPath, "..", reskinScannedTargetFolder));
-            var overwriteCount = 0;
-            var skipped = new System.Collections.Generic.List<string>();
-            foreach (var fileName in reskinPendingOverwrites)
-            {
-                var sourcePath = Path.Combine(reskinScannedSourceFolder, fileName);
-                var targetPath = Path.Combine(targetAbsPath, fileName);
-                if (File.Exists(sourcePath) && File.Exists(targetPath))
-                {
-                    File.Copy(sourcePath, targetPath, overwrite: true);
-                    overwriteCount++;
-                }
-                else
-                {
-                    skipped.Add(fileName);
-                }
-            }
-
-            AssetDatabase.Refresh();
-            reskinPendingOverwrites = null;
-
-            var msg = $"換皮完成。已覆蓋 {overwriteCount} 張圖片。";
-            if (skipped.Count > 0)
-            {
-                msg += $" 有 {skipped.Count} 張在掃描後遺失，已跳過：{string.Join("、", skipped)}。";
-            }
-            if (reskinMissingFiles != null && reskinMissingFiles.Count > 0)
-            {
-                msg += $" 找不到對應美術：{reskinMissingFiles.Count} 張（見下方清單）。";
-                SetStatus(msg, MessageType.Warning);
+                SetStatus(
+                    $"換皮完成：覆蓋 {done.filesOverwritten} 個圖檔、替換 {done.spritesReplaced} 處參照（{done.prefabsChanged} 個 Prefab），機械檢查通過。" +
+                    (done.missing + done.blocked > 0 ? $" 缺圖 {done.missing}、擋下 {done.blocked}（見 Console / 報告）。" : string.Empty),
+                    done.missing + done.blocked > 0 ? MessageType.Warning : MessageType.Info);
             }
             else
             {
-                SetStatus(msg, skipped.Count > 0 ? MessageType.Warning : MessageType.Info);
+                SetStatus($"換皮未完成：{r.execution?.reason}（報告：{PsUiSkinApplier.ReportRelativePath}）", MessageType.Error);
             }
+        }
+
+        private void RollbackReskin()
+        {
+            if (!EditorUtility.DisplayDialog(
+                "還原上次換皮",
+                "將把上次換皮改過的圖檔與 Prefab 還原成備份內容。之後若檔案又被改過，會拒絕還原以免蓋掉新的修改。",
+                "還原",
+                "取消"))
+                return;
+
+            var ok = PsUiSkinApplier.RollbackLastApply(out var message);
+            SetStatus(message, ok ? MessageType.Info : MessageType.Error);
         }
 
         private void DrawActionSection()
@@ -954,7 +947,8 @@ namespace PhotoshopToUnity.EditorImporter
                 referenceResolutionX = referenceResolution.x,
                 referenceResolutionY = referenceResolution.y,
                 useResponsiveAnchor = useResponsiveAnchor,
-                createSpriteAtlases = true
+                createSpriteAtlases = true,
+                autoNineSlice = autoNineSlice
             });
             foreach (var warning in result.warnings)
                 Debug.LogWarning(warning);
@@ -971,6 +965,15 @@ namespace PhotoshopToUnity.EditorImporter
             var dedupHint = result.dedupedSpriteCount > 0
                 ? $"　像素去重合併：{result.dedupedSpriteCount} 張（省 {FormatByteSize(result.dedupedSpriteBytes)}）"
                 : string.Empty;
+            var slicedCount = result.autoSlices.FindAll(s => s.decision == "applied").Count;
+            var proposalCount = result.autoSlices.FindAll(s => s.decision == "proposal").Count;
+            if (slicedCount + proposalCount > 0)
+            {
+                dedupHint += $"　自動九宮格：{slicedCount} 張" + (proposalCount > 0 ? $"（另 {proposalCount} 張既有圖只提案，見 Console）" : string.Empty);
+                foreach (var slice in result.autoSlices)
+                    if (slice.decision == "proposal")
+                        Debug.Log($"[九宮格提案] {slice.imagePath}：{slice.originalWidth}x{slice.originalHeight} -> {slice.slicedWidth}x{slice.slicedHeight}，border {slice.border}。{slice.reason}");
+            }
             var notes = new System.Collections.Generic.List<string>();
             if (result.outlineWarningCount > 0)
                 notes.Add($"{result.outlineWarningCount} 個文字描邊超出 SDF 物理上限被截斷（建議按 Console 建議值重建 Font Asset 的 atlasPadding）");

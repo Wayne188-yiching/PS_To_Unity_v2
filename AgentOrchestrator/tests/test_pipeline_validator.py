@@ -206,6 +206,37 @@ class PipelineValidatorTests(unittest.TestCase):
         decision = AgentDecision(status=Status.PASS, summary="_z", next_action="done")
         self.assertEqual(Status.NEEDS_REVIEW, controller.enforce_decision(decision).status)
 
+    def test_faux_bold_must_reach_tmp(self):
+        self.layout["nodes"][1]["fauxBold"] = True
+        result = PipelineValidatorController(self.request)._compare(self.layout, self.snapshots, self.result())
+        self.assertNotEqual("PASS", result["status"])
+        self.snapshots[2]["textBold"] = True
+        result = PipelineValidatorController(self.request)._compare(self.layout, self.snapshots, self.result())
+        self.assertEqual("PASS", result["status"])
+
+    def _auto_sliced(self, border="20,0,20,0", diff=1, image_type="Sliced"):
+        self.layout["nodes"][0].pop("imageType")
+        self.snapshots[1]["imageType"] = image_type
+        payload = self.result()
+        payload["importResult"]["importedImages"][0].update(
+            spritePixelHash="compressed", nineSliceBorder=border, reconstructedMaxChannelDiff=diff)
+        return PipelineValidatorController(self.request)._compare(self.layout, self.snapshots, payload)
+
+    def test_auto_nine_slice_with_reconstruction_evidence_passes(self):
+        self.assertEqual("PASS", self._auto_sliced()["status"])
+
+    def test_auto_nine_slice_without_evidence_blocks(self):
+        result = self._auto_sliced(border="")
+        self.assertIn("SPRITE_PIXEL_IDENTITY_MISMATCH", {issue["code"] for issue in result["issues"]})
+
+    def test_auto_nine_slice_over_tolerance_blocks(self):
+        result = self._auto_sliced(diff=5)
+        self.assertIn("SPRITE_PIXEL_IDENTITY_MISMATCH", {issue["code"] for issue in result["issues"]})
+
+    def test_auto_sliced_sprite_drawn_simple_blocks(self):
+        result = self._auto_sliced(image_type="Simple")
+        self.assertIn("NINE_SLICE_NOT_APPLIED", {issue["code"] for issue in result["issues"]})
+
     def test_swapped_sprite_binding_blocks(self):
         result_payload = self.result()
         result_payload["importResult"]["imageBindings"][0]["spriteAssetPath"] = "Assets/Sprites/wrong.png"

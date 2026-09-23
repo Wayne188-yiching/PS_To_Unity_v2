@@ -1,6 +1,6 @@
 #target photoshop
 
-var SCRIPT_VERSION = "2.15.0";
+var SCRIPT_VERSION = "2.16.0";
 var GITHUB_JSX_RAW_URL = "https://raw.githubusercontent.com/Wayne188-yiching/PS_To_Unity_v2/main/PhotoshopExporter/PhotoshopUiPackageExporter.jsx";
 
 // OPTIMIZATION_PLAN_zh.html#phase4-5-q10：統一方括號標籤註冊表（Phase 4 Q8 預告的 refactor）。
@@ -1279,6 +1279,9 @@ function createImageNode(layer, context, parentBounds) {
     if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
         return null;
     }
+    // Unclamped bounds: the fast-duplicate export matches the duplicated layer against these to
+    // place it inside the (clamped) export rect. See alignDuplicateToExportRect.
+    var sourceBounds = bounds;
 
     if (!insideScroll) {
         bounds = clampBoundsToCanvas(bounds, context.doc);
@@ -1315,6 +1318,7 @@ function createImageNode(layer, context, parentBounds) {
 
     var noEffectsBounds = readLayerBoundsNoEffects(layer);
     node._exportBounds = bounds;
+    node._sourceBounds = sourceBounds;
     node._noEffectsBounds = noEffectsBounds;
     node._parentBounds = parentBounds;
     node._rawName = layer.name;
@@ -1332,7 +1336,26 @@ function createImageNode(layer, context, parentBounds) {
     applyLayoutMetadata(node, bounds, parentBounds, layer.name);
     applyScrollbarMetadata(node, layer.name);
     applyMaskMetadata(node, layer.name);
+    warnUnsupportedBlendMode(layer, nodeName, context);
     return node;
+}
+
+// Unity UI draws every Image with normal alpha blending, so a Screen / Multiply / Overlay / ... layer is
+// exported with its own pixels and comes out brighter or darker in Unity than in Photoshop (Hall_Ranking's
+// light streak is Screen). [MERGE] groups bake their inner blending into the composite, so only single
+// layers are reported.
+function warnUnsupportedBlendMode(layer, nodeName, context) {
+    if (!layer || layer.typename === "LayerSet") {
+        return;
+    }
+    var mode = null;
+    try { mode = layer.blendMode; } catch (ignored) {}
+    if (!mode || mode === BlendMode.NORMAL || mode === BlendMode.PASSTHROUGH) {
+        return;
+    }
+    pushWarning(context, nodeName, "BLEND_MODE_UNSUPPORTED",
+        "圖層混合模式為 " + String(mode).replace("BlendMode.", "") + "，Unity UI 一律以一般 Alpha 混合繪製，" +
+        "這張圖在 Unity 會比 Photoshop 亮或暗。可在 PS 用 [MERGE] 把它和下方圖層合併輸出，或在 Unity 改用對應混合的材質。");
 }
 
 function exportAllImages(pendingImages, context) {
@@ -1453,12 +1476,16 @@ function exportNodeImageFastDuplicate(layer, node, context, exportDoc, file) {
         if (node._noMaskExport) {
             removeActiveLayerMasks();
         }
-        var duplicateBounds = readLayerBounds(duplicatedLayer);
-        if (duplicateBounds) {
-            node._duplicateExportOriginX = duplicateBounds.left;
-            node._duplicateExportOriginY = duplicateBounds.top;
+        var placement = alignDuplicateToExportRect(exportDoc, duplicatedLayer, node);
+        if (!placement.verified) {
+            // Unknown placement: keep the previous behaviour (align the duplicate's own origin) so the
+            // image is still exported, and say so -- the rect may be off by the reported difference.
+            alignActiveLayerToExportOrigin(exportDoc);
+            pushWarning(context, node.name || "", "EXPORT_ALIGN_UNVERIFIED",
+                "複製到暫存文件後的圖層 bounds（含效果／不含效果 " + placement.duplicateSize + "）與來源 bounds（含效果 " +
+                placement.sourceSize + "／不含效果 " + placement.noEffectsSize + "）都對不上，無法確認位置；" +
+                "已沿用舊的對齊方式，Unity 位置可能偏移，請比對 PS 畫面。");
         }
-        alignActiveLayerToExportOrigin(exportDoc);
 
         if (!trimTransparentPixels(exportDoc, node)) {
             saved = false;
@@ -1479,8 +1506,6 @@ function exportNodeImageFastDuplicate(layer, node, context, exportDoc, file) {
         } catch (ignored) {
         }
         app.activeDocument = context.doc;
-        try { delete node._duplicateExportOriginX; } catch (ignoredOriginX) {}
-        try { delete node._duplicateExportOriginY; } catch (ignoredOriginY) {}
     }
 
     return saved;
@@ -1500,6 +1525,54 @@ function unlockLayerForExport(layer) {
     try { layer.positionLocked = false; } catch (ignoredPosition) {}
     try { layer.pixelsLocked = false; } catch (ignoredPixels) {}
     try { layer.transparentPixelsLocked = false; } catch (ignoredTransparent) {}
+}
+
+// Photoshop does not duplicate a layer into another document at a fixed place. Measured on
+// Hall_Ranking.psd (2026-09-23, PS 2026): Smart Objects that overlap the small export document keep
+// their canvas coordinates (e.g. -41,-32), layers that would land outside it are centred (a text
+// layer at 454,-23 arrived at 0,-11), and a duplicated Smart Object can drop the extent of its layer
+// effects from `bounds` (109x109 in the PSD, 101x101 after duplicate). Aligning the duplicate's own
+// top-left to the origin therefore dropped two offsets into layout.json: the part clamped away at the
+// canvas edge (title +23px, window board +41/+32px with its right/bottom edge cut off) and the
+// transparent margin a trim removes (rows 2-5: +4px).
+// Layer effects are the unreliable part (a duplicate can report glow/stroke extents 4-8px smaller than
+// the source), the layer's own pixels are not: so anchor on boundsNoEffects of both copies first, and
+// only fall back to the with-effects bounds. The duplicate is moved to where the anchor sits relative
+// to the export rect (node.x/node.y, already clamped to the canvas).
+// The export document is exactly that rect: off-canvas pixels stay outside it, and a transparent
+// margin stays a margin whose trimmed width trimTransparentPixels adds back to node.x/node.y.
+function alignDuplicateToExportRect(doc, layer, node) {
+    var dup = readLayerBounds(layer);
+    var dupNoEffects = readLayerBoundsNoEffects(layer);
+    var size = function (b) { return b ? b.width + "x" + b.height : "?"; };
+    var result = {
+        verified: false,
+        duplicateSize: size(dup) + " / " + size(dupNoEffects),
+        sourceSize: size(node._sourceBounds),
+        noEffectsSize: size(node._noEffectsBounds)
+    };
+    var pairs = [
+        [dupNoEffects, node._noEffectsBounds],
+        [dup, node._sourceBounds],
+        [dup, node._noEffectsBounds]
+    ];
+    for (var i = 0; i < pairs.length; i++) {
+        var moving = pairs[i][0];
+        var reference = pairs[i][1];
+        if (!moving || !reference ||
+            Math.abs(reference.width - moving.width) > 1 || Math.abs(reference.height - moving.height) > 1) {
+            continue;
+        }
+        var dx = (reference.left - node.x) - moving.left;
+        var dy = (reference.top - node.y) - moving.top;
+        if (dx !== 0 || dy !== 0) {
+            doc.activeLayer.translate(dx, dy);
+        }
+        result.verified = true;
+        result.anchor = i === 0 ? "noEffects" : "bounds";
+        return result;
+    }
+    return result;
 }
 
 function alignActiveLayerToExportOrigin(doc) {
@@ -1722,18 +1795,16 @@ function trimTransparentPixels(doc, node) {
     doc.resizeCanvas(finalWidth, finalHeight, AnchorPosition.TOPLEFT);
 
     var isMergedComposite = hasMergeGroupTag(node._rawName);
-    var isOversizedSmartObject = smartObjectTrim &&
-        (contentBounds.width < node.width * 0.5 || contentBounds.height < node.height * 0.5);
     if (isMergedComposite && node._noEffectsBounds) {
         // Copy Merged centers the clipboard pixels in the temporary document and
         // loses their transparent selection offset. Re-anchor the tight bitmap to
         // the source group's no-effects center so hidden child bounds cannot shift it.
         node.x = Math.round((node._noEffectsBounds.left + node._noEffectsBounds.right - finalWidth) * 0.5);
         node.y = Math.round((node._noEffectsBounds.top + node._noEffectsBounds.bottom - finalHeight) * 0.5);
-    } else if (isOversizedSmartObject && typeof node._duplicateExportOriginX === "number") {
-        node.x = Math.round(node._duplicateExportOriginX + contentBounds.left);
-        node.y = Math.round(node._duplicateExportOriginY + contentBounds.top);
     } else {
+        // Fast duplicate places the layer at its real position inside the export rect
+        // (alignDuplicateToExportRect), and Copy Merged pastes the selected rect, so in both cases the
+        // trimmed left/top margin is exactly the offset from node.x/node.y.
         node.x = Math.round(node.x + contentBounds.left);
         node.y = Math.round(node.y + contentBounds.top);
     }
@@ -1942,13 +2013,30 @@ function trimActiveSmartObjectTransparency(doc) {
         var width = Math.max(0, Math.round(px(doc.width)));
         var height = Math.max(0, Math.round(px(doc.height)));
         if (width <= 0 || height <= 0) return null;
+
+        // A Smart Object whose whole canvas carries a sub-threshold halo pins every edge exactly like
+        // a normal layer does (Hall_Ranking's 1948x1047 window board). Same rescue as
+        // trimDocumentTransparency, same gate.
+        var rescue = null;
+        if (removedLeft === 0 && removedTop === 0 &&
+            width === Math.round(originalWidth) && height === Math.round(originalHeight) &&
+            width * height >= 4096) {
+            rescue = rescueNearTransparentBounds(doc, width, height);
+            if (rescue) {
+                removedLeft += rescue.left;
+                removedTop += rescue.top;
+                width = rescue.width;
+                height = rescue.height;
+            }
+        }
         return {
             left: removedLeft,
             top: removedTop,
             right: removedLeft + width,
             bottom: removedTop + height,
             width: width,
-            height: height
+            height: height,
+            nearTransparentRescue: rescue
         };
     } catch (error) {
         try { doc.selection.deselect(); } catch (ignoredDeselect) {}
@@ -2645,6 +2733,39 @@ function createTextNode(layer, context, parentBounds) {
         children: []
     };
 
+    // Character panel attributes the layout did not carry (Hall_Ranking rows: faux bold on names and levels,
+    // 103%/102% scale on the scores). impliedFontSize already includes the layer transform but not the
+    // character scale, so the vertical scale goes into fontSize; TMP has no separate horizontal scale.
+    var characterExtras = readTextCharacterExtras(layer);
+    if (characterExtras.fauxBold) {
+        node.fauxBold = true;
+    }
+    if (Math.abs(characterExtras.verticalScale - 100) > 0.5) {
+        node.fontSize = round2(node.fontSize * characterExtras.verticalScale / 100);
+    }
+    // The rect is the with-effects box (stroke / glow / shadow included) so layout math stays unchanged;
+    // TMP starts the glyphs at the rect edge, which put left-aligned text with a 3-11 px effect that much
+    // too far left (Hall_Ranking rows). The effect extent per side becomes a TMP margin instead.
+    var glyphBounds = readLayerBoundsNoEffects(layer);
+    if (glyphBounds && glyphBounds.width > 0 && glyphBounds.height > 0) {
+        var insetLeft = Math.max(0, glyphBounds.left - bounds.left);
+        var insetTop = Math.max(0, glyphBounds.top - bounds.top);
+        var insetRight = Math.max(0, bounds.right - glyphBounds.right);
+        var insetBottom = Math.max(0, bounds.bottom - glyphBounds.bottom);
+        if (insetLeft + insetTop + insetRight + insetBottom > 0 &&
+            insetLeft + insetRight < bounds.width && insetTop + insetBottom < bounds.height) {
+            node.textInsetLeft = insetLeft;
+            node.textInsetTop = insetTop;
+            node.textInsetRight = insetRight;
+            node.textInsetBottom = insetBottom;
+        }
+    }
+    if (Math.abs(characterExtras.horizontalScale - characterExtras.verticalScale) > 2) {
+        pushWarning(context, node.name, "TEXT_HORIZONTAL_SCALE_APPROXIMATED",
+            "文字水平縮放 " + round2(characterExtras.horizontalScale) + "% 與垂直縮放 " + round2(characterExtras.verticalScale) +
+            "% 不同；TMP 沒有單獨的水平縮放，字寬會和 Photoshop 不同。請在 PS 改回相同比例，或接受字寬差異。");
+    }
+
     if (fakeThickness.offsetY !== 0) {
         node.fakeThicknessOffsetY = fakeThickness.offsetY;
     }
@@ -2810,6 +2931,15 @@ function nodeToJson(node, indent) {
             lines.push(childIndent + '"gradientStartColor": ' + quoteJson(node.gradientStartColor) + ",");
             lines.push(childIndent + '"gradientEndColor": ' + quoteJson(node.gradientEndColor || "") + ",");
             lines.push(childIndent + '"gradientAngle": ' + jsonNumber(node.gradientAngle || 0) + ",");
+        }
+        if (node.fauxBold) {
+            lines.push(childIndent + '"fauxBold": true,');
+        }
+        if (node.textInsetLeft || node.textInsetTop || node.textInsetRight || node.textInsetBottom) {
+            lines.push(childIndent + '"textInsetLeft": ' + jsonNumber(node.textInsetLeft || 0) + ",");
+            lines.push(childIndent + '"textInsetTop": ' + jsonNumber(node.textInsetTop || 0) + ",");
+            lines.push(childIndent + '"textInsetRight": ' + jsonNumber(node.textInsetRight || 0) + ",");
+            lines.push(childIndent + '"textInsetBottom": ' + jsonNumber(node.textInsetBottom || 0) + ",");
         }
         if (node.fakeThicknessOffsetY) {
             lines.push(childIndent + '"fakeThicknessOffsetY": ' + jsonNumber(node.fakeThicknessOffsetY) + ",");
@@ -4745,6 +4875,22 @@ function readFontSize(layer) {
     }
 
     return 24;
+}
+
+function readTextCharacterExtras(layer) {
+    var result = { fauxBold: false, horizontalScale: 100, verticalScale: 100 };
+    try {
+        var style = readPrimaryTextStyleDescriptor(layer);
+        if (!style) {
+            return result;
+        }
+        var boldKey = stringIDToTypeID("syntheticBold");
+        result.fauxBold = style.hasKey(boldKey) ? style.getBoolean(boldKey) : false;
+        result.horizontalScale = getDescriptorDouble(style, ["horizontalScale"], [], 100);
+        result.verticalScale = getDescriptorDouble(style, ["verticalScale"], [], 100);
+    } catch (e) {
+    }
+    return result;
 }
 
 function readTextCharacterSpacing(layer) {

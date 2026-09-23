@@ -444,6 +444,8 @@ class PipelineValidatorController:
                 ("characterSpacing", node.get("characterSpacing")),
                 ("lineSpacing", node.get("lineSpacing")),
             ), tolerance=0.01)
+            if bool(node.get("fauxBold")) and not text_snapshot.get("textBold"):
+                text_differences.append("textBold: expected True (Photoshop faux bold)")
             expected_alignment = self._expected_text_alignment(node.get("alignment"))
             if text_snapshot.get("textAlignment") != expected_alignment:
                 text_differences.append(f"textAlignment: expected {expected_alignment}")
@@ -503,6 +505,16 @@ class PipelineValidatorController:
             "bottom": "Bottom", "bottomcenter": "Bottom",
         }.get(normalized, "Center")
 
+    # The importer's measured 9-slice ships a smaller Sprite on purpose (ImageImportService.ApplyAutoNineSlice).
+    # Its pixel evidence is the max channel difference between the source and the Sprite stretched back to the
+    # source size, which the importer measures and must keep within the tolerance.
+    NINE_SLICE_MAX_RECONSTRUCTION_DIFF = 2
+
+    def _nine_slice_reconstruction_ok(self, imported_image):
+        border = str(imported_image.get("nineSliceBorder") or "")
+        diff = imported_image.get("reconstructedMaxChannelDiff")
+        return bool(border) and isinstance(diff, (int, float)) and 0 <= diff <= self.NINE_SLICE_MAX_RECONSTRUCTION_DIFF
+
     def _validate_image_binding(self, item, snapshot, bindings, imported, issues, role="image"):
         node = item["node"]
         name = str(node.get("name") or "image")
@@ -534,11 +546,18 @@ class PipelineValidatorController:
                 ))
             elif (
                 not imported_image.get("sourcePixelHash")
-                or imported_image.get("sourcePixelHash") != imported_image.get("spritePixelHash")
+                or (imported_image.get("sourcePixelHash") != imported_image.get("spritePixelHash")
+                    and not self._nine_slice_reconstruction_ok(imported_image))
             ):
                 issues.append(self._issue(
                     "SPRITE_PIXEL_IDENTITY_MISMATCH", "error",
                     f"Image {name} Sprite pixels do not match its package source.", node=item["sourcePath"],
+                ))
+            if imported_image and imported_image.get("nineSliceBorder") and snapshot.get("imageType") != "Sliced":
+                issues.append(self._issue(
+                    "NINE_SLICE_NOT_APPLIED", "error",
+                    f"Image {name} uses an auto 9-sliced Sprite but is drawn as {snapshot.get('imageType')}; "
+                    "the compressed Sprite would be stretched out of shape.", node=item["sourcePath"],
                 ))
         elif binding.get("sourceKind") == "skin":
             if not node.get("skinKey"):

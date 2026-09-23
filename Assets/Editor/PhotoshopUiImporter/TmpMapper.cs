@@ -55,10 +55,11 @@ namespace PhotoshopToUnity.EditorImporter
             target.enableAutoSizing = false;
             target.enableWordWrapping = false;
             target.overflowMode = TextOverflowModes.Overflow;
-            target.margin = Vector4.zero;
+            target.margin = new Vector4(node.textInsetLeft, node.textInsetTop, node.textInsetRight, node.textInsetBottom);
             target.fontSize = node.fontSize > 0 ? node.fontSize : 24;
             target.characterSpacing = node.characterSpacing;
             target.lineSpacing = node.lineSpacing;
+            target.fontStyle = node.fauxBold ? FontStyles.Bold : FontStyles.Normal;
             target.color = ParseColor(node.color, Color.white);
 
             // Phase 3 漸層文字：有 PS Gradient Overlay 時設 TMP enableVertexGradient + colorGradient。

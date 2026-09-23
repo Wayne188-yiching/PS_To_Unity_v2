@@ -30,6 +30,8 @@ namespace PhotoshopToUnity.EditorImporter
         public float outlineThicknessMultiplier = 1f;
         public bool useResponsiveAnchor;
         public bool createSpriteAtlases = true;
+        // v2.16：量測式無損九宮格（見 ImageImportService.ApplyAutoNineSlice）。舊 request JSON 沒有此欄位時為 true。
+        public bool autoNineSlice = true;
     }
 
     [Serializable]
@@ -68,6 +70,7 @@ namespace PhotoshopToUnity.EditorImporter
         public float fontSize;
         public float characterSpacing;
         public float lineSpacing;
+        public bool textBold;
         public string textAlignment;
         public string textColor;
         public bool textVertexGradient;
@@ -128,6 +131,26 @@ namespace PhotoshopToUnity.EditorImporter
         public string spriteAssetPath;
         public string sourcePixelHash;
         public string spritePixelHash;
+        // v2.16：自動九宮格切過的圖，sprite 像素本來就不等於來源；改以「依 border 拉回原尺寸後與來源逐像素比對」
+        // 的最大差值作為像素一致的證據（-1 = 未切割）。
+        public string nineSliceBorder;
+        public int reconstructedMaxChannelDiff = -1;
+    }
+
+    [Serializable]
+    public sealed class PhotoshopUiAutoSlice
+    {
+        public string imagePath;
+        public string spriteAssetPath;
+        public string decision;
+        public string reason;
+        public int originalWidth;
+        public int originalHeight;
+        public int slicedWidth;
+        public int slicedHeight;
+        public string border;
+        public long savedPixels;
+        public int reconstructionMaxDiff;
     }
 
     [Serializable]
@@ -163,6 +186,7 @@ namespace PhotoshopToUnity.EditorImporter
         public List<PhotoshopUiPrefabNodeSnapshot> prefabNodes = new List<PhotoshopUiPrefabNodeSnapshot>();
         public List<PhotoshopUiImageBinding> imageBindings = new List<PhotoshopUiImageBinding>();
         public List<PhotoshopUiImportedImage> importedImages = new List<PhotoshopUiImportedImage>();
+        public List<PhotoshopUiAutoSlice> autoSlices = new List<PhotoshopUiAutoSlice>();
         public List<PhotoshopUiTextBinding> textBindings = new List<PhotoshopUiTextBinding>();
         public List<string> errors = new List<string>();
         public List<string> warnings = new List<string>();
@@ -227,6 +251,13 @@ namespace PhotoshopToUnity.EditorImporter
         public static PhotoshopUiImportResult Execute(PhotoshopUiImportRequest request)
         {
             return Execute(request, new UGuiTmpPrefabBackend());
+        }
+
+        // "L,B,R,T" in TextureImporter.spriteBorder order.
+        private static string FormatSliceBorder(Vector4 border)
+        {
+            return string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0},{1},{2},{3}",
+                border.x, border.y, border.z, border.w);
         }
 
         internal static PhotoshopUiImportResult Execute(PhotoshopUiImportRequest request, IUiPrefabBackend backend)
@@ -329,7 +360,7 @@ namespace PhotoshopToUnity.EditorImporter
             ImageImportResult importResult;
             try
             {
-                importResult = ImageImportService.ImportImages(layout, sourceFolder, importFolder);
+                importResult = ImageImportService.ImportImages(layout, sourceFolder, importFolder, request.autoNineSlice);
             }
             finally
             {
@@ -350,13 +381,36 @@ namespace PhotoshopToUnity.EditorImporter
                 var sourceImagePath = Path.Combine(
                     sourceFolder, pair.Key.Replace('/', Path.DirectorySeparatorChar));
                 var spriteAssetPath = pair.Value == null ? null : AssetDatabase.GetAssetPath(pair.Value);
-                result.importedImages.Add(new PhotoshopUiImportedImage
+                var imported = new PhotoshopUiImportedImage
                 {
                     imagePath = pair.Key,
                     spriteAssetPath = spriteAssetPath,
                     sourcePixelHash = ImageImportService.ComputePixelHashFromFile(sourceImagePath),
                     spritePixelHash = string.IsNullOrWhiteSpace(spriteAssetPath)
                         ? null : ImageImportService.ComputePixelHashFromFile(PathUtility.ToAbsolutePath(spriteAssetPath)),
+                };
+                if (importResult.autoSlices.TryGetValue(pair.Key, out var slice) && slice.decision == "applied")
+                {
+                    imported.nineSliceBorder = FormatSliceBorder(slice.border);
+                    imported.reconstructedMaxChannelDiff = slice.reconstructionMaxDiff;
+                }
+                result.importedImages.Add(imported);
+            }
+            foreach (var slice in importResult.autoSlices.Values)
+            {
+                result.autoSlices.Add(new PhotoshopUiAutoSlice
+                {
+                    imagePath = slice.imagePath,
+                    spriteAssetPath = slice.spriteAssetPath,
+                    decision = slice.decision,
+                    reason = slice.reason,
+                    originalWidth = slice.originalWidth,
+                    originalHeight = slice.originalHeight,
+                    slicedWidth = slice.slicedWidth,
+                    slicedHeight = slice.slicedHeight,
+                    border = FormatSliceBorder(slice.border),
+                    savedPixels = slice.savedPixels,
+                    reconstructionMaxDiff = slice.reconstructionMaxDiff,
                 });
             }
             if (importResult.redundantSourceImages.Count > 0)
@@ -519,6 +573,7 @@ namespace PhotoshopToUnity.EditorImporter
                 snapshot.fontSize = text.fontSize;
                 snapshot.characterSpacing = text.characterSpacing;
                 snapshot.lineSpacing = text.lineSpacing;
+                snapshot.textBold = (text.fontStyle & FontStyles.Bold) != 0;
                 snapshot.textAlignment = text.alignment.ToString();
                 snapshot.textColor = "#" + ColorUtility.ToHtmlStringRGBA(text.color);
                 snapshot.textVertexGradient = text.enableVertexGradient;

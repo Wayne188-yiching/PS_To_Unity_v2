@@ -55,6 +55,13 @@ namespace PhotoshopToUnity.EditorImporter
         public float fontSize;
         public float characterSpacing;
         public float lineSpacing;
+        // v2.16：Photoshop 仿粗體（Character 面板 Faux Bold）→ TMP Bold。
+        public bool fauxBold;
+        // v2.16：圖層效果（描邊／光暈／陰影）超出字形框的距離；rect 維持含效果的框，由 TMP margin 把字推回字形框。
+        public float textInsetLeft;
+        public float textInsetTop;
+        public float textInsetRight;
+        public float textInsetBottom;
         public string color;
         public string outlineColor;
         public float outlineWidth;
