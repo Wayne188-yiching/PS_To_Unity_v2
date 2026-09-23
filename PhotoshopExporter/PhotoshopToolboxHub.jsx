@@ -23,6 +23,7 @@
     mainPanel.margins = 14;
 
     var exporterButton = mainPanel.add("button", undefined, "UI Package Exporter");
+    var batchExporterButton = mainPanel.add("button", undefined, "Batch PSD → Unity Packages");
     var namerButton = mainPanel.add("button", undefined, "Layer Auto Namer");
     var spineButton = mainPanel.add("button", undefined, "Photoshop To Spine");
     var updaterButton = mainPanel.add("button", undefined, "Update Everything (git pull)");
@@ -58,6 +59,12 @@
     exporterButton.onClick = function () {
         dialog.close(1);
         runTool(sourceFolder, "PhotoshopUiPackageExporter.jsx", "UI Package Exporter");
+    };
+
+    batchExporterButton.enabled = toolExists(sourceFolder, "PhotoshopUiBatchPackageExporter.jsx");
+    batchExporterButton.onClick = function () {
+        dialog.close(1);
+        runTool(sourceFolder, "PhotoshopUiBatchPackageExporter.jsx", "Batch PSD to Unity Packages");
     };
 
     namerButton.onClick = function () {

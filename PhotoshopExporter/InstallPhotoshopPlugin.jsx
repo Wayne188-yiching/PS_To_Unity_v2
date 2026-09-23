@@ -122,6 +122,7 @@ function removeStrayToolCopies(installFolder, sourceFolder) {
         "Debug_LayerKind.jsx",
         "InstallPhotoshopPlugin.jsx",
         "PhotoshopLayerAutoNamer.jsx",
+        "PhotoshopUiBatchPackageExporter.jsx",
         "PhotoshopToSpine.jsx",
         "PhotoshopToolboxHub.jsx",
         "PhotoshopUiPackageExporter.jsx",

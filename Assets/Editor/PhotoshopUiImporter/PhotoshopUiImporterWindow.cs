@@ -59,7 +59,7 @@ namespace PhotoshopToUnity.EditorImporter
         private Vector2 reskinPlanScrollPos;
         private PsUiSkinTheme activeSkinTheme;
         private string reskinAutoMatchSummary;
-        private const string ToolVersion = "2.16.0";
+        private const string ToolVersion = "2.17.0";
         internal static string ReportToolVersion => ToolVersion;
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 

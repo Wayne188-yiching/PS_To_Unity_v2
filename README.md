@@ -12,7 +12,7 @@ It exports a Photoshop UI as a UI Package, then rebuilds the layout in Unity as 
 
 ## Version
 
-v2.16.0
+v2.17.0
 
 ## Main Workflow
 
@@ -37,6 +37,12 @@ This keeps Spine export as a separate pipeline while sharing the same Photoshop 
 3. Export PNG files to a chosen image folder and write a custom-named layout JSON outside that image folder.
 4. In Unity, open `Tools > Photoshop UI Importer > Importer_v2`.
 5. Select the UI Package folder, choose a prefab output folder, assign TMP font/material assets, then generate the prefab.
+
+### New-theme / full redesign: batch PSD packages
+
+Do **not** build a `SkinTheme` table when the new theme has different artwork, names, hierarchy, or layout. `SkinTheme` is for preserving an existing prefab's structure while replacing its sprites.
+
+For a new design, run `PhotoshopExporter/PhotoshopUiBatchPackageExporter.jsx` (or use `Batch PSD → Unity Packages` in the Photoshop toolbox), select the PSD source folder and a Unity-package output root. It opens every PSD read-only, produces one package per PSD (`layout.json` plus `Atlas/SpriteAtlas/Base`), and closes it without saving. Import those packages into new prefabs screen-by-screen; keep the old prefab only as the source of runtime behaviours and bindings that the PSD cannot describe. The batch report identifies any PSD that needs attention.
 
 Exporter speed notes:
 
@@ -82,6 +88,7 @@ Batch font replacement (`Tools > Photoshop UI Importer > Font Replacer`):
 
 - `PhotoshopExporter/PhotoshopLayerAutoNamer.jsx`
 - `PhotoshopExporter/PhotoshopUiPackageExporter.jsx`
+- `PhotoshopExporter/PhotoshopUiBatchPackageExporter.jsx`
 - `PhotoshopExporter/PhotoshopToolboxHub.jsx`
 - Optional: `PhotoshopExporter/PhotoshopToSpine.jsx`
 - `Assets/Editor/PhotoshopUiImporter/`
