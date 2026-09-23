@@ -12,6 +12,8 @@ namespace PhotoshopToUnity.EditorImporter
         public UnityEngine.Object referencePrefabFolderAsset;
         /// <summary>新美術 PNG 來源資料夾（可在 Assets 外，如 PS 匯出路徑）</summary>
         public string sourceArtFolder = string.Empty;
+        /// <summary>僅供尺寸候選比對的新 Sprite 資料夾；必須在 Unity Assets 內。</summary>
+        public UnityEngine.Object candidateSpriteFolderAsset;
         public List<SkinThemeEntry> entries = new List<SkinThemeEntry>();
         public List<GameObject> excludedPrefabs = new List<GameObject>();
     }

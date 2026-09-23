@@ -59,7 +59,10 @@ namespace PhotoshopToUnity.EditorImporter
         private Vector2 reskinPlanScrollPos;
         private PsUiSkinTheme activeSkinTheme;
         private string reskinAutoMatchSummary;
-        private const string ToolVersion = "2.17.1";
+        private System.Collections.Generic.List<PsUiSkinApplier.DimensionCandidate> reskinDimensionMatches;
+        private string reskinDimensionMatchSummary;
+        private Vector2 reskinDimensionMatchScrollPos;
+        private const string ToolVersion = "2.18.0";
         internal static string ReportToolVersion => ToolVersion;
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
@@ -539,8 +542,14 @@ namespace PhotoshopToUnity.EditorImporter
 
                 EditorGUILayout.Space(6);
                 EditorGUILayout.LabelField("B. SkinTheme 對照表（舊 Sprite → 新 Sprite，支援改名與參照替換）", EditorStyles.boldLabel);
+                EditorGUI.BeginChangeCheck();
                 activeSkinTheme = (PsUiSkinTheme)EditorGUILayout.ObjectField(
                     "Skin Theme", activeSkinTheme, typeof(PsUiSkinTheme), false);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    reskinDimensionMatches = null;
+                    reskinDimensionMatchSummary = null;
+                }
 
                 if (activeSkinTheme != null)
                 {
@@ -563,6 +572,18 @@ namespace PhotoshopToUnity.EditorImporter
                     DrawFolderPathField("新美術來源資料夾", ref activeSkinTheme.sourceArtFolder, false);
                     if (GUI.changed) EditorUtility.SetDirty(activeSkinTheme);
 
+                    EditorGUI.BeginChangeCheck();
+                    var candidateFolder = EditorGUILayout.ObjectField("候選新 Sprite 資料夾（Unity Assets）",
+                        activeSkinTheme.candidateSpriteFolderAsset, typeof(DefaultAsset), false);
+                    if (EditorGUI.EndChangeCheck())
+                    {
+                        Undo.RecordObject(activeSkinTheme, "設定尺寸候選 Sprite 資料夾");
+                        activeSkinTheme.candidateSpriteFolderAsset = candidateFolder;
+                        EditorUtility.SetDirty(activeSkinTheme);
+                        reskinDimensionMatches = null;
+                        reskinDimensionMatchSummary = null;
+                    }
+
                     if (GUILayout.Button("掃描 Prefab，自動填入舊 Sprite", GUILayout.Height(28)))
                         ScanSkinTheme();
 
@@ -570,6 +591,10 @@ namespace PhotoshopToUnity.EditorImporter
                         AutoMatchSkinTheme();
                     if (!string.IsNullOrEmpty(reskinAutoMatchSummary))
                         EditorGUILayout.HelpBox(reskinAutoMatchSummary, MessageType.Info);
+
+                    if (GUILayout.Button("依圖片尺寸產生候選（不寫入）", GUILayout.Height(28)))
+                        SuggestSkinThemeByDimensions();
+                    DrawDimensionMatchCandidates();
 
                     if (GUILayout.Button("預覽 SkinTheme 換皮（不會修改檔案）", GUILayout.Height(30)))
                     {
@@ -707,6 +732,7 @@ namespace PhotoshopToUnity.EditorImporter
         {
             var result = PsUiSkinApplier.AutoFillFromPrefabPairs(activeSkinTheme);
             reskinPlan = null;
+            reskinDimensionMatches = null;
             reskinAutoMatchSummary =
                 $"配對 Prefab {result.pairedPrefabs} 組；填入新 Sprite {result.filled} 筆；" +
                 $"待人工處理 {result.remaining} 筆（歧義 {result.ambiguous}、對照 Prefab 未換圖 {result.unchanged}）。" +
@@ -715,6 +741,70 @@ namespace PhotoshopToUnity.EditorImporter
                 Debug.LogWarning($"[SkinTheme 自動配對] {note}");
             SetStatus(reskinAutoMatchSummary + (result.notes.Count > 0 ? " 詳情見 Console。" : ""),
                 result.filled > 0 ? MessageType.Info : MessageType.Warning);
+        }
+
+        private void SuggestSkinThemeByDimensions()
+        {
+            var result = PsUiSkinApplier.SuggestByDimensions(activeSkinTheme);
+            reskinDimensionMatches = result.matches;
+            reskinDimensionMatchSummary =
+                $"候選新圖 {result.sourceSprites} 張；高信心 {result.high}、中信心 {result.medium}、低信心 {result.low}、無候選 {result.noCandidate}。";
+            foreach (var note in result.notes)
+                Debug.LogWarning($"[SkinTheme 尺寸候選] {note}");
+            SetStatus(reskinDimensionMatchSummary + (result.notes.Count > 0 ? " 詳情見 Console。" : ""),
+                result.high + result.medium > 0 ? MessageType.Info : MessageType.Warning);
+        }
+
+        private void DrawDimensionMatchCandidates()
+        {
+            if (reskinDimensionMatches == null) return;
+            EditorGUILayout.HelpBox(
+                (reskinDimensionMatchSummary ?? "尺寸候選完成。") + " 僅為暫存預選；確認寫入前不會修改 SkinTheme。",
+                MessageType.Info);
+
+            reskinDimensionMatchScrollPos = EditorGUILayout.BeginScrollView(
+                reskinDimensionMatchScrollPos, GUILayout.MaxHeight(260));
+            foreach (var match in reskinDimensionMatches)
+            {
+                if (match == null || match.oldSprite == null) continue;
+                EditorGUILayout.LabelField(
+                    $"{match.oldSprite.name}　{match.oldWidth}×{match.oldHeight}　{match.confidence}信心",
+                    EditorStyles.miniBoldLabel);
+                if (match.candidates.Count == 0)
+                {
+                    EditorGUILayout.LabelField("　沒有尺寸足夠接近的候選。", EditorStyles.wordWrappedMiniLabel);
+                    continue;
+                }
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    foreach (var candidate in match.candidates)
+                    {
+                        if (candidate == null) continue;
+                        var selected = match.selectedSprite == candidate;
+                        var previousColor = GUI.backgroundColor;
+                        if (selected) GUI.backgroundColor = new Color(0.65f, 0.9f, 0.65f);
+                        if (GUILayout.Button($"{candidate.name}\n{Mathf.RoundToInt(candidate.rect.width)}×{Mathf.RoundToInt(candidate.rect.height)}",
+                            GUILayout.Width(136), GUILayout.Height(34)))
+                            match.selectedSprite = candidate;
+                        GUI.backgroundColor = previousColor;
+                    }
+                }
+                match.selectedSprite = (Sprite)EditorGUILayout.ObjectField("確認候選", match.selectedSprite, typeof(Sprite), false);
+            }
+            EditorGUILayout.EndScrollView();
+
+            var selectedCount = reskinDimensionMatches.Count(match => match != null && match.selectedSprite != null);
+            using (new EditorGUI.DisabledScope(selectedCount == 0))
+            {
+                if (GUILayout.Button($"確認寫入 {selectedCount} 筆尺寸候選", GUILayout.Height(28)))
+                {
+                    var applied = PsUiSkinApplier.ApplyDimensionSelections(activeSkinTheme, reskinDimensionMatches);
+                    reskinPlan = null;
+                    reskinDimensionMatches = null;
+                    reskinDimensionMatchSummary = null;
+                    SetStatus($"已寫入 {applied} 筆尺寸候選；請再預覽 SkinTheme 換皮確認。", MessageType.Info);
+                }
+            }
         }
 
         private void ExecuteReskinPlan()
