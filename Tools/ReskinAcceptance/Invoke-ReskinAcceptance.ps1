@@ -4,6 +4,7 @@
 #   -Stage build   : sync importer + harness, generate the fixture, keep a pristine copy
 #   -Stage before  : run the v2.15.0 legacy applier (and legacy window folder flow) on the pristine fixture
 #   -Stage after   : run the current applier (dry-run -> apply -> rollback) on the same pristine fixture
+#   -Stage source  : v2.19 read-only source folder + folder to reskin (own fixture, no build needed)
 #
 # The Unity project must be a disposable test project. Never point this at a production project:
 # the script mirrors Assets/Editor/PhotoshopUiImporter from the repo (or from -ImporterRef) into it.
@@ -12,7 +13,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$ProjectPath,
-    [Parameter(Mandatory = $true)][ValidateSet('build', 'before', 'after')][string]$Stage,
+    [Parameter(Mandatory = $true)][ValidateSet('build', 'before', 'after', 'source')][string]$Stage,
     [string]$OutDir,
     [string]$ImporterRef,
     [string]$UnityExe = 'C:\Program Files\Unity\Hub\Editor\6000.0.67f1\Editor\Unity.exe'
@@ -60,7 +61,7 @@ function Sync-Importer {
     Mirror-Scripts $src $importerDst
 }
 
-function Sync-Harness([bool]$withAfter) {
+function Sync-Harness([bool]$withAfter, [bool]$withSource = $false) {
     $stage = Join-Path $env:TEMP 'reskin_harness_stage'
     if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
@@ -68,6 +69,7 @@ function Sync-Harness([bool]$withAfter) {
         Copy-Item (Join-Path $harnessSrc $f) $stage
     }
     if ($withAfter) { Copy-Item (Join-Path $harnessSrc 'ReskinAcceptanceAfter.cs') $stage }
+    if ($withSource) { Copy-Item (Join-Path $harnessSrc 'ReskinSourceFolderAcceptance.cs') $stage }
     Mirror-Scripts $stage $harnessDst
 }
 
@@ -127,6 +129,11 @@ switch ($Stage) {
         Restore-Pristine
         Invoke-Unity 'PsUiReskinAcceptance.ReskinAcceptanceAfter.RunFolderBatch' 'after_folder'
         Restore-Pristine
+    }
+    'source' {
+        Sync-Importer
+        Sync-Harness $true $true
+        Invoke-Unity 'PsUiReskinAcceptance.ReskinSourceFolderAcceptance.RunBatch' 'source_folder'
     }
 }
 Write-Host "Outputs in $OutDir"

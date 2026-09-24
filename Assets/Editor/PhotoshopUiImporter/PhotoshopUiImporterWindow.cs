@@ -59,7 +59,7 @@ namespace PhotoshopToUnity.EditorImporter
         private Vector2 reskinPlanScrollPos;
         private PsUiSkinTheme activeSkinTheme;
         private string reskinAutoMatchSummary;
-        private const string ToolVersion = "2.17.1";
+        private const string ToolVersion = "2.19.0";
         internal static string ReportToolVersion => ToolVersion;
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
@@ -544,38 +544,55 @@ namespace PhotoshopToUnity.EditorImporter
 
                 if (activeSkinTheme != null)
                 {
-                    var folder = activeSkinTheme.targetPrefabFolderAsset != null
-                        ? AssetDatabase.GetAssetPath(activeSkinTheme.targetPrefabFolderAsset)
-                        : "（未設定）";
-                    EditorGUILayout.LabelField($"目標資料夾：{folder}", EditorStyles.miniLabel);
-
-                    EditorGUI.BeginChangeCheck();
-                    var referenceFolder = EditorGUILayout.ObjectField("對照 Prefab 資料夾（已換新圖）",
-                        activeSkinTheme.referencePrefabFolderAsset, typeof(DefaultAsset), false);
-                    if (EditorGUI.EndChangeCheck())
+                    var legacy = PsUiSkinApplier.HasLegacyReference(activeSkinTheme);
+                    if (legacy)
                     {
-                        Undo.RecordObject(activeSkinTheme, "設定對照 Prefab 資料夾");
-                        activeSkinTheme.referencePrefabFolderAsset = referenceFolder;
-                        EditorUtility.SetDirty(activeSkinTheme);
-                        reskinAutoMatchSummary = null;
+                        EditorGUILayout.HelpBox(
+                            PsUiSkinApplier.LegacyReferenceMessage + "\n" +
+                            $"轉換後：舊版來源（唯讀）＝{FolderLabel(activeSkinTheme.targetPrefabFolderAsset)}；" +
+                            $"要換皮的資料夾＝{FolderLabel(activeSkinTheme.referencePrefabFolderAsset)}。",
+                            MessageType.Warning);
+                        if (GUILayout.Button("轉換為新格式", GUILayout.Height(26)))
+                        {
+                            PsUiSkinApplier.MigrateLegacyReference(activeSkinTheme);
+                            reskinPlan = null;
+                            reskinAutoMatchSummary = null;
+                        }
+                    }
+                    else
+                    {
+                        EditorGUILayout.LabelField(
+                            "流程：在要換皮的 Prefab 裡，每張舊圖手動換上新圖一處 → 配對 → 預覽 → 執行。舊版來源只讀不寫。",
+                            EditorStyles.wordWrappedMiniLabel);
+                        DrawSkinThemeFolderField("要換皮的 Prefab 資料夾", ref activeSkinTheme.targetPrefabFolderAsset);
+                        DrawSkinThemeFolderField("舊版來源（唯讀，僅供配對）", ref activeSkinTheme.sourcePrefabFolderAsset);
+                        var conflict = PsUiSkinApplier.SourceTargetConflict(activeSkinTheme);
+                        if (conflict != null)
+                            EditorGUILayout.HelpBox(conflict, MessageType.Error);
                     }
 
                     DrawFolderPathField("新美術來源資料夾", ref activeSkinTheme.sourceArtFolder, false);
                     if (GUI.changed) EditorUtility.SetDirty(activeSkinTheme);
 
-                    if (GUILayout.Button("掃描 Prefab，自動填入舊 Sprite", GUILayout.Height(28)))
-                        ScanSkinTheme();
-
-                    if (GUILayout.Button("依對應 Prefab＋節點路徑填入新 Sprite", GUILayout.Height(28)))
-                        AutoMatchSkinTheme();
-                    if (!string.IsNullOrEmpty(reskinAutoMatchSummary))
-                        EditorGUILayout.HelpBox(reskinAutoMatchSummary, MessageType.Info);
-
-                    if (GUILayout.Button("預覽 SkinTheme 換皮（不會修改檔案）", GUILayout.Height(30)))
+                    using (new EditorGUI.DisabledScope(legacy))
                     {
-                        reskinPlan = PsUiSkinApplier.PlanTheme(activeSkinTheme);
-                        reskinPlanInputs = ReskinInputs(PsUiSkinApplier.FlowSkinTheme);
-                        ReportReskinPlanStatus();
+                        if (GUILayout.Button("掃描 Prefab，自動填入舊 Sprite", GUILayout.Height(28)))
+                            ScanSkinTheme();
+
+                        using (new EditorGUI.DisabledScope(activeSkinTheme.sourcePrefabFolderAsset == null))
+                        {
+                            if (GUILayout.Button("依舊版來源＋節點路徑填入新 Sprite", GUILayout.Height(28)))
+                                AutoMatchSkinTheme();
+                        }
+                        if (!string.IsNullOrEmpty(reskinAutoMatchSummary))
+                            EditorGUILayout.HelpBox(reskinAutoMatchSummary, MessageType.Info);
+
+                        if (GUILayout.Button("預覽 SkinTheme 換皮（不會修改檔案）", GUILayout.Height(30)))
+                        {
+                            reskinPlan = PsUiSkinApplier.PlanTheme(activeSkinTheme);
+                            reskinPlanInputs = ReskinInputs(PsUiSkinApplier.FlowSkinTheme);
+                            ReportReskinPlanStatus();
+                        }
                     }
                 }
 
@@ -604,8 +621,34 @@ namespace PhotoshopToUnity.EditorImporter
             var folder = activeSkinTheme.targetPrefabFolderAsset != null
                 ? AssetDatabase.GetAssetPath(activeSkinTheme.targetPrefabFolderAsset)
                 : string.Empty;
-            return $"{flow}|{activeSkinTheme.GetInstanceID()}|{folder}|{activeSkinTheme.sourceArtFolder}";
+            var source = activeSkinTheme.sourcePrefabFolderAsset != null
+                ? AssetDatabase.GetAssetPath(activeSkinTheme.sourcePrefabFolderAsset)
+                : string.Empty;
+            return $"{flow}|{activeSkinTheme.GetInstanceID()}|{folder}|{source}|{activeSkinTheme.sourceArtFolder}";
         }
+
+        private void DrawSkinThemeFolderField(string label, ref UnityEngine.Object field)
+        {
+            EditorGUI.BeginChangeCheck();
+            var value = EditorGUILayout.ObjectField(label, field, typeof(DefaultAsset), false);
+            if (!EditorGUI.EndChangeCheck())
+            {
+                return;
+            }
+            if (value != null && !AssetDatabase.IsValidFolder(AssetDatabase.GetAssetPath(value)))
+            {
+                SetStatus($"「{label}」只能拖入資料夾。", MessageType.Warning);
+                return;
+            }
+            Undo.RecordObject(activeSkinTheme, "設定 " + label);
+            field = value;
+            EditorUtility.SetDirty(activeSkinTheme);
+            reskinPlan = null;
+            reskinAutoMatchSummary = null;
+        }
+
+        private static string FolderLabel(UnityEngine.Object folderAsset) =>
+            folderAsset != null ? AssetDatabase.GetAssetPath(folderAsset) : "（未設定）";
 
         private void DrawReskinPlan()
         {
@@ -688,7 +731,7 @@ namespace PhotoshopToUnity.EditorImporter
 
             if (activeSkinTheme.targetPrefabFolderAsset == null)
             {
-                SetStatus("請先拖入目標 Prefab 資料夾再掃描。", MessageType.Warning);
+                SetStatus("請先拖入要換皮的 Prefab 資料夾再掃描。", MessageType.Warning);
                 return;
             }
 
@@ -709,8 +752,9 @@ namespace PhotoshopToUnity.EditorImporter
             reskinPlan = null;
             reskinAutoMatchSummary =
                 $"配對 Prefab {result.pairedPrefabs} 組；填入新 Sprite {result.filled} 筆；" +
-                $"待人工處理 {result.remaining} 筆（歧義 {result.ambiguous}、對照 Prefab 未換圖 {result.unchanged}）。" +
-                $" 缺少對照 Prefab {result.missingPrefabs}、節點 {result.missingNodes}、新圖 {result.missingSprites}。";
+                $"待人工處理 {result.remaining} 筆（歧義 {result.ambiguous}、已填值與配對不同 {result.conflicting}、" +
+                $"要換皮的 Prefab 尚未換圖 {result.unchanged}）。" +
+                $" 找不到對應 Prefab {result.missingPrefabs}、節點 {result.missingNodes}、新圖 {result.missingSprites}。";
             foreach (var note in result.notes.Take(30))
                 Debug.LogWarning($"[SkinTheme 自動配對] {note}");
             SetStatus(reskinAutoMatchSummary + (result.notes.Count > 0 ? " 詳情見 Console。" : ""),

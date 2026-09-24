@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Photoshop → Unity UI 工具 v2.17 — 完整使用說明</title>
+  <title>Photoshop → Unity UI 工具 v2.19 — 完整使用說明</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
 
@@ -523,7 +523,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.17.1</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.19.0</span></h1>
     <p class="lead">在 Photoshop 排好的遊戲介面，一鍵搬進 Unity。圖自動切好、文字還能繼續改、位置自動對齊。</p>
   </header>
 
@@ -978,22 +978,22 @@ TXT_score_[THICK:2]</code></pre>
       <h3>模式 B：SkinTheme 批次換皮（推薦）</h3>
       <p>適合「一套新美術，套用到 10～20 個 Prefab」的情境。以「舊 Sprite → 新 Sprite」為單位定義對應表，工具掃描指定資料夾下所有 Prefab，自動替換符合的 <code>Image.sprite</code> 參照，<strong>完全不動任何 Script / Button / Animator / RectTransform</strong>。</p>
 
-      <h3>SkinTheme 使用流程</h3>
+      <h3>SkinTheme 使用流程 <span class="tag tag-new">v2.19</span></h3>
       <ol>
-        <li>在 Project 視窗目標位置 右鍵 → <code>Create → Photoshop UI Importer → Skin Theme</code>，建立 <code>SkinTheme.asset</code>。</li>
-        <li>在 Inspector 填入：
+        <li>在 Project 視窗目標位置 右鍵 → <code>Create → Photoshop UI Importer → Skin Theme</code>，建立 <code>SkinTheme.asset</code>，在 Importer_v2 面板 → 換皮工具 → 選這份 SkinTheme。</li>
+        <li>拖入兩個資料夾：
           <ul>
-            <li><strong>Target Prefab Folder Asset</strong>：將含有目標 Prefab 的資料夾從 Project 視窗<strong>拖入</strong>此欄位。</li>
-            <li><strong>Entries</strong>：每一列填入「舊 Sprite（現在 Prefab 用的）」與「新 Sprite（新美術）」，可加多列。</li>
-            <li><strong>Excluded Prefabs</strong>（選填）：不想被換皮的 Prefab 加入此清單。</li>
+            <li><strong>要換皮的 Prefab 資料夾</strong>：預覽與執行<strong>只會寫這裡</strong>。例如從舊頁面複製出來的 <code>Assets/Temp/LiveRoom</code>。</li>
+            <li><strong>舊版來源（唯讀，僅供配對）</strong>（選填）：被複製的原頁面，例如 <code>Assets/ThemeActivity/CatAct</code>。只拿來比對，換皮不會寫入；和要換皮的資料夾相同或互相包含時不能預覽。</li>
           </ul>
         </li>
-        <li>在 Importer_v2 面板 → 換皮工具 → 選 SkinTheme → 點「<strong>套用換皮到所有 Prefab</strong>」。</li>
-        <li>確認 Dialog 後工具逐一掃描 Prefab，結果顯示「X 個 Prefab 更新，共替換 Y 個 Sprite」。</li>
+        <li>新圖和舊圖檔名、尺寸都不同時：在要換皮的 Prefab 裡，<strong>每張舊圖手動換上新圖一處</strong>，再按「<strong>依舊版來源＋節點路徑填入新 Sprite</strong>」。工具比對兩邊同一節點，學到「舊圖 → 新圖」後填進 Entries，執行時套到其他仍用舊圖的節點。已填過的 Entries 一律保留；和節點配對結果不同的會列在 Console，請人工確認。</li>
+        <li>也可以直接在 Inspector 的 <strong>Entries</strong> 填「舊 Sprite → 新 Sprite」；<strong>Excluded Prefabs</strong>（選填）放不想換皮的 Prefab。</li>
+        <li>按「<strong>預覽 SkinTheme 換皮（不會修改檔案）</strong>」，確認清單後按「<strong>確認執行</strong>」。執行前會備份，取消、失敗或機械檢查不通過會自動還原，之後也可按「還原上次換皮」。</li>
       </ol>
 
       <div class="callout warn">
-        <strong>注意</strong>：套用換皮會直接修改 <code>.prefab</code> 檔案，操作前建議先用 Git commit 備份，或確認可復原。
+        <strong>注意</strong>：換皮不改 RectTransform。新圖尺寸不同時，九宮格圖要先在新 Sprite 設好 Border，其他圖會依既有大小縮放顯示，請目視確認。v2.17.1 以前建立、設過「對照 Prefab 資料夾」的 SkinTheme，面板會要求先按「<strong>轉換為新格式</strong>」才能預覽。
       </div>
 
       <h3>模式 C：新規格 PSD 批次發包（完整改版時使用）</h3>
@@ -1500,7 +1500,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.17.1 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.19.0 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 

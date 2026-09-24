@@ -44,6 +44,10 @@ namespace PhotoshopToUnity.EditorImporter
     //   * SpriteAtlas：覆蓋後找出 packables 含這些圖的 atlas，Sprite Packer 未停用時只重打這幾顆
     //     （SpriteAtlasUtility.PackAtlases），不呼叫 CreateOrUpdateSpriteAtlases —— 那會重設 atlas importer
     //     設定，屬結構變更，不是換皮。
+    //   * v2.19 SkinTheme 分成「要換皮的資料夾」（target，唯一寫入範圍）與「舊版來源」（source，唯讀）。
+    //     配對時拿 source 與 target 的同一節點比對學對應，執行只寫 target；兩者相同或互相包含就不預覽，
+    //     檔案覆蓋的目標檔若位在 source 內一律 blocked（sourceFolderReadOnly）。舊格式（target＝舊版、
+    //     reference＝新版）執行會改到舊版本身，所以轉換前不預覽、不配對。
     // ─────────────────────────────────────────────────────────────────────────
     public static class PsUiSkinApplier
     {
@@ -87,7 +91,7 @@ namespace PhotoshopToUnity.EditorImporter
         // ── 報告模型（欄位對應 reskin_report.json）──────────────────────────
         public sealed class Report
         {
-            public string toolVersion, mode, runId, generatedAt, flow, targetFolder, sourceArtFolder, usageScope;
+            public string toolVersion, mode, runId, generatedAt, flow, targetFolder, sourceArtFolder, usageScope, sourcePrefabFolder;
             public bool planComplete = true;
             public readonly List<Item> items = new List<Item>();
             public readonly List<string> errors = new List<string>();
@@ -267,6 +271,22 @@ namespace PhotoshopToUnity.EditorImporter
             if (!folderValid)
                 report.errors.Add("目標 Prefab 資料夾未設定或不存在：參照替換項目全部 blocked，檔案覆蓋項目無法列出使用位置。");
 
+            if (HasLegacyReference(theme))
+            {
+                report.errors.Add(LegacyReferenceMessage);
+                report.planComplete = false;
+                return;
+            }
+            var sourcePrefabFolder = FolderPath(theme.sourcePrefabFolderAsset);
+            report.sourcePrefabFolder = sourcePrefabFolder;
+            var conflict = SourceTargetConflict(theme);
+            if (conflict != null)
+            {
+                report.errors.Add(conflict);
+                report.planComplete = false;
+                return;
+            }
+
             var sourceValid = !string.IsNullOrWhiteSpace(theme.sourceArtFolder) && Directory.Exists(theme.sourceArtFolder);
             if (theme.entries == null || theme.entries.Count == 0)
             {
@@ -328,6 +348,12 @@ namespace PhotoshopToUnity.EditorImporter
                 var assetPath = AssetDatabase.GetAssetPath(entry.oldSprite);
                 outside.TryGetValue(assetPath, out var outsideUsers);
                 var item = BuildFileItem(assetPath, entry.oldSprite, theme.sourceArtFolder, sourceValid, hits, true, outsideUsers);
+                if ((item.status == StatusOk || item.status == StatusMissing) && IsUnder(assetPath, sourcePrefabFolder))
+                {
+                    Block(item, "sourceFolderReadOnly",
+                        $"{Path.GetFileName(assetPath)} 位在舊版來源資料夾「{sourcePrefabFolder}」內，舊版來源唯讀，不覆蓋。" +
+                        "請把新圖匯入要換皮的資料夾，並在這筆的 New Sprite 指定新圖（參照替換）。");
+                }
                 report.items.Add(item);
             }
 
@@ -801,28 +827,33 @@ namespace PhotoshopToUnity.EditorImporter
 
         public sealed class AutoMatchResult
         {
-            public int pairedPrefabs, missingPrefabs, filled, ambiguous, unchanged, missingNodes, missingSprites;
+            public int pairedPrefabs, missingPrefabs, filled, ambiguous, conflicting, unchanged, missingNodes, missingSprites;
             public int remaining;
             public readonly List<string> notes = new List<string>();
         }
 
-        /// <summary>只採用對照 Prefab 同一節點、同一欄位已換成不同 Sprite 的確定映射。</summary>
+        /// <summary>
+        /// 舊版來源（唯讀）與要換皮的資料夾比對同一節點、同一欄位：目標那邊已手動換成不同 Sprite 的，
+        /// 就是確定的舊圖 → 新圖映射。只寫 SkinTheme 本身（可 Undo），不碰任何 Prefab。
+        /// </summary>
         public static AutoMatchResult AutoFillFromPrefabPairs(PsUiSkinTheme theme)
         {
             var result = new AutoMatchResult();
             if (theme == null) { result.notes.Add("請先指定 SkinTheme。"); return result; }
-            var oldFolder = theme.targetPrefabFolderAsset == null ? null : AssetDatabase.GetAssetPath(theme.targetPrefabFolderAsset);
-            var newFolder = theme.referencePrefabFolderAsset == null ? null : AssetDatabase.GetAssetPath(theme.referencePrefabFolderAsset);
-            if (string.IsNullOrEmpty(oldFolder) || string.IsNullOrEmpty(newFolder) ||
-                !AssetDatabase.IsValidFolder(oldFolder) || !AssetDatabase.IsValidFolder(newFolder) || oldFolder == newFolder)
+            if (HasLegacyReference(theme)) { result.notes.Add(LegacyReferenceMessage); return result; }
+            var oldFolder = FolderPath(theme.sourcePrefabFolderAsset);
+            var newFolder = FolderPath(theme.targetPrefabFolderAsset);
+            if (oldFolder == null || newFolder == null)
             {
-                result.notes.Add("請指定兩個不同且有效的 Prefab 資料夾：舊目標與已換好新圖的對照資料夾。");
+                result.notes.Add("請指定兩個有效的 Prefab 資料夾：舊版來源（唯讀）與要換皮的資料夾（已手動換上部分新圖）。");
                 return result;
             }
+            var conflict = SourceTargetConflict(theme);
+            if (conflict != null) { result.notes.Add(conflict); return result; }
 
             var proposed = new Dictionary<Sprite, HashSet<Sprite>>();
             var unchanged = new HashSet<Sprite>();
-            var excluded = new ScanScope(oldFolder, theme.excludedPrefabs);
+            var targetScope = new ScanScope(newFolder, theme.excludedPrefabs);
             var oldPrefix = Path.GetFileName(oldFolder);
             var newPrefix = Path.GetFileName(newFolder);
             try
@@ -831,7 +862,6 @@ namespace PhotoshopToUnity.EditorImporter
                 foreach (var guid in guids)
                 {
                     var oldPath = AssetDatabase.GUIDToAssetPath(guid);
-                    if (!excluded.Contains(oldPath)) continue;
                     if (EditorUtility.DisplayCancelableProgressBar("SkinTheme 自動配對", oldPath,
                         (float)(result.pairedPrefabs + result.missingPrefabs) / Math.Max(1, guids.Length)))
                         throw new OperationCanceledException();
@@ -852,6 +882,11 @@ namespace PhotoshopToUnity.EditorImporter
                     {
                         result.missingPrefabs++;
                         result.notes.Add($"找不到對應 Prefab：{oldPath}");
+                        continue;
+                    }
+                    if (!targetScope.Contains(newPath))
+                    {
+                        result.notes.Add($"已排除，不配對：{newPath}");
                         continue;
                     }
                     result.pairedPrefabs++;
@@ -909,7 +944,17 @@ namespace PhotoshopToUnity.EditorImporter
                     result.notes.Add($"一張舊圖對應多張新圖，請人工確認：{SpriteKey(pair.Key)}");
                     continue;
                 }
-                if (existing.TryGetValue(pair.Key, out var entry) && entry.newSprite != null) continue;
+                if (existing.TryGetValue(pair.Key, out var entry) && entry.newSprite != null)
+                {
+                    // 已填的值一律保留（可能是人工填的）；和節點配對結果不同時列出來，不默默蓋掉也不默默略過。
+                    if (entry.newSprite != pair.Value.First())
+                    {
+                        result.conflicting++;
+                        result.notes.Add($"已填 {SpriteKey(pair.Key)} → {SpriteKey(entry.newSprite)}，" +
+                                         $"但要換皮的 Prefab 同一節點用的是 {SpriteKey(pair.Value.First())}；保留已填的值，請人工確認。");
+                    }
+                    continue;
+                }
                 if (result.filled == 0) Undo.RecordObject(theme, "依 Prefab 配對 SkinTheme Sprite");
                 if (entry == null)
                 {
@@ -927,9 +972,55 @@ namespace PhotoshopToUnity.EditorImporter
             result.unchanged = unchanged.Count(sprite => !proposed.ContainsKey(sprite));
             result.remaining = entries.Count(e => e != null && e.oldSprite != null && e.newSprite == null);
             if (result.pairedPrefabs > 0 && result.filled == 0 && result.unchanged > 0)
-                result.notes.Add("對照 Prefab 仍引用舊 Sprite；請先讓新 Prefab 指向新圖，再重新配對。");
+                result.notes.Add("要換皮的 Prefab 仍引用舊 Sprite；請先在其中手動換上新圖（每張舊圖換一處即可），再重新配對。");
             return result;
         }
+
+        // ── 舊版來源 / 目標資料夾 ────────────────────────────────────────────
+        public const string LegacyReferenceMessage =
+            "這份 SkinTheme 是 v2.17.1 以前的格式：「目標資料夾」同時用來學對應和執行換皮，執行會改到舊版本身。" +
+            "請先在換皮視窗按「轉換為新格式」，確認舊版來源與要換皮的資料夾後再配對、預覽。";
+
+        /// <summary>舊格式：有「對照資料夾」（已換新圖）但沒有「舊版來源」。舊語意下目標資料夾就是舊版。</summary>
+        public static bool HasLegacyReference(PsUiSkinTheme theme) =>
+            theme != null && theme.referencePrefabFolderAsset != null && theme.sourcePrefabFolderAsset == null;
+
+        /// <summary>舊格式轉新格式：舊的目標（舊版）→ 舊版來源；舊的對照（已換新圖）→ 要換皮的資料夾。可 Undo。</summary>
+        public static void MigrateLegacyReference(PsUiSkinTheme theme)
+        {
+            if (!HasLegacyReference(theme)) return;
+            Undo.RecordObject(theme, "SkinTheme 轉換為舊版來源／要換皮資料夾");
+            theme.sourcePrefabFolderAsset = theme.targetPrefabFolderAsset;
+            theme.targetPrefabFolderAsset = theme.referencePrefabFolderAsset;
+            theme.referencePrefabFolderAsset = null;
+            EditorUtility.SetDirty(theme);
+        }
+
+        /// <summary>舊版來源設了卻無效、或和目標相同／互相包含時回傳原因（此時「舊版來源唯讀」無法保證）；沒問題回傳 null。</summary>
+        public static string SourceTargetConflict(PsUiSkinTheme theme)
+        {
+            if (theme == null || theme.sourcePrefabFolderAsset == null) return null;
+            var source = FolderPath(theme.sourcePrefabFolderAsset);
+            if (source == null)
+                return "舊版來源必須是專案 Assets 之下的資料夾。";
+            var target = FolderPath(theme.targetPrefabFolderAsset);
+            if (target == null) return null;
+            if (source == target)
+                return $"舊版來源與要換皮的資料夾是同一個（{source}）；舊版來源唯讀，請把要換皮的資料夾指到複製出來的那一份。";
+            if (IsUnder(target, source) || IsUnder(source, target))
+                return $"舊版來源（{source}）與要換皮的資料夾（{target}）互相包含，執行時可能寫到舊版；請改成兩個不重疊的資料夾。";
+            return null;
+        }
+
+        private static string FolderPath(UnityEngine.Object folderAsset)
+        {
+            var path = folderAsset == null ? null : AssetDatabase.GetAssetPath(folderAsset);
+            return string.IsNullOrEmpty(path) || !AssetDatabase.IsValidFolder(path) ? null : path.TrimEnd('/');
+        }
+
+        private static bool IsUnder(string assetPath, string folder) =>
+            folder != null && !string.IsNullOrEmpty(assetPath) &&
+            (folder == "Assets" || assetPath == folder || assetPath.StartsWith(folder + "/", StringComparison.Ordinal));
 
         private static string SlotKey(Transform root, UsageHit hit)
         {
@@ -1555,7 +1646,8 @@ namespace PhotoshopToUnity.EditorImporter
             {
                 { "toolVersion", r.toolVersion }, { "mode", r.mode }, { "runId", r.runId }, { "generatedAt", r.generatedAt },
                 { "flow", r.flow }, { "targetFolder", r.targetFolder }, { "sourceArtFolder", r.sourceArtFolder },
-                { "usageScope", r.usageScope }, { "planComplete", r.planComplete }, { "errors", r.errors },
+                { "usageScope", r.usageScope }, { "sourcePrefabFolder", r.sourcePrefabFolder },
+                { "planComplete", r.planComplete }, { "errors", r.errors },
                 { "items", items },
                 { "protectedContract", new J
                     {
