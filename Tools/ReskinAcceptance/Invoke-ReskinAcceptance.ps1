@@ -5,6 +5,7 @@
 #   -Stage before  : run the v2.15.0 legacy applier (and legacy window folder flow) on the pristine fixture
 #   -Stage after   : run the current applier (dry-run -> apply -> rollback) on the same pristine fixture
 #   -Stage source  : v2.19 read-only source folder + folder to reskin (own fixture, no build needed)
+#   -Stage ui      : SkinTheme Inspector / window capture (opens a real editor window; not batchmode)
 #
 # The Unity project must be a disposable test project. Never point this at a production project:
 # the script mirrors Assets/Editor/PhotoshopUiImporter from the repo (or from -ImporterRef) into it.
@@ -13,7 +14,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$ProjectPath,
-    [Parameter(Mandatory = $true)][ValidateSet('build', 'before', 'after', 'source')][string]$Stage,
+    [Parameter(Mandatory = $true)][ValidateSet('build', 'before', 'after', 'source', 'ui')][string]$Stage,
     [string]$OutDir,
     [string]$ImporterRef,
     [string]$UnityExe = 'C:\Program Files\Unity\Hub\Editor\6000.0.67f1\Editor\Unity.exe'
@@ -61,7 +62,7 @@ function Sync-Importer {
     Mirror-Scripts $src $importerDst
 }
 
-function Sync-Harness([bool]$withAfter, [bool]$withSource = $false) {
+function Sync-Harness([bool]$withAfter, [bool]$withSource = $false, [bool]$withUi = $false) {
     $stage = Join-Path $env:TEMP 'reskin_harness_stage'
     if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
@@ -70,6 +71,7 @@ function Sync-Harness([bool]$withAfter, [bool]$withSource = $false) {
     }
     if ($withAfter) { Copy-Item (Join-Path $harnessSrc 'ReskinAcceptanceAfter.cs') $stage }
     if ($withSource) { Copy-Item (Join-Path $harnessSrc 'ReskinSourceFolderAcceptance.cs') $stage }
+    if ($withUi) { Copy-Item (Join-Path $harnessSrc 'SkinThemeUiCapture.cs') $stage }
     Mirror-Scripts $stage $harnessDst
 }
 
@@ -94,6 +96,20 @@ function Invoke-Unity([string]$method, [string]$tag) {
     $env:RESKIN_ACCEPTANCE_OUT = $OutDir
     $p = Start-Process -FilePath $UnityExe -Wait -PassThru -NoNewWindow -ArgumentList @(
         '-batchmode', '-nographics', '-projectPath', "`"$project`"", '-executeMethod', $method, '-logFile', "`"$log`"")
+    $compileErrors = @(Select-String -Path $log -Pattern 'error CS\d{4}' -ErrorAction SilentlyContinue)
+    Write-Host ("[{0}] exit={1} compileErrors={2} log={3}" -f $tag, $p.ExitCode, $compileErrors.Count, $log)
+    if ($compileErrors.Count -gt 0) { $compileErrors | Select-Object -First 10 | ForEach-Object { Write-Host "  $($_.Line)" } }
+    if ($p.ExitCode -ne 0 -or $compileErrors.Count -gt 0) { throw "Unity stage '$tag' failed (see $log)" }
+}
+
+# IMGUI only draws inside a real editor window, so the ui stage cannot use -batchmode / -nographics.
+function Invoke-UnityGui([string]$method, [string]$tag) {
+    $log = Join-Path $OutDir "unity_$tag.log"
+    $env:RESKIN_ACCEPTANCE_OUT = $OutDir
+    # -Wait would also wait for helper processes the editor leaves behind (licensing client, adb); wait for Unity only.
+    $p = Start-Process -FilePath $UnityExe -PassThru -ArgumentList @(
+        '-projectPath', "`"$project`"", '-executeMethod', $method, '-logFile', "`"$log`"")
+    $p.WaitForExit()
     $compileErrors = @(Select-String -Path $log -Pattern 'error CS\d{4}' -ErrorAction SilentlyContinue)
     Write-Host ("[{0}] exit={1} compileErrors={2} log={3}" -f $tag, $p.ExitCode, $compileErrors.Count, $log)
     if ($compileErrors.Count -gt 0) { $compileErrors | Select-Object -First 10 | ForEach-Object { Write-Host "  $($_.Line)" } }
@@ -134,6 +150,11 @@ switch ($Stage) {
         Sync-Importer
         Sync-Harness $true $true
         Invoke-Unity 'PsUiReskinAcceptance.ReskinSourceFolderAcceptance.RunBatch' 'source_folder'
+    }
+    'ui' {
+        Sync-Importer
+        Sync-Harness $false $false $true
+        Invoke-UnityGui 'PsUiReskinAcceptance.SkinThemeUiCapture.Run' 'ui_capture'
     }
 }
 Write-Host "Outputs in $OutDir"

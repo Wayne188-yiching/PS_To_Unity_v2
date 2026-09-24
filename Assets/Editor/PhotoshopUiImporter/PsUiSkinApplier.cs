@@ -351,7 +351,7 @@ namespace PhotoshopToUnity.EditorImporter
                 if ((item.status == StatusOk || item.status == StatusMissing) && IsUnder(assetPath, sourcePrefabFolder))
                 {
                     Block(item, "sourceFolderReadOnly",
-                        $"{Path.GetFileName(assetPath)} 位在舊版來源資料夾「{sourcePrefabFolder}」內，舊版來源唯讀，不覆蓋。" +
+                        $"{Path.GetFileName(assetPath)} 位在舊版 Prefab 資料夾「{sourcePrefabFolder}」內，舊版唯讀，不覆蓋。" +
                         "請把新圖匯入要換皮的資料夾，並在這筆的 New Sprite 指定新圖（參照替換）。");
                 }
                 report.items.Add(item);
@@ -845,7 +845,7 @@ namespace PhotoshopToUnity.EditorImporter
             var newFolder = FolderPath(theme.targetPrefabFolderAsset);
             if (oldFolder == null || newFolder == null)
             {
-                result.notes.Add("請指定兩個有效的 Prefab 資料夾：舊版來源（唯讀）與要換皮的資料夾（已手動換上部分新圖）。");
+                result.notes.Add("請指定兩個有效的 Prefab 資料夾：舊版 Prefab 資料夾（唯讀）與要換皮的 Prefab 資料夾（已手動換上部分新圖）。");
                 return result;
             }
             var conflict = SourceTargetConflict(theme);
@@ -979,7 +979,7 @@ namespace PhotoshopToUnity.EditorImporter
         // ── 舊版來源 / 目標資料夾 ────────────────────────────────────────────
         public const string LegacyReferenceMessage =
             "這份 SkinTheme 是 v2.17.1 以前的格式：「目標資料夾」同時用來學對應和執行換皮，執行會改到舊版本身。" +
-            "請先在換皮視窗按「轉換為新格式」，確認舊版來源與要換皮的資料夾後再配對、預覽。";
+            "請先按「轉換為新格式」（SkinTheme Inspector 與換皮工具都有），確認舊版 Prefab 資料夾與要換皮的 Prefab 資料夾後再配對、預覽。";
 
         /// <summary>舊格式：有「對照資料夾」（已換新圖）但沒有「舊版來源」。舊語意下目標資料夾就是舊版。</summary>
         public static bool HasLegacyReference(PsUiSkinTheme theme) =>
@@ -989,7 +989,7 @@ namespace PhotoshopToUnity.EditorImporter
         public static void MigrateLegacyReference(PsUiSkinTheme theme)
         {
             if (!HasLegacyReference(theme)) return;
-            Undo.RecordObject(theme, "SkinTheme 轉換為舊版來源／要換皮資料夾");
+            Undo.RecordObject(theme, "SkinTheme 轉換為新格式");
             theme.sourcePrefabFolderAsset = theme.targetPrefabFolderAsset;
             theme.targetPrefabFolderAsset = theme.referencePrefabFolderAsset;
             theme.referencePrefabFolderAsset = null;
@@ -1002,13 +1002,13 @@ namespace PhotoshopToUnity.EditorImporter
             if (theme == null || theme.sourcePrefabFolderAsset == null) return null;
             var source = FolderPath(theme.sourcePrefabFolderAsset);
             if (source == null)
-                return "舊版來源必須是專案 Assets 之下的資料夾。";
+                return "舊版 Prefab 資料夾必須是專案 Assets 之下的資料夾。";
             var target = FolderPath(theme.targetPrefabFolderAsset);
             if (target == null) return null;
             if (source == target)
-                return $"舊版來源與要換皮的資料夾是同一個（{source}）；舊版來源唯讀，請把要換皮的資料夾指到複製出來的那一份。";
+                return $"舊版 Prefab 資料夾與要換皮的 Prefab 資料夾是同一個（{source}）；舊版唯讀，請把要換皮的 Prefab 資料夾指到複製出來的那一份。";
             if (IsUnder(target, source) || IsUnder(source, target))
-                return $"舊版來源（{source}）與要換皮的資料夾（{target}）互相包含，執行時可能寫到舊版；請改成兩個不重疊的資料夾。";
+                return $"舊版 Prefab 資料夾（{source}）與要換皮的 Prefab 資料夾（{target}）互相包含，執行時可能寫到舊版；請改成兩個不重疊的資料夾。";
             return null;
         }
 

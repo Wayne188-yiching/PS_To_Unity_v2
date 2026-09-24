@@ -1,5 +1,5 @@
 {
-  "version": "2.19.0",
+  "version": "2.19.1",
   "phase": "Guarded Unity Agent, Pipeline Validator, and Director evidence loop",
   "updated": "2026-09-24",
   "_notes": "Single source of truth for the PS→Unity tool version. Run bump-version.ps1 to sync all surfaces.",

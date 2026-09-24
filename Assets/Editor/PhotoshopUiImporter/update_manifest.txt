@@ -11,6 +11,7 @@ PhotoshopUiImportService.cs
 PhotoshopUiLayout.cs
 PsUiSkinApplier.cs
 PsUiSkinTheme.cs
+PsUiSkinThemeEditor.cs
 SimpleJsonReader.cs
 SkinMap.cs
 SkinResolver.cs

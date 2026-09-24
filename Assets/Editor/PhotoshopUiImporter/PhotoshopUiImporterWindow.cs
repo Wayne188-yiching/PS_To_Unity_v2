@@ -59,7 +59,7 @@ namespace PhotoshopToUnity.EditorImporter
         private Vector2 reskinPlanScrollPos;
         private PsUiSkinTheme activeSkinTheme;
         private string reskinAutoMatchSummary;
-        private const string ToolVersion = "2.19.0";
+        private const string ToolVersion = "2.19.1";
         internal static string ReportToolVersion => ToolVersion;
         private const string GitHubUrl = "https://github.com/Wayne188-yiching/PS_To_Unity_v2";
 
@@ -69,6 +69,19 @@ namespace PhotoshopToUnity.EditorImporter
             var window = GetWindow<PhotoshopUiImporterWindow>("Importer_v2");
             window.minSize = new Vector2(560, 600);
             window.Show();
+        }
+
+        /// <summary>從 SkinTheme Inspector 跳過來：選好這份 SkinTheme、展開換皮工具並捲到該區。</summary>
+        internal static void OpenSkinTheme(PsUiSkinTheme theme)
+        {
+            Open();
+            var window = GetWindow<PhotoshopUiImporterWindow>("Importer_v2");
+            window.activeSkinTheme = theme;
+            window.showReskinFoldout = true;
+            window.reskinPlan = null;
+            window.reskinAutoMatchSummary = null;
+            window.scrollPosition = new Vector2(0f, float.MaxValue); // 換皮工具是最後一區，捲到底即可
+            window.Repaint();
         }
 
         private void OnEnable()
@@ -539,8 +552,13 @@ namespace PhotoshopToUnity.EditorImporter
 
                 EditorGUILayout.Space(6);
                 EditorGUILayout.LabelField("B. SkinTheme 對照表（舊 Sprite → 新 Sprite，支援改名與參照替換）", EditorStyles.boldLabel);
-                activeSkinTheme = (PsUiSkinTheme)EditorGUILayout.ObjectField(
-                    "Skin Theme", activeSkinTheme, typeof(PsUiSkinTheme), false);
+                using (new EditorGUILayout.HorizontalScope())
+                {
+                    activeSkinTheme = (PsUiSkinTheme)EditorGUILayout.ObjectField(
+                        SkinThemeLabels.Theme, activeSkinTheme, typeof(PsUiSkinTheme), false);
+                    if (GUILayout.Button("新建", GUILayout.Width(64)))
+                        CreateSkinTheme();
+                }
 
                 if (activeSkinTheme != null)
                 {
@@ -549,8 +567,8 @@ namespace PhotoshopToUnity.EditorImporter
                     {
                         EditorGUILayout.HelpBox(
                             PsUiSkinApplier.LegacyReferenceMessage + "\n" +
-                            $"轉換後：舊版來源（唯讀）＝{FolderLabel(activeSkinTheme.targetPrefabFolderAsset)}；" +
-                            $"要換皮的資料夾＝{FolderLabel(activeSkinTheme.referencePrefabFolderAsset)}。",
+                            $"轉換後：舊版 Prefab 資料夾（唯讀）＝{FolderLabel(activeSkinTheme.targetPrefabFolderAsset)}；" +
+                            $"要換皮的 Prefab 資料夾＝{FolderLabel(activeSkinTheme.referencePrefabFolderAsset)}。",
                             MessageType.Warning);
                         if (GUILayout.Button("轉換為新格式", GUILayout.Height(26)))
                         {
@@ -562,16 +580,19 @@ namespace PhotoshopToUnity.EditorImporter
                     else
                     {
                         EditorGUILayout.LabelField(
-                            "流程：在要換皮的 Prefab 裡，每張舊圖手動換上新圖一處 → 配對 → 預覽 → 執行。舊版來源只讀不寫。",
+                            "流程：在要換皮的 Prefab 裡，每張舊圖手動換上新圖一處 → 配對 → 預覽 → 執行。舊版 Prefab 只讀不寫。",
                             EditorStyles.wordWrappedMiniLabel);
-                        DrawSkinThemeFolderField("要換皮的 Prefab 資料夾", ref activeSkinTheme.targetPrefabFolderAsset);
-                        DrawSkinThemeFolderField("舊版來源（唯讀，僅供配對）", ref activeSkinTheme.sourcePrefabFolderAsset);
+                        DrawSkinThemeFolderField(SkinThemeLabels.Target, ref activeSkinTheme.targetPrefabFolderAsset);
+                        SkinThemeLabels.DrawNote(SkinThemeLabels.TargetNote);
+                        DrawSkinThemeFolderField(SkinThemeLabels.Source, ref activeSkinTheme.sourcePrefabFolderAsset);
+                        SkinThemeLabels.DrawNote(SkinThemeLabels.SourceNote);
                         var conflict = PsUiSkinApplier.SourceTargetConflict(activeSkinTheme);
                         if (conflict != null)
                             EditorGUILayout.HelpBox(conflict, MessageType.Error);
                     }
 
-                    DrawFolderPathField("新美術來源資料夾", ref activeSkinTheme.sourceArtFolder, false);
+                    DrawFolderPathField(SkinThemeLabels.ArtFolder, ref activeSkinTheme.sourceArtFolder, false);
+                    SkinThemeLabels.DrawNote(SkinThemeLabels.ArtFolderNote);
                     if (GUI.changed) EditorUtility.SetDirty(activeSkinTheme);
 
                     using (new EditorGUI.DisabledScope(legacy))
@@ -581,7 +602,7 @@ namespace PhotoshopToUnity.EditorImporter
 
                         using (new EditorGUI.DisabledScope(activeSkinTheme.sourcePrefabFolderAsset == null))
                         {
-                            if (GUILayout.Button("依舊版來源＋節點路徑填入新 Sprite", GUILayout.Height(28)))
+                            if (GUILayout.Button("依舊版 Prefab＋節點路徑填入新 Sprite", GUILayout.Height(28)))
                                 AutoMatchSkinTheme();
                         }
                         if (!string.IsNullOrEmpty(reskinAutoMatchSummary))
@@ -627,7 +648,24 @@ namespace PhotoshopToUnity.EditorImporter
             return $"{flow}|{activeSkinTheme.GetInstanceID()}|{folder}|{source}|{activeSkinTheme.sourceArtFolder}";
         }
 
-        private void DrawSkinThemeFolderField(string label, ref UnityEngine.Object field)
+        private void CreateSkinTheme()
+        {
+            var path = EditorUtility.SaveFilePanelInProject("新建 SkinTheme", "SkinTheme", "asset", "選擇 SkinTheme 的存放位置");
+            if (string.IsNullOrEmpty(path))
+            {
+                return;
+            }
+            var theme = CreateInstance<PsUiSkinTheme>();
+            AssetDatabase.CreateAsset(theme, path);
+            AssetDatabase.SaveAssets();
+            activeSkinTheme = theme;
+            reskinPlan = null;
+            reskinAutoMatchSummary = null;
+            EditorGUIUtility.PingObject(theme);
+            SetStatus($"已建立 {path}。下一步：拖入「{SkinThemeLabels.Target.text}」。", MessageType.Info);
+        }
+
+        private void DrawSkinThemeFolderField(GUIContent label, ref UnityEngine.Object field)
         {
             EditorGUI.BeginChangeCheck();
             var value = EditorGUILayout.ObjectField(label, field, typeof(DefaultAsset), false);
@@ -637,10 +675,10 @@ namespace PhotoshopToUnity.EditorImporter
             }
             if (value != null && !AssetDatabase.IsValidFolder(AssetDatabase.GetAssetPath(value)))
             {
-                SetStatus($"「{label}」只能拖入資料夾。", MessageType.Warning);
+                SetStatus($"「{label.text}」只能拖入資料夾。", MessageType.Warning);
                 return;
             }
-            Undo.RecordObject(activeSkinTheme, "設定 " + label);
+            Undo.RecordObject(activeSkinTheme, "設定 " + label.text);
             field = value;
             EditorUtility.SetDirty(activeSkinTheme);
             reskinPlan = null;
@@ -1312,14 +1350,17 @@ namespace PhotoshopToUnity.EditorImporter
             }
         }
 
-        private static void DrawFolderPathField(string label, ref string path, bool mustBeAssetPath)
+        private static void DrawFolderPathField(string label, ref string path, bool mustBeAssetPath) =>
+            DrawFolderPathField(new GUIContent(label), ref path, mustBeAssetPath);
+
+        private static void DrawFolderPathField(GUIContent label, ref string path, bool mustBeAssetPath)
         {
             using (new EditorGUILayout.HorizontalScope())
             {
                 path = EditorGUILayout.TextField(label, path);
                 if (GUILayout.Button("選擇", GUILayout.Width(64)))
                 {
-                    var selected = EditorUtility.OpenFolderPanel(label, Application.dataPath, string.Empty);
+                    var selected = EditorUtility.OpenFolderPanel(label.text, Application.dataPath, string.Empty);
                     if (string.IsNullOrEmpty(selected))
                     {
                         return;

@@ -523,7 +523,7 @@
 <main>
 
   <header>
-    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.19.0</span></h1>
+    <h1>Photoshop → Unity UI 工具 <span class="badge">v2.19.1</span></h1>
     <p class="lead">在 Photoshop 排好的遊戲介面，一鍵搬進 Unity。圖自動切好、文字還能繼續改、位置自動對齊。</p>
   </header>
 
@@ -980,15 +980,15 @@ TXT_score_[THICK:2]</code></pre>
 
       <h3>SkinTheme 使用流程 <span class="tag tag-new">v2.19</span></h3>
       <ol>
-        <li>在 Project 視窗目標位置 右鍵 → <code>Create → Photoshop UI Importer → Skin Theme</code>，建立 <code>SkinTheme.asset</code>，在 Importer_v2 面板 → 換皮工具 → 選這份 SkinTheme。</li>
+        <li>在 Importer_v2 面板 → 換皮工具 → 「Skin Theme」欄位右邊按「<strong>新建</strong>」，選存放位置即可建立並選好 <code>SkinTheme.asset</code>。也可以在 Project 視窗右鍵 → <code>Create → Photoshop UI Importer → Skin Theme</code>。</li>
         <li>拖入兩個資料夾：
           <ul>
-            <li><strong>要換皮的 Prefab 資料夾</strong>：預覽與執行<strong>只會寫這裡</strong>。例如從舊頁面複製出來的 <code>Assets/Temp/LiveRoom</code>。</li>
-            <li><strong>舊版來源（唯讀，僅供配對）</strong>（選填）：被複製的原頁面，例如 <code>Assets/ThemeActivity/CatAct</code>。只拿來比對，換皮不會寫入；和要換皮的資料夾相同或互相包含時不能預覽。</li>
+            <li><strong>要換皮的 Prefab 資料夾</strong>（必填）：預覽與執行<strong>只會寫這裡</strong>。例如從舊頁面複製出來的 <code>Assets/Temp/LiveRoom</code>。</li>
+            <li><strong>舊版 Prefab 資料夾</strong>（選填、唯讀）：被複製的原頁面，例如 <code>Assets/ThemeActivity/CatAct</code>。只拿來比對，換皮不會寫入；和要換皮的資料夾相同或互相包含時不能預覽。</li>
           </ul>
         </li>
-        <li>新圖和舊圖檔名、尺寸都不同時：在要換皮的 Prefab 裡，<strong>每張舊圖手動換上新圖一處</strong>，再按「<strong>依舊版來源＋節點路徑填入新 Sprite</strong>」。工具比對兩邊同一節點，學到「舊圖 → 新圖」後填進 Entries，執行時套到其他仍用舊圖的節點。已填過的 Entries 一律保留；和節點配對結果不同的會列在 Console，請人工確認。</li>
-        <li>也可以直接在 Inspector 的 <strong>Entries</strong> 填「舊 Sprite → 新 Sprite」；<strong>Excluded Prefabs</strong>（選填）放不想換皮的 Prefab。</li>
+        <li>新圖和舊圖檔名、尺寸都不同時：在要換皮的 Prefab 裡，<strong>每張舊圖手動換上新圖一處</strong>，再按「<strong>依舊版 Prefab＋節點路徑填入新 Sprite</strong>」。工具比對兩邊同一節點，學到「舊圖 → 新圖」後填進對照表，執行時套到其他仍用舊圖的節點。對照表已填的值一律保留；和節點配對結果不同的會列在 Console，請人工確認。</li>
+        <li>也可以直接在 SkinTheme Inspector 的「<strong>3. 對照表</strong>」填「舊 Sprite → 新 Sprite」。「<strong>2. 選填設定</strong>」裡有「覆蓋用 PNG 資料夾」（只在新 Sprite 留空、要用同檔名 PNG 覆蓋舊圖檔時才填；新圖已匯入 Unity 就留空）和「不換皮的 Prefab」。</li>
         <li>按「<strong>預覽 SkinTheme 換皮（不會修改檔案）</strong>」，確認清單後按「<strong>確認執行</strong>」。執行前會備份，取消、失敗或機械檢查不通過會自動還原，之後也可按「還原上次換皮」。</li>
       </ol>
 
@@ -1500,7 +1500,7 @@ TXT_score_[THICK:2]</code></pre>
 
   <hr style="margin:48px 0 24px; border:none; border-top:1px solid var(--line)">
   <p style="font-size:13px; color:var(--muted)">
-    PS → Unity UI Tool &nbsp;·&nbsp; v2.19.0 &nbsp;·&nbsp;
+    PS → Unity UI Tool &nbsp;·&nbsp; v2.19.1 &nbsp;·&nbsp;
     <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2" target="_blank">GitHub</a>
   </p>
 
