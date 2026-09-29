@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Photoshop To Unity V2：把 PSD 轉成可編輯的 Unity uGUI + TextMeshPro Prefab。功能、工作流與使用案例。">
+  <title>Photoshop To Unity V2</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      /* 60 / 30 / 10：墨色主場、深藍資訊面、薄荷綠強調（DESIGN.md） */
+      --base-60: #07131a;
+      --panel: #0b1e2a;
+      --surface-30: #12314a;
+      --accent-10: #2ee6b2;
+      --ink: #f2f8f7;
+      --muted: #a8bec3;
+      --line: rgba(168, 190, 195, .22);
+      --soft-accent: rgba(46, 230, 178, .10);
+
+      --max: 1180px;
+      --gutter: clamp(16px, 4vw, 40px);
+      --radius: 14px;
+      --radius-sm: 8px;
+
+      --font: "Noto Sans TC", "Microsoft JhengHei", "PingFang TC", "Segoe UI", sans-serif;
+      --mono: ui-monospace, "Cascadia Mono", Consolas, "Roboto Mono", monospace;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    body {
+      margin: 0;
+      background: var(--base-60);
+      color: var(--ink);
+      font: 400 17px/1.7 var(--font);
+      overflow-x: hidden;
+    }
+    a { color: inherit; }
+    code, .tag { font-family: var(--mono); }
+    img { display: block; max-width: 100%; }
+
+    .wrap { width: min(100% - 2 * var(--gutter), var(--max)); margin-inline: auto; }
+
+    /* ── header ─────────────────────────────── */
+    .top {
+      position: sticky; top: 0; z-index: 10;
+      background: rgba(7, 19, 26, .88);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--line);
+    }
+    .top .wrap { display: flex; align-items: center; gap: 16px; height: 60px; }
+    .brand { font-weight: 800; letter-spacing: -.01em; white-space: nowrap; text-decoration: none; }
+    .brand b { color: var(--accent-10); }
+    .top nav { display: flex; gap: 4px; margin-left: auto; }
+    .top nav a {
+      color: var(--muted); text-decoration: none; font-weight: 700; font-size: 15px;
+      padding: 6px 10px; border-radius: var(--radius-sm);
+    }
+    .top nav a:hover, .top nav a:focus-visible { color: var(--ink); background: var(--soft-accent); outline: none; }
+    .ver { font: 700 13px/1 var(--mono); color: var(--muted); white-space: nowrap; }
+    @media (max-width: 560px) { .ver { display: none; } .top nav a { padding: 6px 7px; } }
+
+    /* ── sections ───────────────────────────── */
+    section { padding: clamp(56px, 9vw, 104px) 0; scroll-margin-top: 60px; }
+    section + section { border-top: 1px solid var(--line); }
+    .kicker {
+      display: inline-block; margin: 0 0 10px;
+      font: 700 14px/1 var(--mono); letter-spacing: .12em; color: var(--accent-10);
+    }
+    h1, h2, h3 { margin: 0; letter-spacing: -.02em; }
+    h2 { font-size: clamp(1.9rem, 4.2vw, 3rem); font-weight: 900; line-height: 1.16; }
+    h3 { font-size: 1.2rem; font-weight: 800; line-height: 1.35; }
+    .lead { margin: 14px 0 0; color: var(--muted); font-size: 18px; max-width: 46em; }
+    .block { margin-top: clamp(36px, 5vw, 56px); }
+    .block > h3 { display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px; }
+    .block > h3 small { font-size: 14px; font-weight: 700; color: var(--muted); }
+
+    /* ── hero ───────────────────────────────── */
+    .hero { padding-top: clamp(64px, 11vw, 128px); }
+    .hero h1 { font-size: clamp(2.5rem, 6.4vw, 4.8rem); font-weight: 900; line-height: 1.08; }
+    .hero h1 em { font-style: normal; color: var(--accent-10); }
+    .hero .lead { font-size: clamp(18px, 2vw, 21px); color: var(--ink); opacity: .86; }
+    .pipe {
+      display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: stretch; gap: 12px;
+      margin-top: clamp(36px, 6vw, 60px);
+    }
+    .pipe .node {
+      background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 18px 20px;
+    }
+    .pipe .node small { display: block; font: 700 12px/1 var(--mono); letter-spacing: .12em; color: var(--muted); }
+    .pipe .node strong { display: block; margin-top: 8px; font-size: 20px; font-weight: 800; }
+    .pipe .node span { display: block; margin-top: 2px; font-size: 15px; color: var(--muted); }
+    .pipe .node.out { border-color: rgba(46, 230, 178, .5); background: linear-gradient(180deg, rgba(46,230,178,.08), var(--panel)); }
+    .pipe .arrow { align-self: center; color: var(--accent-10); font: 700 22px/1 var(--mono); }
+    @media (max-width: 760px) {
+      .pipe { grid-template-columns: 1fr; }
+      .pipe .arrow { justify-self: center; transform: rotate(90deg); }
+    }
+
+    /* ── capability: mapping ────────────────── */
+    .map { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .map .row {
+      display: grid; grid-template-columns: 5.5em auto minmax(0, 1fr); align-items: center; gap: 14px;
+      background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px;
+    }
+    .map .ps { font-weight: 700; }
+    .map .to { color: var(--accent-10); font-family: var(--mono); }
+    .map .u strong { display: block; font-weight: 800; }
+    .map .u span { display: block; font-size: 14px; color: var(--muted); line-height: 1.5; }
+    @media (max-width: 760px) { .map { grid-template-columns: 1fr; } }
+
+    /* ── capability: tags ───────────────────── */
+    .tags { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+    .tags li {
+      list-style: none; display: flex; flex-direction: column; gap: 8px;
+      background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px;
+    }
+    .tags .codes { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag {
+      font-size: 14px; font-weight: 700; color: var(--accent-10);
+      background: var(--soft-accent); border-radius: 6px; padding: 2px 8px; white-space: nowrap;
+    }
+    .tags li > span:last-child { font-weight: 700; }
+    ul.tags, ul.list { margin: 0; padding: 0; }
+
+    /* ── capability: lists ──────────────────── */
+    .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(24px, 4vw, 48px); }
+    @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+    .list li {
+      list-style: none; position: relative; padding: 12px 0 12px 22px;
+      border-bottom: 1px solid var(--line);
+    }
+    .list li::before {
+      content: ""; position: absolute; left: 2px; top: 1.28em;
+      width: 8px; height: 8px; border-radius: 2px; background: var(--accent-10);
+    }
+    .list li b { font-weight: 800; }
+    .list li span { color: var(--muted); }
+
+    .agent {
+      display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: center;
+      background: var(--surface-30); border-radius: var(--radius); padding: clamp(20px, 3vw, 28px);
+    }
+    .agent .badge {
+      font: 800 14px/1 var(--mono); letter-spacing: .08em; color: var(--base-60);
+      background: var(--accent-10); border-radius: var(--radius-sm); padding: 10px 12px; white-space: nowrap;
+    }
+    .agent p { margin: 0; }
+    .agent p + p { margin-top: 4px; color: var(--muted); font-size: 15px; }
+    @media (max-width: 560px) { .agent { grid-template-columns: 1fr; } .agent .badge { justify-self: start; } }
+
+    /* ── workflow ───────────────────────────── */
+    .flow { counter-reset: step; margin: clamp(32px, 5vw, 56px) 0 0; padding: 0; }
+    .step {
+      list-style: none; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(20px, 4vw, 48px);
+      align-items: start; padding: clamp(24px, 4vw, 40px) 0; border-top: 1px solid var(--line);
+    }
+    .step:first-child { border-top: 0; padding-top: 0; }
+    .step .num {
+      display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
+      background: var(--accent-10); color: var(--base-60); font: 900 20px/1 var(--font);
+    }
+    .step .where { margin: 16px 0 4px; font: 700 13px/1 var(--mono); letter-spacing: .12em; color: var(--muted); }
+    .step h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 900; }
+    .step p { margin: 10px 0 0; }
+    .step .sub { counter-reset: sub; margin: 12px 0 0; padding: 0; }
+    .step .sub li { list-style: none; position: relative; padding: 4px 0 4px 34px; }
+    .step .sub li::before {
+      counter-increment: sub; content: counter(sub);
+      position: absolute; left: 0; top: 7px; display: grid; place-items: center; width: 22px; height: 22px;
+      border: 1px solid rgba(46, 230, 178, .6); border-radius: 50%;
+      font: 700 12px/1 var(--mono); color: var(--accent-10);
+    }
+    .step .out { margin-top: 14px; font-size: 15px; color: var(--muted); }
+    .step .out code { color: var(--accent-10); font-weight: 700; }
+    @media (max-width: 860px) { .step { grid-template-columns: 1fr; } }
+
+    .loop {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+      margin-top: 8px; padding: 18px 22px; border: 1px dashed rgba(46, 230, 178, .45); border-radius: var(--radius);
+    }
+    .loop strong { color: var(--accent-10); }
+
+    /* ── screenshots ────────────────────────── */
+    .shot { margin: 0; }
+    .shot .frame { position: relative; }
+    .shot .view {
+      display: block; width: 100%; padding: 0; border: 1px solid var(--line); border-radius: var(--radius);
+      background: #050e13; overflow: hidden; cursor: zoom-in; color: inherit;
+    }
+    .shot .view:focus-visible { outline: 2px solid var(--accent-10); outline-offset: 3px; }
+    .shot img { width: 100%; height: auto; max-height: 72vh; object-fit: contain; }
+    .shot img[hidden] { display: none; }
+    .shot figcaption, .shot .cap { margin-top: 8px; font-size: 14px; color: var(--muted); }
+    .shot .ph { display: none; }
+    .shot.empty .view { cursor: default; border: 1px dashed rgba(168, 190, 195, .45); background: rgba(18, 49, 74, .35); }
+    .shot.empty img { display: none; }
+    .shot.empty .ph {
+      display: grid; place-content: center; justify-items: center; gap: 6px;
+      aspect-ratio: 16 / 9; padding: 16px; text-align: center; color: var(--muted);
+    }
+    .shot.empty .ph strong { color: var(--ink); font-size: 16px; }
+    .shot.empty .ph code { font-size: 13px; color: var(--accent-10); word-break: break-all; }
+
+    /* 多張圖：固定比例避免切換時跳動，左右鍵切換 */
+    .shot.multi .view { position: relative; aspect-ratio: 16 / 10; }
+    .shot.multi .view img { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; }
+    .nav-btn {
+      position: absolute; top: 50%; transform: translateY(-50%); z-index: 1;
+      display: none; place-items: center; width: 44px; height: 44px; padding: 0;
+      border: 1px solid var(--line); border-radius: 50%; background: rgba(7, 19, 26, .82);
+      color: var(--ink); font: 700 24px/1 var(--font); cursor: pointer;
+    }
+    .nav-btn:hover, .nav-btn:focus-visible { color: var(--accent-10); border-color: var(--accent-10); outline: none; }
+    .nav-btn.prev { left: 10px; }
+    .nav-btn.next { right: 10px; }
+    .shot .count {
+      position: absolute; right: 10px; bottom: 10px; display: none;
+      font: 700 13px/1 var(--mono); color: var(--ink); background: rgba(7, 19, 26, .82);
+      border-radius: 6px; padding: 6px 9px; pointer-events: none;
+    }
+    .shot .cap { display: none; }
+    .shot.multi .nav-btn { display: grid; }
+    .shot.multi .count, .shot.multi .cap { display: block; }
+
+    /* ── cases ──────────────────────────────── */
+    .cases { display: grid; gap: clamp(28px, 4vw, 44px); margin-top: clamp(32px, 5vw, 56px); }
+    .case { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: clamp(18px, 3vw, 28px); }
+    .case header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 18px; }
+    .case header .no { font: 800 14px/1 var(--mono); color: var(--accent-10); }
+    .case header h3 { font-size: clamp(1.3rem, 2.4vw, 1.7rem); font-weight: 900; }
+    .case header p { margin: 0; color: var(--muted); flex-basis: 100%; }
+    .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    @media (max-width: 760px) { .pair { grid-template-columns: 1fr; } }
+
+    /* ── footer ─────────────────────────────── */
+    footer { border-top: 1px solid var(--line); padding: 32px 0 48px; color: var(--muted); font-size: 15px; }
+    footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; }
+    footer a { color: var(--ink); font-weight: 700; text-decoration-color: rgba(46, 230, 178, .6); text-underline-offset: 4px; }
+    footer .sp { margin-left: auto; }
+
+    /* ── zoom ───────────────────────────────── */
+    dialog.zoom {
+      width: 100vw; height: 100vh; max-width: none; max-height: none; margin: 0; padding: 24px;
+      border: 0; background: rgba(3, 9, 12, .94); cursor: zoom-out;
+    }
+    dialog.zoom::backdrop { background: transparent; }
+    dialog.zoom img { width: 100%; height: 100%; object-fit: contain; }
+    dialog.zoom .nav-btn { position: fixed; width: 52px; height: 52px; font-size: 28px; }
+    dialog.zoom .nav-btn.prev { left: 20px; }
+    dialog.zoom .nav-btn.next { right: 20px; }
+    dialog.zoom .count {
+      position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: none;
+      font: 700 14px/1 var(--mono); color: var(--ink); background: rgba(7, 19, 26, .82);
+      border-radius: 6px; padding: 8px 12px;
+    }
+    dialog.zoom.multi .nav-btn { display: grid; }
+    dialog.zoom.multi .count { display: block; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <a class="brand" href="#top">Photoshop To Unity <b>V2</b></a>
+      <nav aria-label="章節">
+        <a href="#features">功能</a>
+        <a href="#workflow">工作流</a>
+        <a href="#cases">案例</a>
+      </nav>
+      <span class="ver" translate="no">v2.19.1</span>
+    </div>
+  </header>
+
+  <main id="top">
+    <!-- ════════ 封面 ════════ -->
+    <section class="hero">
+      <div class="wrap">
+        <p class="kicker">PHOTOSHOP → UNITY</p>
+        <h1>PSD 直接轉成<br><em>Unity Prefab</em></h1>
+        <p class="lead">文字保留為 TextMeshPro、圖層輸出為 Sprite、群組保留為 uGUI 階層，生成後可直接編輯。</p>
+
+        <div class="pipe" aria-label="轉換流程">
+          <div class="node">
+            <small>PHOTOSHOP</small>
+            <strong>PSD 圖層</strong>
+            <span>命名 ＋ 標記</span>
+          </div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node">
+            <small>PACKAGE</small>
+            <strong>PNG ＋ layout.json</strong>
+            <span>圖片與版面資料</span>
+          </div>
+          <div class="arrow" aria-hidden="true">→</div>
+          <div class="node out">
+            <small>UNITY</small>
+            <strong>uGUI Prefab</strong>
+            <span>TMP ・ Sprite ・ Atlas</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ 功能 ════════ -->
+    <section id="features">
+      <div class="wrap">
+        <p class="kicker">01 · FEATURES</p>
+        <h2>能做到什麼</h2>
+
+        <div class="block">
+          <h3>圖層自動轉成 Unity 元件</h3>
+          <div class="map">
+            <div class="row">
+              <span class="ps">文字圖層</span><span class="to" aria-hidden="true">→</span>
+              <span class="u"><strong>TextMeshPro</strong><span>保留內容、字型、字級、顏色</span></span>
+            </div>
+            <div class="row">
+              <span class="ps">圖片圖層</span><span class="to" aria-hidden="true">→</span>
+              <span class="u"><strong>Image ＋ Sprite</strong><span>每層輸出一張 PNG</span></span>
+            </div>
+            <div class="row">
+              <span class="ps">群組</span><span class="to" aria-hidden="true">→</span>
+              <span class="u"><strong>RectTransform 階層</strong><span>結構與座標一層對一層</span></span>
+            </div>
+            <div class="row">
+              <span class="ps">遮罩</span><span class="to" aria-hidden="true">→</span>
+              <span class="u"><strong>RectMask2D ／ Mask</strong><span>矩形自動用 RectMask2D</span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="block">
+          <h3>命名標記加功能 <small>寫在圖層名稱裡</small></h3>
+          <ul class="tags">
+            <li><span class="codes"><span class="tag">[SCROLL_V]</span><span class="tag">[SCROLL_H]</span></span><span>捲動區 ScrollRect</span></li>
+            <li><span class="codes"><span class="tag">[SCROLLBAR_V]</span><span class="tag">[SCROLLBAR_H]</span></span><span>可拖動捲軸</span></li>
+            <li><span class="codes"><span class="tag">[GRID]</span><span class="tag">[V]</span><span class="tag">[H]</span></span><span>自動排版 LayoutGroup</span></li>
+            <li><span class="codes"><span class="tag">[SLICED=32]</span></span><span>九宮格拉伸</span></li>
+            <li><span class="codes"><span class="tag">[MASK]</span></span><span>異形遮罩</span></li>
+            <li><span class="codes"><span class="tag">[SOFTMASK_BOTTOM=64]</span></span><span>捲動區底邊柔化</span></li>
+            <li><span class="codes"><span class="tag">[MERGE]</span></span><span>整組合成一張圖</span></li>
+            <li><span class="codes"><span class="tag">[PNG]</span></span><span>文字改輸出為圖片</span></li>
+            <li><span class="codes"><span class="tag">[CG]</span></span><span>整組淡入淡出 CanvasGroup</span></li>
+            <li><span class="codes"><span class="tag">BTN_</span></span><span>名稱開頭自動掛 Button</span></li>
+          </ul>
+        </div>
+
+        <div class="block cols">
+          <div>
+            <h3>匯出與生成時自動處理</h3>
+            <ul class="list">
+              <li><b>中文圖層名</b> <span>依詞庫自動翻成英文</span></li>
+              <li><b>相同像素的 PNG</b> <span>自動合併成一張</span></li>
+              <li><b>Sprite Atlas</b> <span>依語系建立 Base／CHS／CHT／EN</span></li>
+              <li><b>多字型</b> <span>依對應表套用各自的 TMP 字型</span></li>
+              <li><b>批次匯出</b> <span>多份 PSD 一次輸出各自的 Package</span></li>
+              <li><b>檢查 Layout</b> <span>生成前檢查 Layout，列出缺少的設定</span></li>
+            </ul>
+          </div>
+          <div>
+            <h3>生成之後</h3>
+            <ul class="list">
+              <li><b>Font Replacer</b> <span>一鍵換字型，排版不動</span></li>
+              <li><b>字型資產</b> <span>從 .ttf／.otf 一鍵建 TMP Font Asset</span></li>
+              <li><b>SkinTheme</b> <span>整套換圖，可預覽、可還原</span></li>
+              <li><b>一鍵更新</b> <span>PS 與 Unity 端直接從 GitHub 更新工具</span></li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="block">
+          <div class="agent">
+            <span class="badge">AGENT SKILL</span>
+            <div>
+              <p>交給 Codex／Claude 自動執行：檢查 PSD → 匯出 → 驗證 → 生成 Prefab。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ 工作流 ════════
+         截圖放進 showcase/ 資料夾，檔名與下方 src 相同即自動顯示；沒放的會顯示「待放截圖」框。 -->
+    <section id="workflow">
+      <div class="wrap">
+        <p class="kicker">02 · WORKFLOW</p>
+        <h2>工作流</h2>
+
+        <ol class="flow">
+          <li class="step">
+            <div>
+              <span class="num">1</span>
+              <p class="where">PHOTOSHOP</p>
+              <h3>整理圖層</h3>
+              <p>圖層用英文命名，需要的功能加上標記；中文 PSD 先跑自動命名。</p>
+            </div>
+            <figure class="shot">
+              <div class="frame"><button type="button" class="view" aria-label="放大截圖：整理圖層">
+                <img src="showcase/flow-1-layers.png" alt="Photoshop 圖層面板：已命名並加上標記的圖層">
+                <span class="ph"><strong>待放截圖</strong>PS 圖層面板<code>showcase/flow-1-layers.png</code></span>
+              </button></div>
+            </figure>
+          </li>
+
+          <li class="step">
+            <div>
+              <span class="num">2</span>
+              <p class="where">PHOTOSHOP</p>
+              <h3>匯出 Package</h3>
+              <ol class="sub">
+                <li>選單「檔案 › 指令碼 › PS To Unity v2」</li>
+                <li>點 UI Package Exporter</li>
+                <li>設定輸出位置，按「匯出 UI Package」</li>
+              </ol>
+              <p class="out">產出：<code>PNG</code> ＋ <code>layout.json</code></p>
+            </div>
+            <!-- 一格放多張圖：依序多放幾個 <img>，會自動出現左右切換 -->
+            <figure class="shot">
+              <div class="frame"><button type="button" class="view" aria-label="放大截圖：匯出 Package">
+                <img src="showcase/flow-2-export-1.png" alt="選單：檔案 › 指令碼 › PS To Unity v2">
+                <img src="showcase/flow-2-export-2.png" alt="PS To Unity v2 工具箱：點 UI Package Exporter">
+                <img src="showcase/flow-2-export-3.png" alt="UI Package Exporter：設定輸出位置後按「匯出 UI Package」">
+                <span class="ph"><strong>待放截圖</strong>選單 ＋ 工具箱 ＋ 匯出視窗<code>showcase/flow-2-export-1.png</code><code>showcase/flow-2-export-2.png</code><code>showcase/flow-2-export-3.png</code></span>
+              </button></div>
+            </figure>
+          </li>
+
+          <li class="step">
+            <div>
+              <span class="num">3</span>
+              <p class="where">UNITY</p>
+              <h3>設定並生成</h3>
+              <ol class="sub">
+                <li>選單「Tools › Photoshop UI Importer › Importer_v2」</li>
+                <li>套用 Package，按「建立專案資料夾」，指定 TMP 字型</li>
+                <li>按「檢查 Layout」，再按 Generate Prefab</li>
+              </ol>
+            </div>
+            <figure class="shot">
+              <div class="frame"><button type="button" class="view" aria-label="放大截圖：設定並生成">
+                <img src="showcase/flow-3-setup-1.png" alt="Unity 選單：Tools › Photoshop UI Importer › Importer_v2">
+                <img src="showcase/flow-3-setup-2.png" alt="Importer_v2：套用 Package，按「建立專案資料夾」自動建立標準資料夾">
+                <img src="showcase/flow-3-setup-3.png" alt="Importer_v2：檢查 Layout 成功後按 Generate Prefab">
+                <span class="ph"><strong>待放截圖</strong>Unity 選單 ＋ Importer_v2<code>showcase/flow-3-setup-1.png</code><code>showcase/flow-3-setup-2.png</code><code>showcase/flow-3-setup-3.png</code></span>
+              </button></div>
+            </figure>
+          </li>
+
+          <li class="step">
+            <div>
+              <span class="num">4</span>
+              <p class="where">UNITY</p>
+              <h3>完成 Prefab</h3>
+              <ol class="sub">
+                <li>Sprite Atlas 自動打包在 Atlas 資料夾</li>
+                <li>Prefab 生成在 Prefab 資料夾</li>
+              </ol>
+              <p>可直接換字、換圖、做動畫、串接程式。</p>
+            </div>
+            <figure class="shot">
+              <div class="frame"><button type="button" class="view" aria-label="放大截圖：完成 Prefab">
+                <img src="showcase/flow-4-result-1.png" alt="Sprite Atlas：Bonus_Coin_Atlas 自動打包 Base 語系圖片">
+                <img src="showcase/flow-4-result-2.png" alt="Prefab 資料夾：生成的 bonus_coins_layout Prefab">
+                <span class="ph"><strong>待放截圖</strong>Sprite Atlas ＋ Prefab<code>showcase/flow-4-result-1.png</code><code>showcase/flow-4-result-2.png</code></span>
+              </button></div>
+            </figure>
+          </li>
+        </ol>
+
+        <div class="loop">
+          <strong>可重複執行</strong>
+          <span>PSD 更新後重跑 2 → 3，Prefab 同步更新。</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ════════ 使用案例 ════════
+         新增案例：複製一整段 <article class="case">，改編號、標題、說明與兩張截圖檔名。 -->
+    <section id="cases">
+      <div class="wrap">
+        <p class="kicker">03 · CASES</p>
+        <h2>使用案例</h2>
+
+        <div class="cases">
+          <article class="case">
+            <header>
+              <span class="no">CASE 01</span>
+              <h3>通用廳館排行</h3>
+              <p>（一句話說明這個案例）</p>
+            </header>
+            <div class="pair">
+              <figure class="shot">
+                <div class="frame"><button type="button" class="view" aria-label="放大截圖：案例 01 PSD 原稿">
+                  <img src="showcase/case-1-psd.png" alt="案例 01 Photoshop 原稿">
+                  <span class="ph"><strong>待放截圖</strong>PSD 原稿<code>showcase/case-1-psd.png</code></span>
+                </button></div>
+                <figcaption>Photoshop 原稿</figcaption>
+              </figure>
+              <figure class="shot">
+                <div class="frame"><button type="button" class="view" aria-label="放大截圖：案例 01 Unity 結果">
+                  <img src="showcase/case-1-unity.png" alt="案例 01 Unity 生成結果">
+                  <span class="ph"><strong>待放截圖</strong>Unity 結果<code>showcase/case-1-unity.png</code></span>
+                </button></div>
+                <figcaption>Unity 生成結果</figcaption>
+              </figure>
+            </div>
+          </article>
+
+          <article class="case">
+            <header>
+              <span class="no">CASE 02</span>
+              <h3>（案例名稱）</h3>
+              <p>（一句話說明這個案例）</p>
+            </header>
+            <div class="pair">
+              <figure class="shot">
+                <div class="frame"><button type="button" class="view" aria-label="放大截圖：案例 02 PSD 原稿">
+                  <img src="showcase/case-2-psd.png" alt="案例 02 Photoshop 原稿">
+                  <span class="ph"><strong>待放截圖</strong>PSD 原稿<code>showcase/case-2-psd.png</code></span>
+                </button></div>
+                <figcaption>Photoshop 原稿</figcaption>
+              </figure>
+              <figure class="shot">
+                <div class="frame"><button type="button" class="view" aria-label="放大截圖：案例 02 Unity 結果">
+                  <img src="showcase/case-2-unity.png" alt="案例 02 Unity 生成結果">
+                  <span class="ph"><strong>待放截圖</strong>Unity 結果<code>showcase/case-2-unity.png</code></span>
+                </button></div>
+                <figcaption>Unity 生成結果</figcaption>
+              </figure>
+            </div>
+          </article>
+
+          <article class="case">
+            <header>
+              <span class="no">CASE 03</span>
+              <h3>（案例名稱）</h3>
+              <p>（一句話說明這個案例）</p>
+            </header>
+            <div class="pair">
+              <figure class="shot">
+                <div class="frame"><button type="button" class="view" aria-label="放大截圖：案例 03 PSD 原稿">
+                  <img src="showcase/case-3-psd.png" alt="案例 03 Photoshop 原稿">
+                  <span class="ph"><strong>待放截圖</strong>PSD 原稿<code>showcase/case-3-psd.png</code></span>
+                </button></div>
+                <figcaption>Photoshop 原稿</figcaption>
+              </figure>
+              <figure class="shot">
+                <div class="frame"><button type="button" class="view" aria-label="放大截圖：案例 03 Unity 結果">
+                  <img src="showcase/case-3-unity.png" alt="案例 03 Unity 生成結果">
+                  <span class="ph"><strong>待放截圖</strong>Unity 結果<code>showcase/case-3-unity.png</code></span>
+                </button></div>
+                <figcaption>Unity 生成結果</figcaption>
+              </figure>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span translate="no">Photoshop To Unity V2</span>
+      <a href="docs/GUIDE_zh.html">完整使用說明</a>
+      <a href="https://github.com/Wayne188-yiching/PS_To_Unity_v2">GitHub</a>
+      <span class="sp" translate="no">v2.19.1</span>
+    </div>
+  </footer>
+
+  <dialog class="zoom" aria-label="截圖放大檢視">
+    <img alt="">
+    <button type="button" class="nav-btn prev" aria-label="上一張">‹</button>
+    <button type="button" class="nav-btn next" aria-label="下一張">›</button>
+    <span class="count"></span>
+  </dialog>
+
+  <script>
+    (function () {
+      var dlg = document.querySelector("dialog.zoom");
+      var big = dlg.querySelector("img");
+      var active = null; // 目前放大中的截圖格
+
+      function pics(fig) {
+        return [].filter.call(fig.querySelectorAll(".view img"), function (im) { return !im.hasAttribute("data-missing"); });
+      }
+      function show(fig, k) {
+        var list = pics(fig), n = list.length;
+        if (!n) return;
+        k = ((k % n) + n) % n;
+        fig.dataset.k = k;
+        list.forEach(function (im, j) { im.hidden = j !== k; });
+        fig.querySelector(".count").textContent = (k + 1) + " / " + n;
+        fig.querySelector(".cap").textContent = list[k].alt;
+        if (fig === active) {
+          big.src = list[k].currentSrc || list[k].src;
+          big.alt = list[k].alt;
+          dlg.querySelector(".count").textContent = (k + 1) + " / " + n;
+          dlg.classList.toggle("multi", n > 1);
+        }
+      }
+      function step(fig, d) { show(fig, +(fig.dataset.k || 0) + d); }
+      function refresh(fig) {
+        var n = pics(fig).length;
+        fig.classList.toggle("empty", n === 0);
+        fig.classList.toggle("multi", n > 1);
+        show(fig, +(fig.dataset.k || 0));
+      }
+      function swipe(el, fig) {
+        var x0 = null;
+        el.addEventListener("touchstart", function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+        el.addEventListener("touchend", function (e) {
+          if (x0 === null) return;
+          var dx = e.changedTouches[0].clientX - x0;
+          x0 = null;
+          var f = fig || active;
+          if (f && Math.abs(dx) > 40) { el.dataset.swiped = "1"; step(f, dx < 0 ? 1 : -1); }
+        });
+      }
+      function navButtons(parent, onStep) {
+        ["prev", "next"].forEach(function (dir) {
+          var b = parent.querySelector(".nav-btn." + dir);
+          if (!b) {
+            b = document.createElement("button");
+            b.type = "button";
+            b.className = "nav-btn " + dir;
+            b.setAttribute("aria-label", dir === "prev" ? "上一張" : "下一張");
+            b.textContent = dir === "prev" ? "‹" : "›";
+            parent.appendChild(b);
+          }
+          b.addEventListener("click", function (e) { e.stopPropagation(); onStep(dir === "prev" ? -1 : 1); });
+        });
+      }
+
+      [].forEach.call(document.querySelectorAll(".shot"), function (fig) {
+        var frame = fig.querySelector(".frame");
+        navButtons(frame, function (d) { step(fig, d); });
+        var count = document.createElement("span");
+        count.className = "count";
+        frame.appendChild(count);
+        var cap = document.createElement("p");
+        cap.className = "cap";
+        frame.after(cap);
+
+        fig.querySelector(".view").addEventListener("click", function () {
+          if (fig.classList.contains("empty") || this.dataset.swiped) { delete this.dataset.swiped; return; }
+          active = fig;
+          show(fig, +(fig.dataset.k || 0));
+          dlg.showModal();
+        });
+        frame.addEventListener("keydown", function (e) {
+          if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); step(fig, e.key === "ArrowLeft" ? -1 : 1); }
+        });
+        swipe(fig.querySelector(".view"), fig);
+
+        fig.querySelectorAll(".view img").forEach(function (im) {
+          function missing() { im.setAttribute("data-missing", ""); refresh(fig); }
+          if (im.complete) { if (!im.naturalWidth) missing(); }
+          else { im.addEventListener("error", missing); }
+        });
+        refresh(fig);
+      });
+
+      navButtons(dlg, function (d) { if (active) step(active, d); });
+      swipe(dlg, null);
+      dlg.addEventListener("keydown", function (e) {
+        if (active && (e.key === "ArrowLeft" || e.key === "ArrowRight")) { e.preventDefault(); step(active, e.key === "ArrowLeft" ? -1 : 1); }
+      });
+      dlg.addEventListener("click", function () {
+        if (dlg.dataset.swiped) { delete dlg.dataset.swiped; return; }
+        dlg.close();
+      });
+      dlg.addEventListener("close", function () { active = null; });
+    })();
+  </script>
+</body>
+</html>
