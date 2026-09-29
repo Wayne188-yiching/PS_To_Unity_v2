@@ -83,6 +83,9 @@ namespace PhotoshopToUnity.EditorImporter
                 }
                 target.enableVertexGradient = true;
                 target.colorGradient = new VertexGradient(topColor, topColor, bottomColor, bottomColor);
+                // TMP multiplies the vertex gradient by text.color. Photoshop's
+                // Gradient Overlay replaces the text fill, so keep this tint white.
+                target.color = Color.white;
             }
             else
             {
@@ -121,6 +124,8 @@ namespace PhotoshopToUnity.EditorImporter
             if (fontAsset != null)
             {
                 target.font = fontAsset;
+                if (baseMaterialPreset == null)
+                    baseMaterialPreset = fontAsset.material;
             }
 
             // outline 材質：有 outline 資料時解析專屬材質，否則 fallback 到該字型的基底材質

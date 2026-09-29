@@ -47,7 +47,7 @@ namespace PhotoshopToUnity.EditorImporter
 
         internal static void CreateOrUpdateSpriteAtlases(string atlasRootFolder)
         {
-            atlasRootFolder = PathUtility.NormalizeAssetKey(atlasRootFolder).TrimEnd('/');
+            atlasRootFolder = ResolveSpriteAtlasFolder(atlasRootFolder);
             EnsureAssetFolder(atlasRootFolder);
 
             var packed = new System.Collections.Generic.List<SpriteAtlas>();
@@ -166,6 +166,7 @@ namespace PhotoshopToUnity.EditorImporter
         // the folders and packs exactly once at the end.
         internal static void DetachSpriteAtlasFolderForImageImport(string atlasRootFolder)
         {
+            atlasRootFolder = ResolveSpriteAtlasFolder(atlasRootFolder);
             foreach (var language in AtlasLanguages)
             {
                 var atlasPath = ResolveLanguageAtlasPath(atlasRootFolder, language);
