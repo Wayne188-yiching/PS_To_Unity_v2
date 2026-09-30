@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Photoshop To Unity V2：把 PSD 轉成可編輯的 Unity uGUI + TextMeshPro Prefab。功能、工作流與使用案例。">
+  <meta name="description" content="Photoshop To Unity V2：把 PSD 轉成可編輯的 Unity uGUI + TextMeshPro Prefab。功能、工作流、使用案例、優缺點與開發瓶頸。">
   <title>Photoshop To Unity V2</title>
   <style>
     :root {
@@ -53,7 +53,8 @@
     .top .wrap { display: flex; align-items: center; gap: 16px; height: 60px; }
     .brand { font-weight: 800; letter-spacing: -.01em; white-space: nowrap; text-decoration: none; }
     .brand b { color: var(--accent-10); }
-    .top nav { display: flex; gap: 4px; margin-left: auto; }
+    .top nav { display: flex; gap: 4px; margin-left: auto; min-width: 0; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
+    .top nav::-webkit-scrollbar { display: none; }
     .top nav a {
       color: var(--muted); text-decoration: none; font-weight: 700; font-size: 15px;
       padding: 6px 10px; border-radius: var(--radius-sm);
@@ -236,6 +237,23 @@
     .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
     @media (max-width: 760px) { .pair { grid-template-columns: 1fr; } }
 
+    /* ── tradeoffs and bottlenecks ─────────── */
+    .tradeoffs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: clamp(32px, 5vw, 56px); }
+    .tradeoff, .bottleneck { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: clamp(20px, 3vw, 28px); }
+    .tradeoff h3 { margin-bottom: 18px; font-size: 1.35rem; }
+    .tradeoff dl { margin: 0; }
+    .tradeoff dt { margin-top: 16px; color: var(--accent-10); font-weight: 800; }
+    .tradeoff dd { margin: 4px 0 0; color: var(--muted); }
+    .tradeoff dt:first-child { margin-top: 0; }
+    .section-note { margin: 20px 0 0; color: var(--muted); font-size: 15px; }
+    .bottlenecks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: clamp(32px, 5vw, 56px); }
+    .bottleneck p { margin: 12px 0 0; color: var(--muted); }
+    .skin-note { margin-top: 20px; padding: clamp(20px, 3vw, 28px); border: 1px solid rgba(46, 230, 178, .55); border-radius: var(--radius); background: linear-gradient(110deg, rgba(46, 230, 178, .13), var(--panel)); }
+    .skin-note h3 { color: var(--accent-10); }
+    .skin-note p { margin: 8px 0 0; }
+    @media (max-width: 860px) { .bottlenecks { grid-template-columns: 1fr; } }
+    @media (max-width: 760px) { .tradeoffs { grid-template-columns: 1fr; } }
+
     /* ── footer ─────────────────────────────── */
     footer { border-top: 1px solid var(--line); padding: 32px 0 48px; color: var(--muted); font-size: 15px; }
     footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; }
@@ -269,6 +287,8 @@
         <a href="#features">功能</a>
         <a href="#workflow">工作流</a>
         <a href="#cases">案例</a>
+        <a href="#comparison">優缺點</a>
+        <a href="#bottlenecks">瓶頸</a>
       </nav>
       <span class="ver" translate="no">v2.19.1</span>
     </div>
@@ -489,7 +509,7 @@
             <header>
               <span class="no">CASE 01</span>
               <h3>通用廳館排行</h3>
-              <p>（一句話說明這個案例）</p>
+              <p>將 2340 × 1080 的 Hall_Ranking.psd 轉為可編輯 Unity Prefab，保留圖片與 TextMeshPro 文字；排行分數依照 Photoshop 原稿置中於各列底板。</p>
             </header>
             <div class="pair">
               <figure class="shot">
@@ -501,10 +521,10 @@
               </figure>
               <figure class="shot">
                 <div class="frame"><button type="button" class="view" aria-label="放大截圖：案例 01 Unity 結果">
-                  <img src="showcase/case-1-unity.png" alt="案例 01 Unity 生成結果">
+                  <img src="showcase/case-1-unity.png" alt="案例 01 Unity 生成結果，排行分數已置中">
                   <span class="ph"><strong>待放截圖</strong>Unity 結果<code>showcase/case-1-unity.png</code></span>
                 </button></div>
-                <figcaption>Unity 生成結果</figcaption>
+                <figcaption>Unity 生成結果 · 排行分數置中</figcaption>
               </figure>
             </div>
           </article>
@@ -512,23 +532,23 @@
           <article class="case">
             <header>
               <span class="no">CASE 02</span>
-              <h3>（案例名稱）</h3>
-              <p>（一句話說明這個案例）</p>
+              <h3>超值金幣</h3>
+              <p>對照 Bonus_Coins.psd 與 Unity 實測畫面，檢查禮包卡片、金額、道具與購買狀態。</p>
             </header>
             <div class="pair">
               <figure class="shot">
                 <div class="frame"><button type="button" class="view" aria-label="放大截圖：案例 02 PSD 原稿">
-                  <img src="showcase/case-2-psd.png" alt="案例 02 Photoshop 原稿">
+                  <img src="showcase/case-2-psd.png" alt="超值金幣頁面 Photoshop 原稿">
                   <span class="ph"><strong>待放截圖</strong>PSD 原稿<code>showcase/case-2-psd.png</code></span>
                 </button></div>
                 <figcaption>Photoshop 原稿</figcaption>
               </figure>
               <figure class="shot">
-                <div class="frame"><button type="button" class="view" aria-label="放大截圖：案例 02 Unity 結果">
-                  <img src="showcase/case-2-unity.png" alt="案例 02 Unity 生成結果">
+                <div class="frame"><button type="button" class="view" aria-label="放大截圖：案例 02 Unity 實測結果">
+                  <img src="showcase/case-2-unity.png" alt="超值金幣頁面 Unity 實測結果">
                   <span class="ph"><strong>待放截圖</strong>Unity 結果<code>showcase/case-2-unity.png</code></span>
                 </button></div>
-                <figcaption>Unity 生成結果</figcaption>
+                <figcaption>Unity 實測結果</figcaption>
               </figure>
             </div>
           </article>
@@ -557,6 +577,63 @@
             </div>
           </article>
         </div>
+      </div>
+    </section>
+
+    <!-- ════════ 優缺點 ════════ -->
+    <section id="comparison">
+      <div class="wrap">
+        <p class="kicker">04 · COMPARISON</p>
+        <h2>新舊流程，各有取捨</h2>
+        <p class="lead">同一份 PSD 製作 Unity UI 時，兩種方法的交付與修改方式不同；最後都需要檢查實際畫面。</p>
+        <div class="tradeoffs">
+          <article class="tradeoff">
+            <h3>使用這套工具</h3>
+            <dl>
+              <dt>優點</dt>
+              <dd>批次匯出圖片與版面資料，生成可編輯的 Sprite、TMP 與基本 uGUI 階層。改稿可沿用相同流程，並先用 Validate 檢查部分缺漏。</dd>
+              <dt>缺點</dt>
+              <dd>需先整理圖層、命名標記與字型對應；遇到警告、特殊視覺效果或互動邏輯，仍需人工檢查與補作。</dd>
+            </dl>
+          </article>
+          <article class="tradeoff">
+            <h3>傳統手動重建</h3>
+            <dl>
+              <dt>優點</dt>
+              <dd>開發者可直接依專案架構安排共用 Prefab、列表模板、腳本與互動，並逐項調整特殊畫面。</dd>
+              <dt>缺點</dt>
+              <dd>切圖、命名、量座標、建立文字與階層都要重做；改稿時也需重新對照 PSD，容易累積重複工作與手動輸入誤差。</dd>
+            </dl>
+          </article>
+        </div>
+        <p class="section-note">目前沒有可公開查證的節省工時數據；以上比較的是流程與工作內容。</p>
+      </div>
+    </section>
+
+    <!-- ════════ 開發瓶頸 ════════ -->
+    <section id="bottlenecks">
+      <div class="wrap">
+        <p class="kicker">05 · BOTTLENECKS</p>
+        <h2>目前的開發瓶頸</h2>
+        <p class="lead">工具能重建畫面，但要將產物接入正式 UI，仍有需要校準、整理與人工判斷的環節。</p>
+        <div class="bottlenecks">
+          <article class="bottleneck">
+            <h3>文字與特效還原</h3>
+            <p>Photoshop 與 TMP 的仿粗體、字距、描邊幾何可能不同；Screen 混合模式也無法直接等同 Unity 的一般混合。正式字型與特效仍需逐案校準。</p>
+          </article>
+          <article class="bottleneck">
+            <h3>可維護的頁面結構</h3>
+            <p>生成畫面可能保留靜態重複節點，未接上專案既有的共用 Prefab、列表模板與腳本。需先整理 PSD 結構，或在 Unity 進一步加工。</p>
+          </article>
+          <article class="bottleneck">
+            <h3>端到端自動化</h3>
+            <p>Photoshop 與 Unity 已可串接，但命名標記、警告處理及最後畫面檢查仍需人判斷；中斷恢復與跨專案穩定性也需持續驗證。</p>
+          </article>
+        </div>
+        <aside class="skin-note" aria-label="換皮命名提醒">
+          <h3>換皮工項：新舊圖片盡量同名</h3>
+          <p>相同用途的新圖與舊圖，請在製作前統一檔名。同名 PNG 可由換皮掃描直接配對並批次覆蓋，操作最順；若檔名不同，仍可用 SkinTheme 建立舊 Sprite 到新 Sprite 的對照，但需要額外設定與檢查。</p>
+        </aside>
       </div>
     </section>
   </main>
